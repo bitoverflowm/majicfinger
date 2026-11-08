@@ -10,6 +10,7 @@ import { marketTradeSheet, sheetChartBlock } from "./holderTerminalSheets";
 import { HolderTradesTable, MergeOutcomesButton } from "./holderTradesTable";
 import { useFusedMarketTrades } from "./useFusedMarketTrades";
 import { useLiveMarketMeta, useLiveMarketStats } from "./useLiveMarketMeta";
+import { useMarketPriceHistory } from "./useMarketPriceHistory";
 
 const SheetBlockChart = dynamic(
   () => retryImport(() => import("@/components/dashboardComposer/sheetBlockChart")).then((m) => m.SheetBlockChart),
@@ -67,6 +68,8 @@ export function HolderMarketView({ subject, onPickTrader }) {
   const { meta, error, quotes } = useLiveMarketMeta(subject.conditionId);
   const { rows, status } = useFusedMarketTrades(meta);
   const stats = useLiveMarketStats(meta, quotes, rows);
+  const priceHistory = useMarketPriceHistory(meta, stats?.prices);
+  const priceChart = useMemo(() => (priceHistory.sheet ? sheetChartBlock(priceHistory.sheet) : null), [priceHistory.sheet]);
   const [merged, setMerged] = useState(false);
   useEffect(() => setMerged(false), [subject.conditionId]);
 
@@ -100,7 +103,7 @@ export function HolderMarketView({ subject, onPickTrader }) {
           <MarketStatsCard meta={stats} />
         </div>
         <section
-          aria-label="Price chart"
+          aria-label="Last traded price chart"
           data-block-type={chart?.type}
           data-source-sheet={chart?.sourceSheetId}
           className="flex h-[420px] min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background p-3 shadow-sm"
@@ -147,6 +150,30 @@ export function HolderMarketView({ subject, onPickTrader }) {
           onPickTrader={onPickTrader}
         />
       </div>
+
+      <div className="max-w-3xl pt-8">
+        <h3 className="text-[15px] font-semibold text-foreground">Price chart</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          The price Polymarket shows for {meta.outcomes?.[0] || "Yes"} and {meta.outcomes?.[1] || "No"}, from the day the market
+          opened to now. It&apos;s the midpoint of the best bid and ask, or the last trade when the spread is wider than 10¢, so
+          it moves with the order book even between trades.
+          {meta.closed ? " The market has closed, so the line ends there." : " The line keeps extending live."}
+        </p>
+      </div>
+      <section
+        aria-label="Price chart"
+        data-block-type={priceChart?.type}
+        data-source-sheet={priceChart?.sourceSheetId}
+        className="flex h-[440px] min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background p-3 shadow-sm"
+      >
+        {priceHistory.sheet ? (
+          <SheetBlockChart sheet={priceHistory.sheet} live={live && !meta.closed} view={priceChart.chartView} />
+        ) : priceHistory.error ? (
+          <p className="flex h-full items-center justify-center text-[12px] text-muted-foreground">{priceHistory.error}</p>
+        ) : (
+          <PanelLoading label="Loading the price history" />
+        )}
+      </section>
     </div>
   );
 }

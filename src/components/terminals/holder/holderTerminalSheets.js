@@ -85,6 +85,37 @@ export function marketTradeSheet(meta, rows, { outcome = "both", truncated = fal
   };
 }
 
+export const PRICE_COLUMNS = polymarketLiveBuildColumns("getBatchPricesHistory");
+
+/** One market's Polymarket price history, Yes and No, with live points appended. */
+export function marketPriceSheet(meta, records) {
+  const handle = meta.slug || meta.conditionId;
+  return {
+    id: `terminal-${HOLDER_TERMINAL}-prices-${slugId(handle)}`,
+    type: "sheet",
+    title: `Price · ${handle}`,
+    columns: PRICE_COLUMNS,
+    records,
+    rowCount: records.length,
+    keepAllRows: true,
+    span: "full",
+    integrationId: "polymarket",
+    table: "getBatchPricesHistory",
+    summary: ["Price history", meta.title].filter(Boolean).join(" · "),
+    query: { table: "getBatchPricesHistory", filters: { quote_outcome: { value: "both" } } },
+    pull: {
+      terminal: HOLDER_TERMINAL,
+      ticker: handle,
+      tokens: outcomeTokens(meta, "both"),
+      table: "getBatchPricesHistory",
+      marketTitle: meta.title,
+      conditionId: meta.conditionId,
+      ...(meta.eventSlug ? { eventSlug: meta.eventSlug } : {}),
+      live: "websocket+history",
+    },
+  };
+}
+
 /** A chart block drawn from a sheet. An empty view lets the canvas pick, as it does for a new sheet. */
 export function sheetChartBlock(sheet, chartView = "") {
   return {
