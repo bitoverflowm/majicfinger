@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import {
   Closes,
+  CompetitiveLine,
   MarketIcon,
   NewBadge,
   StatPending,
@@ -30,7 +31,7 @@ function Stat({ label, children, className }) {
   );
 }
 
-function MarketCard({ market: base, now, live, arrivedAt, resolvedOutcome, onPick }) {
+function MarketCard({ market: base, now, live, arrivedAt, resolvedOutcome, onPick, showQuote }) {
   const { market, looked, quote, price, ticking, traded, volume24h, volume, elapsed, arriving, fresh, tags, firstOutcome, winner } = marketFigures({
     market: base,
     now,
@@ -66,19 +67,26 @@ function MarketCard({ market: base, now, live, arrivedAt, resolvedOutcome, onPic
           <p className="line-clamp-2 text-[13px] font-semibold leading-[18px] text-foreground" title={market.question}>
             {market.question || market.slug}
           </p>
-          <div className="mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden text-[11px] text-muted-foreground [mask-image:linear-gradient(to_right,black_85%,transparent)]">
-            {fresh ? <NewBadge /> : null}
-            {market.eventTitle && market.eventTitle !== market.question ? (
-              <span className="max-w-full shrink-0 truncate" title={market.eventTitle}>
-                {market.eventTitle}
-              </span>
-            ) : null}
-            {tags.slice(0, 2).map((tag) => (
-              <span key={tag} className="shrink-0 rounded bg-muted px-1.5 py-px leading-[14px]">
-                {tag}
-              </span>
-            ))}
-          </div>
+          {showQuote ? (
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+              {fresh ? <NewBadge /> : null}
+              <CompetitiveLine market={market} withVolume={false} />
+            </div>
+          ) : (
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden text-[11px] text-muted-foreground [mask-image:linear-gradient(to_right,black_85%,transparent)]">
+              {fresh ? <NewBadge /> : null}
+              {market.eventTitle && market.eventTitle !== market.question ? (
+                <span className="max-w-full shrink-0 truncate" title={market.eventTitle}>
+                  {market.eventTitle}
+                </span>
+              ) : null}
+              {tags.slice(0, 2).map((tag) => (
+                <span key={tag} className="shrink-0 rounded bg-muted px-1.5 py-px leading-[14px]">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -153,7 +161,7 @@ function MarketCard({ market: base, now, live, arrivedAt, resolvedOutcome, onPic
  * Markets as a grid of cards, drawn only where the grid is scrolled to. Same live data as the
  * table: prices tick, new markets flash in, stats load as cards come into view.
  */
-export function MarketBrowseCards({ markets, live, arrivals, resolved, onPick, onVisible, empty, height = 620, resetKey }) {
+export function MarketBrowseCards({ markets, live, arrivals, resolved, onPick, onVisible, empty, height = 620, resetKey, showQuote }) {
   const { scrollRef, view, onScroll } = useBrowseScroll({ height, resetKey });
   const now = useBrowseNow(live, markets);
 
@@ -189,6 +197,7 @@ export function MarketBrowseCards({ markets, live, arrivals, resolved, onPick, o
                   arrivedAt={arrivals.get(market.conditionId)}
                   resolvedOutcome={resolved.get(market.conditionId)}
                   onPick={onPick}
+                  showQuote={showQuote}
                 />
               ))}
             </div>

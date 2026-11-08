@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, Loader2, Merge, Split } from "lucide-react";
+import { ArrowRight, Loader2, Merge, Split } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
@@ -128,38 +128,41 @@ function gridTemplate(merged) {
   ].join(" ");
 }
 
-function TraderCell({ row }) {
+function TraderCell({ row, onPickTrader }) {
   const wallet = String(row.proxy_wallet || "");
   const name = String(row.name || "").trim();
   const pseudonym = String(row.pseudonym || "").trim();
   const label = name || pseudonym || shortWallet(wallet);
-  const hash = String(row.transaction_hash || "");
   if (!label) {
     return <span className="truncate text-[12px] italic text-muted-foreground">Confirming trader…</span>;
   }
-  return (
-    <span className="flex min-w-0 items-center gap-2">
+  const identity = (
+    <>
       <UserAvatar handle={wallet || label} name={label} size={18} className="shrink-0" />
       <span className="min-w-0 truncate" title={wallet || undefined}>
         <span className="font-medium text-foreground">{label}</span>
         {name && pseudonym ? <span className="ml-1.5 text-muted-foreground">{pseudonym}</span> : null}
       </span>
-      {hash ? (
-        <a
-          href={`https://polygonscan.com/tx/${hash}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="View transaction on Polygonscan"
-          className="ml-auto shrink-0 rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100"
-        >
-          <ExternalLink className="size-3" aria-hidden />
-        </a>
-      ) : null}
-    </span>
+    </>
+  );
+  if (!wallet || !onPickTrader) return <span className="flex min-w-0 items-center gap-2">{identity}</span>;
+  return (
+    <button
+      type="button"
+      onClick={() => onPickTrader({ address: wallet, title: name || pseudonym })}
+      aria-label={`Open holder analysis for ${label}`}
+      className="group/trader flex w-full min-w-0 items-center gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {identity}
+      <ArrowRight
+        className="ml-auto size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100 group-hover/trader:text-foreground group-focus-visible/trader:opacity-100"
+        aria-hidden
+      />
+    </button>
   );
 }
 
-function TradeRow({ row, top, merged, meta, outcomes, maxValue, arrivedAt }) {
+function TradeRow({ row, top, merged, meta, outcomes, maxValue, arrivedAt, onPickTrader }) {
   const value = tradeValue(row);
   const side = String(row.side || "").toUpperCase();
   const index = outcomeIndex(meta, row);
@@ -206,14 +209,14 @@ function TradeRow({ row, top, merged, meta, outcomes, maxValue, arrivedAt }) {
         </span>
       </div>
       <div role="cell" className="min-w-0 px-3">
-        <TraderCell row={row} />
+        <TraderCell row={row} onPickTrader={onPickTrader} />
       </div>
     </div>
   );
 }
 
 /** Rows newest first, drawn only where the list is scrolled to. New rows at the top don't move what the reader is looking at. */
-function TradeList({ rows, merged, meta, outcomes, arrivals, empty }) {
+function TradeList({ rows, merged, meta, outcomes, arrivals, empty, onPickTrader }) {
   const scrollRef = useRef(null);
   const [view, setView] = useState({ top: 0, height: 480 });
   const firstKeyRef = useRef("");
@@ -293,6 +296,7 @@ function TradeList({ rows, merged, meta, outcomes, arrivals, empty }) {
                   outcomes={outcomes}
                   maxValue={maxValue}
                   arrivedAt={arrivals.get(key)}
+                  onPickTrader={onPickTrader}
                 />
               );
             })}
@@ -355,7 +359,7 @@ export function MergeOutcomesButton({ merged, outcomes, onChange }) {
  * The market's trades as a rich table. Split puts the first outcome (Yes, Up) on the left and the
  * second on the right; merged is one list with an outcome column.
  */
-export function HolderTradesTable({ meta, rows, merged, loading, ready }) {
+export function HolderTradesTable({ meta, rows, merged, loading, ready, onPickTrader }) {
   const outcomes = [meta.outcomes?.[0] || "Yes", meta.outcomes?.[1] || "No"];
   const arrivals = useTradeArrivals(rows, ready);
   const sides = useMemo(() => {
@@ -384,7 +388,7 @@ export function HolderTradesTable({ meta, rows, merged, loading, ready }) {
   if (merged) {
     return (
       <section aria-label="Trades" className="flex h-[560px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
-        <TradeList rows={rows} merged meta={meta} outcomes={outcomes} arrivals={arrivals} empty={empty("")} />
+        <TradeList rows={rows} merged meta={meta} outcomes={outcomes} arrivals={arrivals} empty={empty("")} onPickTrader={onPickTrader} />
       </section>
     );
   }
@@ -398,7 +402,15 @@ export function HolderTradesTable({ meta, rows, merged, loading, ready }) {
           className="flex h-[560px] min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm"
         >
           <PanelHeader label={label} tone={OUTCOME_TONE[index]} rows={sides[index]} />
-          <TradeList rows={sides[index]} merged={false} meta={meta} outcomes={outcomes} arrivals={arrivals} empty={empty(label)} />
+          <TradeList
+            rows={sides[index]}
+            merged={false}
+            meta={meta}
+            outcomes={outcomes}
+            arrivals={arrivals}
+            empty={empty(label)}
+            onPickTrader={onPickTrader}
+          />
         </section>
       ))}
     </div>

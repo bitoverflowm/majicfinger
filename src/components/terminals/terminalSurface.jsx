@@ -142,7 +142,14 @@ function HolderTerminal({ tab }) {
         </header>
         <HolderTerminalSearch onPick={pick} onExplore={subject ? explore : undefined} className="mt-6 max-w-3xl" />
         {subject?.kind === "market" ? (
-          <HolderMarketView key={subject.conditionId} subject={subject} />
+          <HolderMarketView
+            key={subject.conditionId}
+            subject={subject}
+            onPickTrader={({ address, title }) => {
+              pick([{ kind: "trader", address, title }]);
+              scrollRef.current?.scrollTo({ top: 0 });
+            }}
+          />
         ) : subject?.kind === "trader" ? (
           <HolderTraderView
             key={subject.address}

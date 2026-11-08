@@ -59,8 +59,11 @@ function HistoryStatus({ status, count }) {
   );
 }
 
-/** One market: live stats, price chart and every trade from its first to now. */
-export function HolderMarketView({ subject }) {
+/**
+ * One market: live stats, price chart and every trade from its first to now.
+ * `onPickTrader({ address, title })` opens a trader from the trades table.
+ */
+export function HolderMarketView({ subject, onPickTrader }) {
   const { meta, error, quotes } = useLiveMarketMeta(subject.conditionId);
   const { rows, status } = useFusedMarketTrades(meta);
   const stats = useLiveMarketStats(meta, quotes, rows);
@@ -110,6 +113,17 @@ export function HolderMarketView({ subject }) {
         </section>
       </div>
 
+      <div className="max-w-3xl pt-4">
+        <h3 className="text-[15px] font-semibold text-foreground">Every trade in this market</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          Each fill on Polymarket,{" "}
+          {merged
+            ? `${meta.outcomes?.[0] || "Yes"} and ${meta.outcomes?.[1] || "No"} together in one list,`
+            : `${meta.outcomes?.[0] || "Yes"} on the left and ${meta.outcomes?.[1] || "No"} on the right,`}{" "}
+          from the market&apos;s first trade to now. New trades stream in at the top as they happen; the trader fills in
+          once Polymarket confirms who made it. Pick a trader to open their holder analysis.
+        </p>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <MergeOutcomesButton
           merged={merged}
@@ -130,6 +144,7 @@ export function HolderMarketView({ subject }) {
           merged={merged}
           loading={status.phase === "history"}
           ready={historyLoaded}
+          onPickTrader={onPickTrader}
         />
       </div>
     </div>

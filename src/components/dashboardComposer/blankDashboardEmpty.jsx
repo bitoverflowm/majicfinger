@@ -126,7 +126,7 @@ export function WorkspaceTabsLayer({ viewing, navChromeExpanded, connectHome }) 
 
   if (terminalId) {
     return (
-      <div className="absolute inset-0 z-30 -my-1 flex min-h-0 flex-col bg-background">
+      <div className="absolute inset-0 z-30 -my-1 flex min-h-0 flex-col bg-[#f5f5f5] dark:bg-[#1e1e1e]">
         <WorkspaceStartTabs tabsActive={viewing === "welcome"} onOpenTabs={openTabs} />
         <TerminalSurface terminalId={terminalId} tab={active} />
       </div>

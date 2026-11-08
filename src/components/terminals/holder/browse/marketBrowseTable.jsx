@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { cachedStats, closeAt, displayTags, withStats } from "./marketBrowseFeeds";
+import { cachedStats, closeAt, competitiveQuote, displayTags, withStats } from "./marketBrowseFeeds";
 
 const ROW_HEIGHT = 56;
 const OVERSCAN = 8;
@@ -187,6 +187,35 @@ export function marketFigures({ market: base, now, live, arrivedAt, resolvedOutc
   };
 }
 
+function cents(dollars) {
+  return `${Number((dollars * 100).toFixed(1))}¢`;
+}
+
+/**
+ * "51% Yes · 49% No · 2¢ spread · $84K traded today": the numbers the Competitive feed ranks on.
+ * `withVolume={false}` drops the volume where it's already shown next to the line.
+ */
+export function CompetitiveLine({ market, volume24h, withVolume = true }) {
+  const quote = competitiveQuote(market);
+  if (!quote) return null;
+  const [first = "Yes", second = "No"] = market.outcomes;
+  // Keeps the half point (49.5%) so markets that rank apart don't both read 50%.
+  const firstPct = Number((quote.mid * 100).toFixed(1));
+  const secondPct = Number((100 - firstPct).toFixed(1));
+  return (
+    <span
+      className="min-w-0 truncate tabular-nums"
+      title={`Midpoint of the ${cents(quote.bid)} bid and ${cents(quote.ask)} ask for ${first}. Ranked by how close it is to 50%.`}
+    >
+      <span className="font-medium text-foreground">
+        {firstPct}% {first}
+      </span>
+      {` · ${secondPct}% ${second} · ${cents(quote.spread)} spread`}
+      {withVolume ? ` · ${usd(volume24h ?? market.volume24h) ?? "$0"} traded today` : null}
+    </span>
+  );
+}
+
 export function NewBadge() {
   return (
     <span className="inline-flex shrink-0 items-center gap-1 rounded bg-[#0d99ff]/10 px-1.5 py-px font-semibold text-[#0b7fd4]">
@@ -225,7 +254,7 @@ export function Closes({ market, now }) {
   );
 }
 
-function MarketRow({ market: base, top, now, live, arrivedAt, resolvedOutcome, onPick }) {
+function MarketRow({ market: base, top, now, live, arrivedAt, resolvedOutcome, onPick, showQuote }) {
   const { market, looked, quote, price, ticking, traded, volume24h, volume, elapsed, arriving, fresh, tags, firstOutcome, winner } = marketFigures({
     market: base,
     now,
@@ -261,14 +290,20 @@ function MarketRow({ market: base, top, now, live, arrivedAt, resolvedOutcome, o
           </span>
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
             {fresh ? <NewBadge /> : null}
-            {market.eventTitle && market.eventTitle !== market.question ? (
-              <span className="truncate">{market.eventTitle}</span>
-            ) : null}
-            {tags.map((tag) => (
-              <span key={tag} className="shrink-0 rounded bg-muted px-1.5 py-px leading-[14px]">
-                {tag}
-              </span>
-            ))}
+            {showQuote ? (
+              <CompetitiveLine market={market} volume24h={volume24h} />
+            ) : (
+              <>
+                {market.eventTitle && market.eventTitle !== market.question ? (
+                  <span className="truncate">{market.eventTitle}</span>
+                ) : null}
+                {tags.map((tag) => (
+                  <span key={tag} className="shrink-0 rounded bg-muted px-1.5 py-px leading-[14px]">
+                    {tag}
+                  </span>
+                ))}
+              </>
+            )}
           </span>
         </span>
       </div>
@@ -305,7 +340,7 @@ function MarketRow({ market: base, top, now, live, arrivedAt, resolvedOutcome, o
       </div>
       <div role="cell" className="px-2 text-right font-mono text-[12px] tabular-nums">
         {market.change24h == null || winner ? (
-          <span className="text-muted-foreground/60">—</span>
+          <span className="text-muted-foreground opacity-60">—</span>
         ) : (
           <span className={market.change24h > 0 ? "text-emerald-600 dark:text-emerald-400" : market.change24h < 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"}>
             {market.change24h > 0 ? "+" : ""}
@@ -329,7 +364,7 @@ function MarketRow({ market: base, top, now, live, arrivedAt, resolvedOutcome, o
 }
 
 export function StatPending({ looked }) {
-  return looked ? <span className="text-muted-foreground/60">—</span> : <span className="inline-block h-2.5 w-10 animate-pulse rounded bg-muted" aria-label="Loading" />;
+  return looked ? <span className="text-muted-foreground opacity-60">—</span> : <span className="inline-block h-2.5 w-10 animate-pulse rounded bg-muted" aria-label="Loading" />;
 }
 
 /** Where a windowed list is scrolled to and how big it is; back to the top whenever `resetKey` changes. */
@@ -390,7 +425,7 @@ export function useReportVisible(visible, onVisible) {
  * Markets as a rich table, drawn only where the list is scrolled to. Tells the parent which
  * markets are on screen so it can fetch their stats and stream their prices.
  */
-export function MarketBrowseTable({ markets, live, arrivals, resolved, onPick, onVisible, empty, height = 620, resetKey, sort, onSort, onClearSort }) {
+export function MarketBrowseTable({ markets, live, arrivals, resolved, onPick, onVisible, empty, height = 620, resetKey, sort, onSort, onClearSort, showQuote }) {
   const { scrollRef, view, onScroll } = useBrowseScroll({ height, resetKey });
   const now = useBrowseNow(live, markets);
 
@@ -423,6 +458,7 @@ export function MarketBrowseTable({ markets, live, arrivals, resolved, onPick, o
                 arrivedAt={arrivals.get(market.conditionId)}
                 resolvedOutcome={resolved.get(market.conditionId)}
                 onPick={onPick}
+                showQuote={showQuote}
               />
             ))}
           </div>

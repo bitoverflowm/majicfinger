@@ -19,6 +19,9 @@ import { polymarketGet } from "@/components/dashboardComposer/recipes/polymarket
  *   volume: number | null;
  *   liquidity: number | null;
  *   change24h: number | null;
+ *   bestBid: number | null;
+ *   bestAsk: number | null;
+ *   acceptingOrders: boolean | null;
  *   closed: boolean;
  *   winner: string;
  * }} BrowseMarket
@@ -32,6 +35,18 @@ const GAMMA_PAGE = 100;
 const TRENDING_POOL = 500;
 const TRENDING_MIN_VOLUME = 5_000;
 const STAT_BATCH = 50;
+/** Gamma refuses offsets past this; deeper pages go through the keyset endpoint. */
+const GAMMA_MAX_OFFSET = 2000;
+const GAMMA_CONCURRENCY = 7;
+/** Safety stop for the keyset walk (about 3,300 open markets trade $1k a day). */
+const KEYSET_MAX_PAGES = 80;
+
+/** What makes a market competitive. Starter thresholds, meant to be tuned. */
+export const COMPETITIVE = {
+  /** Widest bid/ask gap allowed, in dollars per share (0.03 = 3¢). */
+  maxSpread: 0.03,
+  minVolume24h: 1_000,
+};
 
 /** Tags Polymarket uses for its own plumbing, never shown as a category chip. */
 const NOISE_TAG = /^(hide from new|recurring|earn \d|hfc|parent for derivative|pre-market|pyth|season stats|all)/i;
@@ -42,6 +57,7 @@ export const FEEDS = [
   { id: "closed", label: "Recently closed" },
   { id: "volume", label: "By volume" },
   { id: "liquidity", label: "By liquidity" },
+  { id: "competitive", label: "Competitive" },
   { id: "trending", label: "Trending" },
 ];
 
@@ -129,6 +145,9 @@ function blank(conditionId) {
     volume: null,
     liquidity: null,
     change24h: null,
+    bestBid: null,
+    bestAsk: null,
+    acceptingOrders: null,
     closed: false,
     winner: "",
   };
@@ -175,6 +194,9 @@ export function fromGamma(raw) {
   market.volume = num(raw?.volumeNum ?? raw?.volume);
   market.liquidity = num(raw?.liquidityNum ?? raw?.liquidity);
   market.change24h = num(raw?.oneDayPriceChange);
+  market.bestBid = num(raw?.bestBid);
+  market.bestAsk = num(raw?.bestAsk);
+  market.acceptingOrders = typeof raw?.acceptingOrders === "boolean" ? raw.acceptingOrders : null;
   market.closed = raw?.closed === true;
   if (market.closed) {
     const won = market.prices.findIndex((price) => price >= 0.99);
@@ -266,6 +288,7 @@ const GAMMA_QUERIES = {
   volume: { closed: "false", order: "volume24hr", ascending: "false" },
   liquidity: { closed: "false", order: "liquidityNum", ascending: "false" },
   trending: { closed: "false", order: "volume24hr", ascending: "false" },
+  competitive: { closed: "false", order: "volume24hr", ascending: "false" },
 };
 
 export function cachedFeed(feedId) {
@@ -280,7 +303,94 @@ function trending(markets) {
     .sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h));
 }
 
-export async function loadFeed(feedId, signal) {
+/**
+ * The quote a market is ranked on, or null when it isn't competitive: a binary market taking
+ * orders, with a bid and an ask on both sides, a tight spread and real volume today.
+ */
+export function competitiveQuote(market) {
+  const { bestBid: bid, bestAsk: ask } = market;
+  if (market.outcomes.length !== 2 || market.acceptingOrders !== true) return null;
+  if (!Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask >= 1 || ask <= bid) return null;
+  // Rounded to a tenth of a cent so 0.43 − 0.40 counts as exactly 3¢.
+  const spread = Math.round((ask - bid) * 1000) / 1000;
+  if (spread > COMPETITIVE.maxSpread) return null;
+  if ((market.volume24h ?? 0) < COMPETITIVE.minVolume24h) return null;
+  const mid = (bid + ask) / 2;
+  return { bid, ask, mid, spread, distance: Math.round(Math.abs(mid - 0.5) * 10_000) };
+}
+
+/** Closest to a coin flip first; ties go to the market that traded more today. */
+function competitive(markets) {
+  return markets
+    .map((market) => ({ market, quote: competitiveQuote(market) }))
+    .filter((entry) => entry.quote)
+    .sort((a, b) => a.quote.distance - b.quote.distance || (b.market.volume24h ?? 0) - (a.market.volume24h ?? 0))
+    .map((entry) => entry.market);
+}
+
+function keepNew(rows, seen, into) {
+  for (const raw of rows) {
+    const market = fromGamma(raw);
+    if (!/^0x[a-fA-F0-9]{64}$/.test(market.conditionId) || seen.has(market.conditionId)) continue;
+    seen.add(market.conditionId);
+    into.push(market);
+  }
+}
+
+/**
+ * Every open market with $1k+ traded today. Gamma's offset pages stop at 2,100 markets, so those
+ * load in parallel for a quick first ranking while a keyset walk reaches the rest.
+ */
+async function loadCompetitive(signal, onProgress) {
+  const query = { ...GAMMA_QUERIES.competitive, limit: String(GAMMA_PAGE), include_tag: "true" };
+  const seen = new Set();
+  const pool = [];
+
+  const offsets = [];
+  for (let offset = 0; offset <= GAMMA_MAX_OFFSET; offset += GAMMA_PAGE) offsets.push(offset);
+  const fromOffsets = async () => {
+    const pages = [];
+    let next = 0;
+    const worker = async () => {
+      while (next < offsets.length) {
+        const index = next;
+        next += 1;
+        const body = await polymarketGet("listMarkets", { ...query, offset: String(offsets[index]) }, signal, { retries: 2 });
+        pages[index] = Array.isArray(body) ? body : [];
+      }
+    };
+    await Promise.all(Array.from({ length: GAMMA_CONCURRENCY }, worker));
+    keepNew(pages.flat(), seen, pool);
+    onProgress?.(competitive(pool));
+  };
+
+  const fromKeyset = async () => {
+    let cursor = "";
+    for (let page = 0; page < KEYSET_MAX_PAGES; page += 1) {
+      const body = await polymarketGet("listMarketsKeyset", { ...query, ...(cursor ? { after_cursor: cursor } : {}) }, signal, { retries: 2 });
+      const rows = Array.isArray(body?.markets) ? body.markets : [];
+      keepNew(rows, seen, pool);
+      cursor = String(body?.next_cursor || "").trim();
+      const last = num(rows[rows.length - 1]?.volume24hr) ?? 0;
+      if (!cursor || !rows.length || last < COMPETITIVE.minVolume24h) break;
+    }
+  };
+
+  // The deep pages only add the quieter markets, so losing them keeps the first ranking.
+  const tail = fromKeyset().catch(() => {});
+  await fromOffsets();
+  await tail;
+  signal?.throwIfAborted();
+  return competitive(pool);
+}
+
+/** `onProgress` gets a usable list early for feeds that take a while to load completely. */
+export async function loadFeed(feedId, signal, onProgress) {
+  if (feedId === "competitive") {
+    const markets = await loadCompetitive(signal, onProgress);
+    gammaCache.set(feedId, { at: Date.now(), markets });
+    return markets;
+  }
   const query = GAMMA_QUERIES[feedId];
   if (!query) return [];
   const total = feedId === "trending" ? TRENDING_POOL : GAMMA_LIST_LIMIT;

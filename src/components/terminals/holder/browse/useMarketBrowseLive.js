@@ -64,16 +64,19 @@ export function useNewMarketFeed({ assetIds, onNewMarkets, onResolved }) {
  * Live prices and traded volume for the assets on screen. Moves are collected and published a few
  * times a second; the socket is reopened when the on-screen set settles on something new.
  *
+ * `paused` closes the socket; prices hold where they were until it reopens.
+ *
  * @param {string[]} assetIds
+ * @param {{ paused?: boolean }} [opts]
  * @returns {{
  *   quotes: Map<string, { price: number, dir: number, at: number }>,
  *   traded: Map<string, number>,
  *   tradesPerMin: number,
- *   status: "idle" | "connecting" | "open" | "closed" | "error",
+ *   status: "idle" | "paused" | "connecting" | "open" | "closed" | "error",
  *   version: number,
  * }}
  */
-export function useLiveQuotes(assetIds) {
+export function useLiveQuotes(assetIds, { paused = false } = {}) {
   const quotesRef = useRef(new Map());
   const tradedRef = useRef(new Map());
   const tradeTimesRef = useRef([]);
@@ -89,6 +92,12 @@ export function useLiveQuotes(assetIds) {
   }, [key, activeKey]);
 
   useEffect(() => {
+    if (paused) {
+      setStatus("paused");
+      tradeTimesRef.current = [];
+      setTradesPerMin(0);
+      return undefined;
+    }
     if (!activeKey) {
       setStatus("idle");
       return undefined;
@@ -126,7 +135,7 @@ export function useLiveQuotes(assetIds) {
       close();
       window.clearInterval(flush);
     };
-  }, [activeKey]);
+  }, [activeKey, paused]);
 
   return { quotes: quotesRef.current, traded: tradedRef.current, tradesPerMin, status, version };
 }

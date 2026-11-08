@@ -1,9 +1,9 @@
-const DEFAULT_WS_URL =
-  process.env.NEXT_PUBLIC_POLYMARKET_WS_URL ||
-  "wss://ws-subscriptions-clob.polymarket.com/ws/market";
-const PING_MS = 10_000;
+import { polymarketSocketHub } from "./polymarketSocketClient";
 
 /**
+ * A subscription on the browser's shared market-channel socket (see `polymarketSocketHub`), so
+ * however many live views are open, the browser holds one connection to Polymarket.
+ *
  * @param {{
  *   assetIds: string[];
  *   customFeatureEnabled?: boolean;
@@ -15,128 +15,15 @@ const PING_MS = 10_000;
 function openPolymarketMarketChannel(opts) {
   const assetIds = [...new Set((opts.assetIds || []).map(String).filter(Boolean))];
   if (!assetIds.length) return () => {};
-
-  let closed = false;
-  let ws = null;
-  let ping = null;
-  let reconnectTimer = null;
-  let attempt = 0;
-
-  const emitStatus = (status) => {
-    try {
-      opts.onStatus?.(status);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const clearPing = () => {
-    if (ping) {
-      clearInterval(ping);
-      ping = null;
-    }
-  };
-
-  const handlePayload = (payload) => {
-    const messages = Array.isArray(payload) ? payload : [payload];
-    for (const msg of messages) {
-      if (!msg || typeof msg !== "object") continue;
-      try {
-        opts.onMessage(msg);
-      } catch {
-        /* ignore */
-      }
-    }
-  };
-
-  const connect = () => {
-    if (closed) return;
-    try {
-      ws = new WebSocket(DEFAULT_WS_URL);
-    } catch {
-      emitStatus("error");
-      scheduleReconnect();
-      return;
-    }
-
-    ws.onopen = () => {
-      attempt = 0;
-      emitStatus("open");
-      try {
-        const payload = {
-          assets_ids: assetIds,
-          type: "market",
-          initial_dump: true,
-        };
-        if (opts.customFeatureEnabled === true) {
-          payload.custom_feature_enabled = true;
-        }
-        ws.send(JSON.stringify(payload));
-      } catch {
-        /* ignore */
-      }
-      clearPing();
-      ping = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          try {
-            ws.send("PING");
-          } catch {
-            /* ignore */
-          }
-        }
-      }, PING_MS);
-    };
-
-    ws.onmessage = (event) => {
-      if (event.data === "PONG") return;
-      try {
-        handlePayload(JSON.parse(event.data));
-      } catch {
-        /* ignore malformed frames */
-      }
-    };
-
-    ws.onerror = () => {
-      emitStatus("error");
-    };
-
-    ws.onclose = () => {
-      clearPing();
-      ws = null;
-      if (closed) return;
-      emitStatus("closed");
-      scheduleReconnect();
-    };
-  };
-
-  const scheduleReconnect = () => {
-    if (closed || reconnectTimer) return;
-    const delay = Math.min(15_000, 1_000 * 2 ** Math.min(attempt, 4));
-    attempt += 1;
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null;
-      connect();
-    }, delay);
-  };
-
-  connect();
-
-  return () => {
-    closed = true;
-    clearPing();
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    if (ws) {
-      try {
-        ws.close(1000, "Closed by user");
-      } catch {
-        /* ignore */
-      }
-      ws = null;
-    }
-  };
+  const subscription = polymarketSocketHub().subscribe({
+    assetIds,
+    custom: opts.customFeatureEnabled === true,
+    onMessage: (msg) => opts.onMessage(msg),
+    onStatus: (status) => {
+      if (status === "open" || status === "closed" || status === "error") opts.onStatus?.(status);
+    },
+  });
+  return () => subscription.close();
 }
 
 function messageTime(msg) {

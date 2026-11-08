@@ -40,19 +40,21 @@ const SORTS = {
   volume: { label: "24h volume", compare: (a, b) => (b.volume24h ?? -1) - (a.volume24h ?? -1) },
   liquidity: { label: "Liquidity", compare: (a, b) => (b.liquidity ?? -1) - (a.liquidity ?? -1) },
   movers: { label: "Biggest movers", compare: null },
+  competitive: { label: "Closest to 50/50", compare: null },
   resolved: { label: "Latest resolved", compare: (a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0) },
 };
 
 const FEED_SORTS = {
-  tradable: ["newest", "closing"],
+  tradable: ["closing", "newest"],
   new: ["newest"],
   closed: ["resolved", "volume"],
   volume: ["volume", "newest", "closing"],
   liquidity: ["liquidity", "newest", "closing"],
   trending: ["movers", "volume", "closing"],
+  competitive: ["competitive", "volume", "closing"],
 };
 
-const TOP_FEEDS = new Set(["closed", "volume", "liquidity"]);
+const TOP_FEEDS = new Set(["closed", "volume", "liquidity", "competitive"]);
 
 function sortsFor(feed) {
   return FEED_SORTS[feed] || FEED_SORTS.tradable;
@@ -166,7 +168,7 @@ export function CategoryChip({ selected, onClick, children, count }) {
       )}
     >
       {children}
-      {count != null ? <span className="tabular-nums text-muted-foreground/70">{count.toLocaleString()}</span> : null}
+      {count != null ? <span className="tabular-nums text-muted-foreground opacity-70">{count.toLocaleString()}</span> : null}
     </button>
   );
 }
@@ -197,7 +199,14 @@ export function Segmented({ label, value, options, onChange }) {
 }
 
 function LiveDot({ status }) {
-  const tone = status === "open" ? "bg-emerald-500" : status === "error" || status === "closed" ? "bg-amber-500" : "bg-muted-foreground/50";
+  const tone =
+    status === "open"
+      ? "bg-emerald-500"
+      : status === "paused"
+        ? "bg-amber-400"
+        : status === "error" || status === "closed"
+          ? "bg-amber-500"
+          : "bg-muted-foreground opacity-50";
   return (
     <span className="relative flex size-2" aria-hidden>
       {status === "open" ? <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" /> : null}
@@ -260,7 +269,7 @@ function NewMarketToast({ markets, onPause, onView }) {
 export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
   const [feed, setFeed] = useState("tradable");
   const [view, setView] = useState("list");
-  const [sort, setSort] = useState("newest");
+  const [sort, setSort] = useState("closing");
   const [resetKey, setResetKey] = useState(0);
   const [tradable, setTradable] = useState(() => {
     const cached = cachedTradable();
@@ -275,6 +284,8 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
   const [columnSort, setColumnSort] = useState(null);
   const [statsProgress, setStatsProgress] = useState(null);
   const [paused, setPaused] = useState(false);
+  const [livePaused, setLivePaused] = useState(false);
+  const [held, setHeld] = useState(0);
   const [retry, setRetry] = useState(0);
   const pausedRef = useRef(false);
   pausedRef.current = paused;
@@ -320,7 +331,11 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
     }
     const abort = new AbortController();
     setFeeds((prev) => ({ ...prev, [gammaFeed]: { markets: prev[gammaFeed]?.markets || [], loading: true, error: "" } }));
-    loadFeed(gammaFeed, abort.signal)
+    loadFeed(gammaFeed, abort.signal, (markets) => {
+      if (abort.signal.aborted) return;
+      rememberStats(markets);
+      setFeeds((prev) => ({ ...prev, [gammaFeed]: { markets, loading: true, error: "" } }));
+    })
       .then((markets) => {
         if (abort.signal.aborted) return;
         rememberStats(markets);
@@ -448,7 +463,7 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [visibleIds],
   );
-  const live = useLiveQuotes(liveAssets);
+  const live = useLiveQuotes(liveAssets, { paused: livePaused });
 
   const discoveryAssets = useMemo(() => tradable.markets.slice(0, 3).flatMap((market) => market.tokenIds), [tradable.markets]);
 
@@ -535,7 +550,37 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
     setResolved((prev) => new Map(prev).set(id, String(msg?.winning_outcome || "Resolved")));
   }, []);
 
-  const discoveryStatus = useNewMarketFeed({ assetIds: discoveryAssets, onNewMarkets, onResolved });
+  /* Paused, the list holds still: arrivals and results wait here and land when it goes live again. */
+  const livePausedRef = useRef(false);
+  const heldRef = useRef({ markets: [], resolved: [] });
+  const onNewMarketsLive = useCallback(
+    (batch) => {
+      if (!livePausedRef.current) return onNewMarkets(batch);
+      heldRef.current.markets.push(...batch);
+      setHeld(heldRef.current.markets.length);
+    },
+    [onNewMarkets],
+  );
+  const onResolvedLive = useCallback(
+    (msg) => {
+      if (!livePausedRef.current) return onResolved(msg);
+      heldRef.current.resolved.push(msg);
+    },
+    [onResolved],
+  );
+  const toggleLive = () => {
+    const next = !livePaused;
+    livePausedRef.current = next;
+    setLivePaused(next);
+    if (next) return;
+    const { markets: waiting, resolved: results } = heldRef.current;
+    heldRef.current = { markets: [], resolved: [] };
+    setHeld(0);
+    results.forEach(onResolved);
+    if (waiting.length) onNewMarkets(waiting);
+  };
+
+  const discoveryStatus = useNewMarketFeed({ assetIds: discoveryAssets, onNewMarkets: onNewMarketsLive, onResolved: onResolvedLive });
 
   const feedState = gammaFeed ? feeds[gammaFeed] : null;
   const loading = gammaFeed ? !!feedState?.loading || !feedState : feed !== "new" && !tradable.done;
@@ -544,7 +589,7 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
     ? `${CATEGORIES.find((category) => category.id === categoryId)?.label} markets`
     : FEEDS.find((item) => item.id === feed)?.label;
   const sortOptions = sortsFor(categoryId ? "tradable" : feed).map((id) => ({ id, label: SORTS[id].label }));
-  const tableProps = { live, arrivals: feed === "new" ? arrivals : NO_ARRIVALS, resolved, onPick: open, onVisible: setVisible };
+  const tableProps = { live, arrivals: feed === "new" ? arrivals : NO_ARRIVALS, resolved, onPick: open, onVisible: setVisible, showQuote: feed === "competitive" };
   const feedChip = (item) => (
     <Chip
       key={item.id}
@@ -649,6 +694,11 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
               <Loader2 className="size-3 animate-spin" aria-hidden />
               {selectedLabel} · {base.length.toLocaleString()} loaded so far
             </span>
+          ) : loading && gammaFeed && base.length ? (
+            <span className="inline-flex items-center gap-1.5" title="Still checking the quieter markets; the ranking may shift a little">
+              <Loader2 className="size-3 animate-spin" aria-hidden />
+              {selectedLabel} · {base.length.toLocaleString()} so far
+            </span>
           ) : (
             `${selectedLabel} · ${base.length.toLocaleString()}`
           )}
@@ -669,13 +719,40 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
           </span>
         ) : null}
         <span className="ml-auto inline-flex items-center gap-3 text-[12px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5" title="Prices and trades for the markets on screen">
-            <LiveDot status={live.status} />
-            {live.status === "open" ? `Live · ${live.tradesPerMin.toLocaleString()} trades/min` : live.status === "idle" ? "Live" : "Connecting"}
-          </span>
+          <button
+            type="button"
+            onClick={toggleLive}
+            aria-pressed={livePaused}
+            title={
+              livePaused
+                ? "Go live again: reconnect live prices and add the new markets that came in meanwhile"
+                : "Pause live prices and hold new markets back, so the list stays still"
+            }
+            className={cn(
+              "-mx-1.5 inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted",
+              livePaused ? "font-medium text-amber-600 dark:text-amber-300" : "hover:text-foreground",
+            )}
+          >
+            <LiveDot status={livePaused ? "paused" : live.status} />
+            {livePaused
+              ? "Paused"
+              : live.status === "open"
+                ? `Live · ${live.tradesPerMin.toLocaleString()} trades/min`
+                : live.status === "idle"
+                  ? "Live"
+                  : "Connecting"}
+          </button>
           <span className="inline-flex items-center gap-1.5" title="Polymarket announces each new market on this feed">
-            <LiveDot status={discoveryStatus} />
-            {discoveryStatus !== "open" ? "Connecting to new markets" : paused ? "Watching for new markets · alerts paused" : "Watching for new markets"}
+            <LiveDot status={livePaused ? "paused" : discoveryStatus} />
+            {discoveryStatus !== "open"
+              ? "Connecting to new markets"
+              : livePaused
+                ? held
+                  ? `${held.toLocaleString()} new ${held === 1 ? "market" : "markets"} waiting`
+                  : "Holding new markets until you go live"
+                : paused
+                  ? "Watching for new markets · alerts paused"
+                  : "Watching for new markets"}
           </span>
         </span>
       </div>

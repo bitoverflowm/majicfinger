@@ -129,7 +129,7 @@ export function MarketBrowseCalendar({ markets, closedFeed, ...tableProps }) {
               }}
               className={cn(
                 "relative flex h-[104px] min-w-0 flex-col items-stretch gap-1 border-b border-r border-border/40 p-1.5 text-left transition-colors hover:bg-muted/50 [&:nth-child(7n)]:border-r-0",
-                outside && "text-muted-foreground/50",
+                outside && "text-muted-foreground",
                 isSelected && "z-[1] ring-2 ring-inset ring-[#0d99ff]",
               )}
               style={heat && !outside ? { backgroundColor: `rgb(13 153 255 / ${heat})` } : undefined}
@@ -144,7 +144,7 @@ export function MarketBrowseCalendar({ markets, closedFeed, ...tableProps }) {
                   {date.getDate()}
                 </span>
                 {list.length ? (
-                  <span className={cn("text-[11px] font-semibold tabular-nums", outside ? "text-muted-foreground/50" : "text-foreground")}>
+                  <span className={cn("text-[11px] font-semibold tabular-nums", outside ? "text-muted-foreground" : "text-foreground")}>
                     {list.length.toLocaleString()}
                   </span>
                 ) : null}

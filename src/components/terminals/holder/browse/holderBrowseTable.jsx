@@ -91,7 +91,7 @@ function TraderName({ row }) {
 }
 
 function RankBadge({ rank, className }) {
-  if (!Number.isFinite(rank)) return <span className="text-muted-foreground/60">—</span>;
+  if (!Number.isFinite(rank)) return <span className="text-muted-foreground opacity-60">—</span>;
   const top = rank <= 3;
   return (
     <span
