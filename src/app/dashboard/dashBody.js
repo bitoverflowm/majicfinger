@@ -21,6 +21,9 @@ import { WorkspaceWelcomeLayer } from "@/components/dashboardComposer/blankDashb
 import { IntegrationConnectLandingDemo } from "@/components/dashboardComposer/integrationConnectDialog";
 import FigmaNavChrome from "./components/figmaNavChrome";
 import { cn } from "@/lib/utils";
+import { PROJECT_THUMBNAIL_ROOT } from "@/lib/projectThumbnail";
+import { ProjectThumbnailKeeper } from "@/components/projects/projectThumbnailKeeper";
+import { TerminalPlacementHost } from "@/components/terminals/terminalPlacement";
 
 import { debounce } from "@/lib/debounce";
 import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
@@ -443,6 +446,8 @@ const DashBody = ({ user }) => {
         {!isDemo && (
           <>
             <Nav />
+            <ProjectThumbnailKeeper />
+            <TerminalPlacementHost />
             {!navChromeExpanded && (
               <div className="h-14 shrink-0" aria-hidden />
             )}
@@ -455,7 +460,10 @@ const DashBody = ({ user }) => {
           </>
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
-        <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1 [--dashboard-tab-clearance:2.75rem]">
+        <div
+          {...{ [PROJECT_THUMBNAIL_ROOT]: "" }}
+          className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1 [--dashboard-tab-clearance:2.75rem]"
+        >
                 <WorkspaceCanvas />
                 {entryReady && (viewing === "welcome" || viewing === "connectDataHome") && (
                   <WorkspaceWelcomeLayer

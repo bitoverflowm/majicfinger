@@ -1,13 +1,15 @@
 /** Browser-local start tabs (Welcome and its copies). No backend field. */
 
 import { terminalTabField } from "@/lib/workspaceTerminals";
+import { scopedLocalOwner } from "@/lib/workspaceProjectScope";
 
 export const WELCOME_START_TAB_ID = "welcome";
 
 const STORAGE_PREFIX = "lycheeWorkspaceStartTabs:";
 
+/** Kept per project; see `scopedLocalOwner`. */
 function storageKey(userId) {
-  return `${STORAGE_PREFIX}${userId || "local"}`;
+  return `${STORAGE_PREFIX}${scopedLocalOwner(userId) || "local"}`;
 }
 
 export function defaultWorkspaceStartTabs() {

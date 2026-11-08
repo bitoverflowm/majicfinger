@@ -1,17 +1,26 @@
 import mongoose from "mongoose";
 import dbConnect from "@/lib/dbConnect";
-import { getLoginSession } from "@/lib/auth";
 import { requirePaidMember } from "@/lib/requirePaidMember";
 import WorkspaceDashboard from "@/models/WorkspaceDashboards";
 import { sanitizeWorkspaceDashboard } from "@/lib/workspaceDashboardDocument";
+import { liveTabIds, PROJECT_KINDS, sessionUserId } from "@/lib/server/workspaceProjects";
 
-async function sessionUserId(req) {
-  try {
-    const session = await getLoginSession(req);
-    return session?.userId ? String(session.userId) : "";
-  } catch {
-    return "";
+/** Starring, renaming, or retyping a project from the projects view. Starring is not an edit. */
+function projectFields(body) {
+  const input = body?.project && typeof body.project === "object" ? body.project : null;
+  if (!input) return { $set: {}, edit: false };
+  const $set = {};
+  let edit = false;
+  if (typeof input.starred === "boolean") $set.starred = input.starred;
+  if (PROJECT_KINDS.includes(input.kind)) {
+    $set.kind = input.kind;
+    edit = true;
   }
+  if (typeof input.name === "string" && input.name.trim()) {
+    $set.name = input.name.trim().slice(0, 120);
+    edit = true;
+  }
+  return { $set, edit };
 }
 
 /** Tab ids go into a Mongo field path, so dots and dollars must never reach it. */
@@ -46,6 +55,7 @@ async function patchDashboard(req, res, id, userId) {
 
   const projection = { _id: 1 };
   if (upserts.length || removedTables.size || removeTabs.length) projection.tables = 1;
+  if (setTabs.length || removeTabs.length) projection.live_tabs = 1;
   for (const tabId of removeTabs) projection[`blocks.${tabId}.id`] = 1;
   const current = await WorkspaceDashboard.findOne({ _id: id, user_id: userId }).select(projection).lean();
   if (!current) return res.status(404).json({ success: false, message: "Dashboard not found" });
@@ -106,11 +116,23 @@ async function patchDashboard(req, res, id, userId) {
     $set.tables = [...byId.values()].slice(0, MAX_TABLES);
   }
 
+  // A project from before `live_tabs` gets the whole list from `backfillLiveTabs`, not a partial one here.
+  if (projection.live_tabs && Array.isArray(current.live_tabs)) {
+    const touched = new Set([...setTabs, ...removeTabs]);
+    const live = liveTabIds(Object.fromEntries(setTabs.map((tabId) => [tabId, clean.blocks[tabId] || []])));
+    const kept = (Array.isArray(current.live_tabs) ? current.live_tabs : []).filter((tabId) => !touched.has(tabId));
+    $set.live_tabs = [...kept, ...live];
+  }
+
+  const project = projectFields(body);
+  const editing = Object.keys($set).length || Object.keys($unset).length || project.edit;
+  Object.assign($set, project.$set);
+
   const update = {};
   if (Object.keys($set).length) update.$set = $set;
   if (Object.keys($unset).length) update.$unset = $unset;
   if (!Object.keys(update).length) return res.status(200).json({ success: true, data: { _id: current._id } });
-  await WorkspaceDashboard.updateOne({ _id: id, user_id: userId }, update);
+  await WorkspaceDashboard.updateOne({ _id: id, user_id: userId }, update, editing ? {} : { timestamps: false });
   return res.status(200).json({
     success: true,
     data: { _id: current._id, saved_tabs: setTabs, removed_tabs: removeTabs, removed_tables: droppedTables },
@@ -118,8 +140,8 @@ async function patchDashboard(req, res, id, userId) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "GET" && req.method !== "PUT" && req.method !== "PATCH") {
-    res.setHeader("Allow", "GET, PUT, PATCH");
+  if (!["GET", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    res.setHeader("Allow", "GET, PUT, PATCH, DELETE");
     return res.status(405).json({ success: false, message: "Method not allowed" });
   }
 
@@ -146,6 +168,12 @@ export default async function handler(req, res) {
     }
   }
 
+  if (req.method === "DELETE") {
+    const { deletedCount } = await WorkspaceDashboard.deleteOne({ _id: id, user_id: userId });
+    if (!deletedCount) return res.status(404).json({ success: false, message: "Project not found" });
+    return res.status(200).json({ success: true, data: { _id: id } });
+  }
+
   const doc = await WorkspaceDashboard.findOne({ _id: id, user_id: userId });
   if (!doc) return res.status(404).json({ success: false, message: "Dashboard not found" });
 
@@ -165,7 +193,7 @@ export default async function handler(req, res) {
     }
     next.blocks = merged;
   }
-  doc.set(next);
+  doc.set({ ...next, live_tabs: liveTabIds(next.blocks) });
   await doc.save();
   return res.status(200).json({ success: true, data: doc.toObject() });
 }

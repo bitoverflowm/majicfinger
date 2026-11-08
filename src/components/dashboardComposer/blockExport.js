@@ -195,6 +195,46 @@ async function snapshot(node, format, options) {
   throw new Error(`Unknown image export format: ${format}`);
 }
 
+/** Small JPEG of what `node` shows on screen, `maxWidth` wide, cropped to `aspect` (height / width). */
+export async function captureNodeThumbnail(node, { maxWidth = 640, aspect = 0.625, quality = 0.72, background = "#ffffff" } = {}) {
+  if (!node) return "";
+  const width = node.clientWidth;
+  const height = Math.min(node.clientHeight, Math.round(width * aspect));
+  if (!width || !height) return "";
+  const box = node.getBoundingClientRect();
+  const bottom = box.top + height;
+  const right = box.left + width;
+  // Copying styles is the slow part, so skip everything outside the crop and images that need a cross-origin fetch.
+  const inCrop = (el) => {
+    if (!(el instanceof Element)) return true;
+    if (el instanceof HTMLImageElement && el.src && !el.src.startsWith("data:") && new URL(el.src, location.href).origin !== location.origin) return false;
+    const rect = el.getBoundingClientRect();
+    if (!rect.width && !rect.height) return true;
+    return rect.bottom >= box.top && rect.top <= bottom && rect.right >= box.left && rect.left <= right;
+  };
+  ensureStillStyle();
+  const restartAnimations = stopInlineAnimations(node);
+  const restorePaint = resolveSvgPaint(node);
+  node.classList.add(STILL_CLASS);
+  try {
+    const { toJpeg } = await import("html-to-image");
+    return await toJpeg(node, {
+      width,
+      height,
+      pixelRatio: Math.min(1, maxWidth / width),
+      quality,
+      backgroundColor: background,
+      skipFonts: true,
+      filter: inCrop,
+      imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+    });
+  } finally {
+    restorePaint();
+    restartAnimations();
+    node.classList.remove(STILL_CLASS);
+  }
+}
+
 /** Snapshot of a block's content (title bar included) as an image file. */
 export async function exportNodeImage(node, format, title, { background } = {}) {
   if (!node) throw new Error("Nothing to export");

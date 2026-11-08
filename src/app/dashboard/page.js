@@ -3,7 +3,7 @@
 import Script from 'next/script'
 
 import { Suspense, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import useSWR from "swr"
 
 import { StateProvider } from '@/context/stateContext'
@@ -17,6 +17,7 @@ import { HubQueryLoaderGate } from './HubQueryLoaderGate';
 
 import { Toaster } from "@/components/ui/sonner"
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state"
+import { WorkspaceProjectProvider } from "@/components/projects/workspaceProjectContext"
 
 import { userSwrFetcher } from "@/lib/hooks"
 import { AuthenticatedJourneyInit } from "@/components/analytics/AuthenticatedJourneyInit"
@@ -33,6 +34,7 @@ function DashboardLoading() {
 
 function DashboardInner() {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher)
 
     useEffect(() => {
@@ -49,19 +51,25 @@ function DashboardInner() {
     return (
         <div>
             <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" strategy="afterInteractive"/>
-            <StateProvider>
-                <StateProviderV2 initialSettings={{ viewing: "welcome" }}>
-                    <AuthenticatedJourneyInit user={user} />
-                    <LiveStreamManager />
-                    <RestLiveFeedManager />
-                    <Toaster />
-                    <main className="flex min-h-svh flex-col">
-                        <RunYourselfLoaderGate userId={user.userId} />
-                        <HubQueryLoaderGate />
-                        <DashBody user={user} />
-                    </main>
-                </StateProviderV2>
-            </StateProvider>
+            <WorkspaceProjectProvider
+                userId={user.userId}
+                urlProject={searchParams.get("project") || ""}
+                loading={<DashboardLoading />}
+            >
+                <StateProvider>
+                    <StateProviderV2 initialSettings={{ viewing: "welcome" }}>
+                        <AuthenticatedJourneyInit user={user} />
+                        <LiveStreamManager />
+                        <RestLiveFeedManager />
+                        <Toaster />
+                        <main className="flex min-h-svh flex-col">
+                            <RunYourselfLoaderGate userId={user.userId} />
+                            <HubQueryLoaderGate />
+                            <DashBody user={user} />
+                        </main>
+                    </StateProviderV2>
+                </StateProvider>
+            </WorkspaceProjectProvider>
         </div>
     )
 }

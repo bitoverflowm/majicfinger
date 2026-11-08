@@ -27,6 +27,7 @@ import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/lan
 import { RecipePreviewPanel, RecipesSidebar } from "@/components/dashboardComposer/recipes/recipesSidebar";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { openTerminalTab } from "@/components/terminals/openTerminalTab";
+import { requestTerminalPlacement } from "@/components/terminals/terminalPlacement";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useUser } from "@/lib/hooks";
 import { buildIntegrationPickerRows } from "@/lib/connectIntegrationPickerRows";
@@ -511,7 +512,9 @@ function IntegrationConnectFlow({
     window.clearTimeout(previewTimer.current);
     setPreviewRecipeId(null);
     connect?.close?.();
-    openTerminalTab({ terminalId: id, ctx, canvas, accountId: user?.userId || "" });
+    requestTerminalPlacement({ terminalId: id }, () =>
+      openTerminalTab({ terminalId: id, ctx, canvas, accountId: user?.userId || "" }),
+    );
   };
 
   useEffect(() => {

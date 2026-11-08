@@ -35,6 +35,8 @@ import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/lan
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, loadWorkspaceStartTabs, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
+import { scopedLocalOwner, workspaceProjectScope } from "@/lib/workspaceProjectScope";
+import { useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { ActivityRichTableView } from "@/components/dashboardComposer/activityRichTableView";
 import { CatalogRichTableView } from "@/components/dashboardComposer/catalogRichTableView";
@@ -264,8 +266,9 @@ function assignUniqueIds(blocks, reserved = []) {
   });
 }
 
-function canvasStorageKey(userId, pageId) {
-  return `lycheeWorkspaceCanvas:v1:${userId || "local"}:${pageId || "workspace"}`;
+/** `store` is the user id scoped to the open project (`scopedLocalOwner`), so browser copies stay per project. */
+function canvasStorageKey(store, pageId) {
+  return `lycheeWorkspaceCanvas:v1:${store || "local"}:${pageId || "workspace"}`;
 }
 
 function readCanvasBlocks(key) {
@@ -278,9 +281,9 @@ function readCanvasBlocks(key) {
   }
 }
 
-function collectLocalBlocks(userId) {
+function collectLocalBlocks(store) {
   if (typeof localStorage === "undefined") return {};
-  const prefix = `lycheeWorkspaceCanvas:v1:${userId}:`;
+  const prefix = `lycheeWorkspaceCanvas:v1:${store}:`;
   const blocks = {};
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index);
@@ -314,7 +317,7 @@ function draftFromLive(live) {
   const saved = savedBlocksByPage(live.blocksByPage);
   const blocks = blocksForDocument(saved.blocksByPage);
   if (live.pendingTabs?.length) {
-    const previous = readLocalDashboard(live.owner);
+    const previous = readLocalDashboard(live.store);
     for (const tabId of live.pendingTabs) {
       if (previous?.blocks?.[tabId]) blocks[tabId] = previous.blocks[tabId];
     }
@@ -353,24 +356,24 @@ function blocksForDocument(blocksByPage) {
   return blocks;
 }
 
-function dashboardDocKey(userId) {
-  return `lycheeWorkspaceDashboardDoc:v1:${userId || "local"}`;
+function dashboardDocKey(store) {
+  return `lycheeWorkspaceDashboardDoc:v1:${store || "local"}`;
 }
 
-function readLocalDashboard(userId) {
+function readLocalDashboard(store) {
   if (typeof localStorage === "undefined") return null;
   try {
-    const parsed = JSON.parse(localStorage.getItem(dashboardDocKey(userId)) || "null");
+    const parsed = JSON.parse(localStorage.getItem(dashboardDocKey(store)) || "null");
     return parsed && typeof parsed === "object" ? parsed : null;
   } catch {
     return null;
   }
 }
 
-function writeLocalDashboard(userId, draft) {
+function writeLocalDashboard(store, draft) {
   if (typeof localStorage === "undefined") return;
   try {
-    localStorage.setItem(dashboardDocKey(userId), JSON.stringify(draft));
+    localStorage.setItem(dashboardDocKey(store), JSON.stringify(draft));
   } catch {
     // Private mode can block storage.
   }
@@ -386,7 +389,18 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const owner = ctx?.landingDemo
     ? "local"
     : user === undefined ? "" : user?.userId || signedInRef.current || "local";
-  const storageKey = owner ? canvasStorageKey(owner, pageId) : "";
+  // The dashboard remounts the canvas per project, so the project scope is fixed for this mount.
+  const projectScopeRef = useRef(null);
+  if (projectScopeRef.current === null) projectScopeRef.current = workspaceProjectScope();
+  const store = owner ? scopedLocalOwner(owner, projectScopeRef.current) : "";
+  const storageKey = store ? canvasStorageKey(store, pageId) : "";
+  const project = useWorkspaceProject();
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  // Fixed for this mount; the dashboard remounts the canvas to open another project.
+  const projectIdRef = useRef(project?.id || "");
+  if (!projectIdRef.current && project?.id) projectIdRef.current = project.id;
+  const projectMissingRef = useRef(false);
   const [tool, setTool] = useState("select");
   const [handDown, setHandDown] = useState(false);
   const [blocksByPage, setBlocksByPage] = useState({});
@@ -463,9 +477,18 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     setReady(false);
     (async () => {
       const landingTab = loadWorkspaceStartTabs(owner).activeId || "welcome";
-      const loaded = readOnly ? await loadWorkspaceDashboardPreview() : await loadCurrentWorkspaceDashboard(landingTab);
+      const projectId = projectIdRef.current;
+      const loaded = readOnly
+        ? await loadWorkspaceDashboardPreview({ project: projectId })
+        : await loadCurrentWorkspaceDashboard(landingTab, { project: projectId });
       if (cancel) return;
       let doc = loaded.ok ? loaded.data : null;
+      if (!readOnly && loaded.ok && !doc && projectId) {
+        // Deleted, or not this account's. The project resolver sends the user to their files.
+        projectMissingRef.current = true;
+        setReady(true);
+        return;
+      }
       if (readOnly) {
         if (!doc) {
           setReady(true);
@@ -487,7 +510,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
           active_tab_id: activeTabId,
           welcome_removed: welcomeRemoved,
           tabs: tabs.length ? tabs : [{ id: "welcome", name: "Welcome", blank: false }],
-          blocks: collectLocalBlocks(owner),
+          blocks: collectLocalBlocks(store),
           tables: [],
           charts: [],
         };
@@ -496,8 +519,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         doc = created.ok ? created.data : null;
       }
       if (!doc) {
-        const localDoc = readLocalDashboard(owner);
-        const blocks = localDoc?.blocks && Object.keys(localDoc.blocks).length ? localDoc.blocks : collectLocalBlocks(owner);
+        const localDoc = readLocalDashboard(store);
+        const blocks = localDoc?.blocks && Object.keys(localDoc.blocks).length ? localDoc.blocks : collectLocalBlocks(store);
         doc = {
           name: localDoc?.name || "Untitled",
           active_tab_id: localDoc?.active_tab_id || activeTabId,
@@ -511,6 +534,10 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       const nextBlocks = blocksByPageFromDoc(doc);
       const nextTables = Array.isArray(doc.tables) ? doc.tables : [];
       docIdRef.current = String(doc._id || "");
+      if (doc._id) {
+        projectIdRef.current = String(doc._id);
+        projectRef.current?.adopt?.(doc);
+      }
       setDashboardName(String(doc.name || "").trim() || "Untitled");
       const serverPending = Array.isArray(doc.pending_tabs) ? doc.pending_tabs.filter(Boolean) : [];
       const listedTabs = new Set((Array.isArray(doc.tabs) ? doc.tabs : []).map((tab) => tab?.id).filter(Boolean));
@@ -535,13 +562,13 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       saveBaseRef.current = base;
       removedTabsRef.current = new Set(orphanTabs);
       for (const id of orphanTabs) delete nextBlocks[pageIdForTab(id)];
-      const previousLocal = readLocalDashboard(owner);
+      const previousLocal = readLocalDashboard(store);
       const localBlocks = { ...(previousLocal?.blocks || {}), ...(doc.blocks || {}) };
       for (const tabId of pendingNow) {
         if (previousLocal?.blocks?.[tabId]) localBlocks[tabId] = previousLocal.blocks[tabId];
       }
       for (const tabId of orphanTabs) delete localBlocks[tabId];
-      writeLocalDashboard(owner, {
+      writeLocalDashboard(store, {
         name: doc.name,
         active_tab_id: doc.active_tab_id,
         welcome_removed: doc.welcome_removed,
@@ -590,7 +617,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     const inflight = tabFetchRef.current;
     if (!tabId || inflight.has(tabId)) return;
     const epoch = loadEpochRef.current;
-    const run = loadCurrentWorkspaceDashboard(tabId, { blocksOnly: true })
+    const run = loadCurrentWorkspaceDashboard(tabId, { blocksOnly: true, project: projectIdRef.current })
       .catch(() => ({ ok: false }))
       .then((part) => {
         if (epoch !== loadEpochRef.current) return;
@@ -651,13 +678,13 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   }, [fetchPendingTab, pendingTabs, prefetchOn, readOnly, ready, tabRetryNonce, tabs, viewedTabId]);
 
   const liveRef = useRef(null);
-  liveRef.current = { readOnly, ready, owner, tabs, activeTabId, welcomeRemoved, dashboardName, blocksByPage, tables, pendingTabs };
+  liveRef.current = { readOnly, ready, owner, store, tabs, activeTabId, welcomeRemoved, dashboardName, blocksByPage, tables, pendingTabs };
   const backupAtRef = useRef(0);
 
   /** One save at a time. Edits made while a save is out go in the next one. */
   const flushSave = useCallback(({ keepalive = false } = {}) => {
     const live = liveRef.current;
-    if (!live || live.readOnly || !live.ready || !live.owner || live.owner === "local" || !live.tabs.length) {
+    if (!live || live.readOnly || !live.ready || !live.owner || live.owner === "local" || !live.tabs.length || projectMissingRef.current) {
       return Promise.resolve({ ok: true });
     }
     if (savingRef.current) {
@@ -674,10 +701,12 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       return result;
     };
     if (!docIdRef.current) {
-      const run = createWorkspaceDashboard(draftFromLive(live))
+      const run = createWorkspaceDashboard(draftFromLive(live), { project: projectIdRef.current })
         .then((created) => {
           if (!created.ok || !created.data?._id) return { ok: false };
           docIdRef.current = String(created.data._id);
+          projectIdRef.current = docIdRef.current;
+          projectRef.current?.adopt?.(created.data);
           saveBaseRef.current = createSaveBaseline();
           resaveRef.current = true;
           return { ok: true };
@@ -720,7 +749,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         }
         if (Date.now() - backupAtRef.current > 30000) {
           backupAtRef.current = Date.now();
-          whenIdle(() => writeLocalDashboard(live.owner, draftFromLive(liveRef.current)), 5000);
+          whenIdle(() => writeLocalDashboard(live.store, draftFromLive(liveRef.current)), 5000);
         }
         return { ok: true };
       })
@@ -834,6 +863,11 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);
   }, [flushSave, readOnly]);
+
+  // Leaving for the projects view, or opening another project, unmounts the canvas before the debounced save fires.
+  useEffect(() => () => {
+    if (docIdRef.current) void flushSave({ keepalive: true });
+  }, [flushSave]);
 
   const updateBlock = useCallback(
     (id, patch) => {
@@ -1286,10 +1320,10 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     });
     if (goneIds.size) setTables((prev) => prev.filter((table) => !goneIds.has(table.id)));
     setPendingTabs((prev) => (prev.includes(tabId) ? prev.filter((id) => id !== tabId) : prev));
-    const localOwner = liveRef.current?.owner;
-    if (localOwner) {
+    const localStore = liveRef.current?.store;
+    if (localStore) {
       try {
-        window.localStorage.removeItem(canvasStorageKey(localOwner, page));
+        window.localStorage.removeItem(canvasStorageKey(localStore, page));
       } catch {
         /* storage unavailable */
       }
@@ -1421,9 +1455,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
 
   const saveNow = useCallback(async () => {
     const live = liveRef.current;
-    const localOwner = live.owner || "local";
-    writeLocalDashboard(localOwner, draftFromLive(live));
-    if (localOwner === "local") return { ok: true };
+    writeLocalDashboard(live.store || "local", draftFromLive(live));
+    if (!live.owner || live.owner === "local") return { ok: true };
     while (savingRef.current) await savingRef.current;
     return flushSave();
   }, [flushSave]);
@@ -1441,10 +1474,14 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     });
   }, [blocks.length, pageId, ready]);
 
+  /** Anything saved in any tab of this project, counting tabs whose blocks are still loading. */
+  const hasContent = pendingTabs.length > 0 || Object.values(blocksByPage).some((list) => Array.isArray(list) && list.length > 0);
+
   const value = useMemo(
     () => ({
       tool,
       setTool,
+      hasContent,
       handDown,
       setHandDown,
       dashboardName,
@@ -1502,7 +1539,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       createChartFromBlock,
       generateChartsForSheets,
     }),
-    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, deleteTab, dismissRun, duplicateBlock, endTour, focusBlock, focusSheetRow, generateChartsForSheets, getPageId, handDown, leavePrompt, markTabSettled, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, setTourStep, startRealtimeMode, startSheetRealtime, startTour, stopRealtimeMode, stopSheetRealtime, tables, tool, tour, updateBlock],
+    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, deleteTab, dismissRun, duplicateBlock, endTour, focusBlock, focusSheetRow, generateChartsForSheets, getPageId, handDown, hasContent, leavePrompt, markTabSettled, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, setTourStep, startRealtimeMode, startSheetRealtime, startTour, stopRealtimeMode, stopSheetRealtime, tables, tool, tour, updateBlock],
   );
 
   return (

@@ -12,7 +12,7 @@ function commitTabs(ctx, nextTabs, accountId, activeId) {
   });
 }
 
-function terminalTab(terminal, subject, takenNames) {
+export function terminalTab(terminal, subject, takenNames) {
   const clean = sanitizeTerminalSubject(subject);
   return {
     id: newStartTabId(),
@@ -37,6 +37,20 @@ export function openTerminalTab({ terminalId, ctx, canvas, accountId, subject = 
     ctx?.setViewing?.("welcome");
   }
   return tab.id;
+}
+
+/** A new terminal project holding just this terminal's tab, for `createWorkspaceProject`. */
+export function terminalProjectDraft(terminalId, subject = null) {
+  const terminal = findTerminal(terminalId);
+  if (!terminal) return null;
+  const tab = terminalTab(terminal, subject, []);
+  return {
+    name: terminal.title,
+    kind: "terminal",
+    tabs: [tab],
+    active_tab_id: tab.id,
+    welcome_removed: true,
+  };
 }
 
 /**

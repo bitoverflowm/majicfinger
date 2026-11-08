@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { BarChart3, Check, ChevronDown, ChevronRight, Database, Eye, Play, Radio, RotateCcw, RotateCw, Save, Square, Table2, Type } from "lucide-react";
+import { ArrowLeft, BarChart3, Check, ChevronDown, ChevronRight, Database, Eye, Loader2, Play, Radio, RotateCcw, RotateCw, Save, Square, Table2, Type } from "lucide-react";
 import { ProvenanceMapButton } from "@/components/dashboardComposer/provenanceMap";
+import { PROJECTS_PATH, useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
+import { captureProjectThumbnail } from "@/lib/projectThumbnail";
 
 const DashboardShareDialog = dynamic(() =>
   import("@/components/dashboardComposer/DashboardShareDialog").then((m) => m.DashboardShareDialog),
@@ -740,12 +742,71 @@ function DashboardNameField({ name, onCommit }) {
   );
 }
 
-function LeftChromeHeader({ dashboardName, expanded, onToggle, onRename }) {
+function ChromeLogo() {
+  return (
+    <span className="flex size-[22px] shrink-0 overflow-hidden rounded-full">
+      <Image src="/logo.png" width={22} height={22} alt="Lychee" className="size-full object-cover" />
+    </span>
+  );
+}
+
+/** Like Figma's file menu: the logo opens a menu whose first item goes back to the projects view. */
+function ChromeLogoMenu() {
+  const router = useRouter();
+  const canvas = useWorkspaceCanvas();
+  const project = useWorkspaceProject();
+  const [leaving, setLeaving] = useState(false);
+
+  const backToFiles = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    const settle = (async () => {
+      await canvas?.saveNow?.();
+      if (project?.id) await captureProjectThumbnail(project.id);
+    })();
+    await Promise.race([settle.catch(() => null), new Promise((resolve) => window.setTimeout(resolve, 4000))]);
+    router.push(PROJECTS_PATH);
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Main menu"
+          className="mr-0.5 inline-flex h-7 shrink-0 items-center gap-0.5 rounded-md px-1 hover:bg-black/[0.05] data-[state=open]:bg-black/[0.06] dark:hover:bg-white/10 dark:data-[state=open]:bg-white/10"
+        >
+          <ChromeLogo />
+          <ChevronDown className="size-3 text-neutral-500 dark:text-neutral-400" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" sideOffset={8} className="w-56">
+        <DropdownMenuItem
+          disabled={leaving}
+          onSelect={(event) => {
+            event.preventDefault();
+            void backToFiles();
+          }}
+          className="gap-2 text-[13px]"
+        >
+          {leaving ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ArrowLeft className="size-3.5" aria-hidden />}
+          {leaving ? "Saving…" : "Back to files"}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function LeftChromeHeader({ dashboardName, expanded, onToggle, onRename, logoMenu }) {
   return (
     <div className={cn("flex h-10 shrink-0 items-center gap-2 pl-1.5 pr-1", expanded && "border-b border-black/[0.06] dark:border-white/10")}>
-      <span className="mr-1 flex size-[22px] shrink-0 overflow-hidden rounded-full">
-        <Image src="/logo.png" width={22} height={22} alt="Lychee" className="size-full object-cover" />
-      </span>
+      {logoMenu ? (
+        <ChromeLogoMenu />
+      ) : (
+        <span className="mr-1 flex">
+          <ChromeLogo />
+        </span>
+      )}
       {onRename ? (
         <DashboardNameField name={dashboardName} onCommit={onRename} />
       ) : (
@@ -768,6 +829,7 @@ function LeftChromeHeader({ dashboardName, expanded, onToggle, onRename }) {
 export default function FigmaNavChrome({ onLogout, dashboardName: fixedName }) {
   const ctx = useMyStateV2();
   const canvas = useWorkspaceCanvas();
+  const project = useWorkspaceProject();
   const expanded = !!ctx?.navChromeExpanded;
   const setExpanded = ctx?.setNavChromeExpanded;
   const dashboardName = fixedName || canvas?.dashboardName || "Untitled";
@@ -797,6 +859,7 @@ export default function FigmaNavChrome({ onLogout, dashboardName: fixedName }) {
           expanded={expanded}
           onToggle={toggle}
           onRename={fixedName ? undefined : (next) => canvas?.renameDashboard?.(next)}
+          logoMenu={!fixedName && !!project}
         />
         {expanded ? <DashboardLayerTree /> : null}
       </aside>
