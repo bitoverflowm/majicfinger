@@ -251,6 +251,14 @@ module.exports = {
   				'0%': { backgroundColor: 'rgb(13 153 255 / 0.2)', boxShadow: 'inset 2px 0 0 0 rgb(13 153 255)' },
   				'60%': { backgroundColor: 'rgb(13 153 255 / 0.08)', boxShadow: 'inset 2px 0 0 0 rgb(13 153 255 / 0.6)' },
   				'100%': { backgroundColor: 'transparent', boxShadow: 'inset 2px 0 0 0 transparent' }
+  			},
+  			'tick-up': {
+  				'0%': { backgroundColor: 'rgb(16 185 129 / 0.22)' },
+  				'100%': { backgroundColor: 'transparent' }
+  			},
+  			'tick-down': {
+  				'0%': { backgroundColor: 'rgb(244 63 94 / 0.22)' },
+  				'100%': { backgroundColor: 'transparent' }
   			}
   		},
   		animation: {
@@ -271,7 +279,9 @@ module.exports = {
   			'border-beam': 'border-beam calc(var(--duration)*1s) infinite linear',
   			ripple: 'ripple var(--duration,2s) ease calc(var(--i, 0)*.2s) infinite',
   			'api-tab-pulse': 'api-tab-pulse 0.6s ease-out forwards',
-  			'row-arrive': 'row-arrive 3s ease-out'
+  			'row-arrive': 'row-arrive 3s ease-out',
+  			'tick-up': 'tick-up 1.2s ease-out',
+  			'tick-down': 'tick-down 1.2s ease-out'
   		},
   		slide: {
   			to: {

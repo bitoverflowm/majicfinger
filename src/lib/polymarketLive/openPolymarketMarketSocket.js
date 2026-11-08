@@ -199,6 +199,77 @@ export function openPolymarketLastTradeSocket(opts) {
   });
 }
 
+/** Polymarket shows the midpoint unless the spread is wider than 10¢, when the last trade is the better price. */
+function quoteMid(bid, ask) {
+  const b = Number(bid);
+  const a = Number(ask);
+  if (!Number.isFinite(b) || !Number.isFinite(a) || a <= 0 || a - b > 0.1) return null;
+  return (a + b) / 2;
+}
+
+/**
+ * Market-wide events plus top-of-book moves for a set of assets. `new_market` and
+ * `market_resolved` are broadcast to every subscriber that sets `custom_feature_enabled`,
+ * whatever assets it asked for.
+ *
+ * @param {{
+ *   assetIds: string[];
+ *   onNewMarket?: (msg: Record<string, unknown>) => void;
+ *   onResolved?: (msg: Record<string, unknown>) => void;
+ *   onTrade?: (row: { asset_id: string; market: string; price: number; size: number; side: string; timestamp: number }) => void;
+ *   onQuote?: (row: { asset_id: string; market: string; mid: number; timestamp: number }) => void;
+ *   onStatus?: (status: "open" | "closed" | "error") => void;
+ * }} opts
+ * @returns {() => void}
+ */
+export function openPolymarketMarketFeed(opts) {
+  return openPolymarketMarketChannel({
+    assetIds: opts.assetIds,
+    customFeatureEnabled: true,
+    onStatus: opts.onStatus,
+    onMessage: (msg) => {
+      const type = String(msg.event_type || "");
+      const timestamp = Number(messageTime(msg).timestamp);
+      const market = String(msg.market || "");
+      if (type === "new_market") {
+        opts.onNewMarket?.(msg);
+        return;
+      }
+      if (type === "market_resolved") {
+        opts.onResolved?.(msg);
+        return;
+      }
+      if (type === "last_trade_price" && msg.asset_id) {
+        const price = Number(msg.price);
+        if (!Number.isFinite(price)) return;
+        opts.onTrade?.({
+          asset_id: String(msg.asset_id),
+          market,
+          price,
+          size: Number(msg.size) || 0,
+          side: String(msg.side || "").toUpperCase(),
+          timestamp,
+        });
+        return;
+      }
+      if (type === "best_bid_ask" && msg.asset_id) {
+        const mid = quoteMid(msg.best_bid, msg.best_ask);
+        if (mid != null) opts.onQuote?.({ asset_id: String(msg.asset_id), market, mid, timestamp });
+        return;
+      }
+      if (type === "price_change") {
+        const changes = Array.isArray(msg.price_changes) ? msg.price_changes : [];
+        for (const change of changes) {
+          const mid = quoteMid(change?.best_bid, change?.best_ask);
+          if (change?.asset_id && mid != null) {
+            opts.onQuote?.({ asset_id: String(change.asset_id), market, mid, timestamp });
+          }
+        }
+      }
+    },
+  });
+}
+
 /**
  * Subscribe to best bid / ask / spread (and book snapshots) for top-of-book
  * live views. `custom_feature_enabled` is required for `best_bid_ask` events.
