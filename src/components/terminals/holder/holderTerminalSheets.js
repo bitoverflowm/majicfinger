@@ -34,10 +34,6 @@ export const TRADE_COLUMNS = polymarketLiveBuildColumns("getTradesByMarket").map
   defaultOn: TERMINAL_WIDTHS.has(column.id),
   ...(TERMINAL_WIDTHS.has(column.id) ? { width: TERMINAL_WIDTHS.get(column.id) } : {}),
 }));
-
-/** The columns the terminal shows, in its order. */
-export const TRADE_GRID_COLUMNS = TERMINAL_TRADE_COLUMNS.map(([id]) => TRADE_COLUMNS.find((column) => column.id === id)).filter(Boolean);
-
 function slugId(text) {
   return String(text || "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
 }

@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
-import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { MarketCardSkeleton, MarketStatsCard } from "@/components/dashboardComposer/recipes/polymarketMarketSearch";
 import { retryImport } from "@/lib/retryImport";
 import { cn } from "@/lib/utils";
-import { marketTradeSheet, outcomeTokens, sheetChartBlock, TRADE_GRID_COLUMNS } from "./holderTerminalSheets";
+import { marketTradeSheet, sheetChartBlock } from "./holderTerminalSheets";
+import { HolderTradesTable, MergeOutcomesButton } from "./holderTradesTable";
 import { useFusedMarketTrades } from "./useFusedMarketTrades";
 import { useLiveMarketMeta, useLiveMarketStats } from "./useLiveMarketMeta";
 
@@ -34,34 +34,6 @@ export function LiveDot({ on, label }) {
       </span>
       {label}
     </span>
-  );
-}
-
-function OutcomeToggle({ meta, value, onChange }) {
-  const [first = "Yes", second = "No"] = meta.outcomes || [];
-  const options = [
-    { id: "both", label: `${first} + ${second}` },
-    { id: "yes", label: first },
-    { id: "no", label: second },
-  ];
-  return (
-    <div role="radiogroup" aria-label="Outcomes" className="inline-flex rounded-lg bg-muted p-0.5 text-[12px]">
-      {options.map((option) => (
-        <button
-          key={option.id}
-          type="button"
-          role="radio"
-          aria-checked={value === option.id}
-          onClick={() => onChange(option.id)}
-          className={cn(
-            "rounded-md px-3 py-1 font-medium transition-colors",
-            value === option.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -92,34 +64,16 @@ export function HolderMarketView({ subject }) {
   const { meta, error, quotes } = useLiveMarketMeta(subject.conditionId);
   const { rows, status } = useFusedMarketTrades(meta);
   const stats = useLiveMarketStats(meta, quotes, rows);
-  const [outcome, setOutcome] = useState("both");
-  const [widths, setWidths] = useState({});
-  useEffect(() => setOutcome("both"), [subject.conditionId]);
-
-  const shown = useMemo(() => {
-    if (!meta || outcome === "both") return rows;
-    const keep = new Set(outcomeTokens(meta, outcome).map(String));
-    return rows.filter((row) => keep.has(String(row.token_id)));
-  }, [meta, outcome, rows]);
+  const [merged, setMerged] = useState(false);
+  useEffect(() => setMerged(false), [subject.conditionId]);
 
   const sheet = useMemo(
-    () => (meta ? marketTradeSheet(meta, shown, { outcome, truncated: status.truncated, label: status.label }) : null),
-    [meta, outcome, shown, status.label, status.truncated],
+    () => (meta ? marketTradeSheet(meta, rows, { truncated: status.truncated, label: status.label }) : null),
+    [meta, rows, status.label, status.truncated],
   );
   const chart = useMemo(() => (sheet ? sheetChartBlock(sheet) : null), [sheet]);
-  const gridBlock = useMemo(
-    () =>
-      sheet
-        ? {
-            ...sheet,
-            columns: TRADE_GRID_COLUMNS.map((column) =>
-              widths[column.id] ? { ...column, width: widths[column.id] } : column,
-            ),
-          }
-        : null,
-    [sheet, widths],
-  );
   const live = status.socket === "open";
+  const historyLoaded = status.phase === "live" && rows.length >= status.historyCount;
 
   if (error && !meta) {
     return <p className="mt-8 rounded-xl border border-border/70 px-4 py-6 text-[13px] text-muted-foreground">{error}</p>;
@@ -148,7 +102,7 @@ export function HolderMarketView({ subject }) {
           data-source-sheet={chart?.sourceSheetId}
           className="flex h-[420px] min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background p-3 shadow-sm"
         >
-          {shown.length ? (
+          {rows.length ? (
             <SheetBlockChart sheet={sheet} live={live} view={chart.chartView} />
           ) : (
             <PanelLoading label={status.phase === "history" ? "Waiting for trades" : "No trades yet"} />
@@ -157,28 +111,27 @@ export function HolderMarketView({ subject }) {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <OutcomeToggle meta={meta} value={outcome} onChange={setOutcome} />
+        <MergeOutcomesButton
+          merged={merged}
+          outcomes={[meta.outcomes?.[0] || "Yes", meta.outcomes?.[1] || "No"]}
+          onChange={setMerged}
+        />
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
-          <HistoryStatus status={status} count={shown.length} />
+          <HistoryStatus status={status} count={rows.length} />
           <LiveDot on={live} label={live ? "Streaming" : "Offline"} />
         </div>
       </div>
       {status.error ? <p className="text-[12px] text-amber-700 dark:text-amber-300">{status.error}</p> : null}
 
-      <section
-        aria-label="Trade history"
-        data-block-type={sheet.type}
-        className="flex h-[560px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm"
-      >
-        <DashboardSheetGrid
-          block={gridBlock}
-          readOnly
-          onChange={(patch) => {
-            if (!patch?.columns) return;
-            setWidths(Object.fromEntries(patch.columns.filter((column) => column.id).map((column) => [column.id, column.width])));
-          }}
+      <div data-block-type={sheet.type}>
+        <HolderTradesTable
+          meta={meta}
+          rows={rows}
+          merged={merged}
+          loading={status.phase === "history"}
+          ready={historyLoaded}
         />
-      </section>
+      </div>
     </div>
   );
 }
