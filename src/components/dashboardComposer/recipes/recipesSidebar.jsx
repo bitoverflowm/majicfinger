@@ -6,6 +6,7 @@ import {
   KalshiTradeHistoryPreview,
   PolymarketTradeHistoryPreview,
 } from "@/components/dashboardComposer/recipes/kalshiTradeHistoryPreview";
+import { HolderTerminalPreview } from "@/components/dashboardComposer/recipes/holderTerminalPreview";
 import { PolymarketHolderAnalysisPreview } from "@/components/dashboardComposer/recipes/polymarketHolderAnalysisPreview";
 import { cn } from "@/lib/utils";
 import { TERMINALS } from "@/lib/workspaceTerminals";
@@ -36,6 +37,8 @@ export const RECIPES = [
     preview: PolymarketHolderAnalysisPreview,
   },
 ];
+
+const TERMINAL_PREVIEWS = { holder: HolderTerminalPreview };
 
 const PANEL_MS = 500;
 
@@ -95,6 +98,15 @@ function SidebarRow({ item, icon: Icon, active = false, onClick, hoverProps }) {
  * a recipe opens a full-window tool.
  */
 export function RecipesSidebar({ onOpen, onOpenTerminal, onHover, activeId = null, expanded = false, className }) {
+  const hoverProps = (id) => ({
+    onMouseEnter: () => onHover?.(id),
+    onMouseLeave: () => onHover?.(null),
+    onFocus: (event) => {
+      // Keyboard focus only: a dialog's open autofocus must not slide the preview out.
+      if (event.currentTarget.matches(":focus-visible")) onHover?.(id);
+    },
+    onBlur: () => onHover?.(null),
+  });
   return (
     <aside
       className={cn(
@@ -109,7 +121,13 @@ export function RecipesSidebar({ onOpen, onOpenTerminal, onHover, activeId = nul
         </SectionHeader>
         <ul>
           {TERMINALS.map((terminal) => (
-            <SidebarRow key={terminal.id} item={terminal} icon={SquareTerminal} onClick={() => onOpenTerminal?.(terminal.id)} />
+            <SidebarRow
+              key={terminal.id}
+              item={terminal}
+              icon={SquareTerminal}
+              onClick={() => onOpenTerminal?.(terminal.id)}
+              hoverProps={TERMINAL_PREVIEWS[terminal.id] ? hoverProps(terminal.id) : undefined}
+            />
           ))}
         </ul>
         <SectionHeader title="Recipes" count={RECIPES.length} className="pt-5">
@@ -123,15 +141,7 @@ export function RecipesSidebar({ onOpen, onOpenTerminal, onHover, activeId = nul
               icon={recipe.icon}
               active={recipe.id === activeId}
               onClick={() => onOpen?.(recipe.id)}
-              hoverProps={{
-                onMouseEnter: () => onHover?.(recipe.id),
-                onMouseLeave: () => onHover?.(null),
-                onFocus: (event) => {
-                  // Keyboard focus only: a dialog's open autofocus must not slide the preview out.
-                  if (event.currentTarget.matches(":focus-visible")) onHover?.(recipe.id);
-                },
-                onBlur: () => onHover?.(null),
-              }}
+              hoverProps={hoverProps(recipe.id)}
             />
           ))}
         </ul>
@@ -141,10 +151,10 @@ export function RecipesSidebar({ onOpen, onOpenTerminal, onHover, activeId = nul
 }
 
 /**
- * The hovered recipe's walkthrough. It slides out of the sidebar over the picker and its
- * preview, inside the same dialog box. Clicking it opens the recipe.
+ * The hovered recipe's or terminal's walkthrough. It slides out of the sidebar over the picker
+ * and its preview, inside the same dialog box. Clicking it opens the recipe or terminal.
  */
-export function RecipePreviewPanel({ recipeId, onOpen, onHover }) {
+export function RecipePreviewPanel({ recipeId, onOpen, onOpenTerminal, onHover }) {
   const open = Boolean(recipeId);
   const [shownId, setShownId] = useState(recipeId);
 
@@ -157,13 +167,18 @@ export function RecipePreviewPanel({ recipeId, onOpen, onHover }) {
     return () => window.clearTimeout(timer);
   }, [recipeId]);
 
-  const Preview = RECIPES.find((recipe) => recipe.id === shownId)?.preview;
+  const Preview = RECIPES.find((recipe) => recipe.id === shownId)?.preview || TERMINAL_PREVIEWS[shownId];
+  const openShown = () => {
+    if (!open) return;
+    if (TERMINAL_PREVIEWS[recipeId]) onOpenTerminal?.(recipeId);
+    else onOpen?.(recipeId);
+  };
   return (
     <div
       aria-hidden
       onMouseEnter={() => open && onHover?.(recipeId)}
       onMouseLeave={() => onHover?.(null)}
-      onClick={() => open && onOpen?.(recipeId)}
+      onClick={openShown}
       className={cn(
         "absolute inset-y-0 left-1/4 right-0 z-[5] hidden bg-background transition-[clip-path] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:block",
         open ? "cursor-pointer [clip-path:inset(0_0_0_0)]" : "pointer-events-none [clip-path:inset(0_100%_0_0)]",

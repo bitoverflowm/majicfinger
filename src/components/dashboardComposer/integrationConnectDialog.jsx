@@ -560,7 +560,7 @@ function IntegrationConnectFlow({
           expanded={Boolean(previewRecipeId)}
           className="hidden w-1/4 shrink-0 md:flex"
         />
-        <RecipePreviewPanel recipeId={previewRecipeId} onOpen={openRecipe} onHover={previewRecipe} />
+        <RecipePreviewPanel recipeId={previewRecipeId} onOpen={openRecipe} onOpenTerminal={openTerminal} onHover={previewRecipe} />
         <div className="grid min-h-0 min-w-0 flex-1 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           <div className="flex min-h-0 flex-col bg-background">
             <div className={cn("px-6 pb-3 pt-6", withClose && "pr-12")}>

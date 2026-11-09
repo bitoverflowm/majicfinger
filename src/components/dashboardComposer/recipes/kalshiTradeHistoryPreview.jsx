@@ -119,7 +119,7 @@ export function useTimeline(paused) {
   return paused ? { phase: READY, loop: 0 } : state;
 }
 
-function useTyped(text, active) {
+export function useTyped(text, active) {
   const [count, setCount] = useState(active ? 0 : text.length);
   useEffect(() => {
     if (!active) {
@@ -133,7 +133,7 @@ function useTyped(text, active) {
   return text.slice(0, count);
 }
 
-function useTick(active, ms = 110) {
+export function useTick(active, ms = 110) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!active) return undefined;
@@ -143,7 +143,7 @@ function useTick(active, ms = 110) {
   return tick;
 }
 
-function useCountUp(target, active, ms) {
+export function useCountUp(target, active, ms) {
   const [value, setValue] = useState(target);
   useEffect(() => {
     if (!active) {

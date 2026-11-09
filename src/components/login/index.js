@@ -81,10 +81,14 @@ const Login = ({ fromHome }) => {
     <div className="relative flex min-h-dvh w-full flex-1 flex-col items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
       <div className="relative hidden h-full min-h-screen flex-col p-10 text-white lg:flex dark:border-r">
         <div className="absolute inset-0 bg-black" />
-        <div className="relative z-20 flex items-center text-lg font-medium">
-          <img src="/fruit.png" alt="Lychee" className="mr-2 h-8 w-6 brightness-0 invert" />
+        <Link
+          href="/"
+          aria-label="Lychee home"
+          className="relative z-20 flex w-fit items-center text-lg font-medium transition-opacity hover:opacity-80"
+        >
+          <img src="/fruit.png" alt="" className="mr-2 h-8 w-6 brightness-0 invert" />
           <span className="text-white">Lychee</span>
-        </div>
+        </Link>
         <div className="relative z-20 mt-auto">
           <blockquote className="leading-normal text-balance text-white/90">
             &ldquo;Discover something great.&rdquo;
@@ -96,9 +100,6 @@ const Login = ({ fromHome }) => {
           <div className="flex flex-col gap-2 text-center">
             <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
             <p className="text-sm text-muted-foreground">Enter your email below to receive a magic link</p>
-            <p className="text-xs text-muted-foreground text-balance">
-              Your email must match the email you used to complete the Stripe Checkout.
-            </p>
           </div>
           {loading ? (
             <Progress value={progress} className="w-full" />
