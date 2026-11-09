@@ -181,7 +181,7 @@ export function MarketPriceNewsPanel() {
       title="Price and news over the market's life"
       description={
         meta
-          ? `The price from the day before the market opened to ${meta.closed ? "its close" : "now"}, with headlines that mention every word below marked where they came out, from Google News and GDELT, the open global news index. The bars under the chart show how many matching articles came out when, so spikes line up with price moves; click one to look closer. The words start from the market's title; remove them, add your own or pick a suggestion, and it remembers your choice for this market.${
+          ? `We put the news right on top of the price so you can see what moved this market. Each headline sits where it broke, and the bars underneath show how much coverage there was, so a burst of news next to a jump in the odds stands out. Click a bar to read what came out then. The words below decide which stories count; they start from the market's title, and you can change them for this market.${
               meta.closed ? "" : " New headlines show up within a few minutes."
             }`
           : null

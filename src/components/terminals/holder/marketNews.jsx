@@ -67,18 +67,12 @@ function timeNote(article) {
 }
 
 function sourceSummary(sources, count) {
-  const parts = [];
+  const answered = ["google", "gdelt"].some((id) => sources[id]?.status === "ok");
   const warnings = [];
-  for (const id of ["google", "gdelt"]) {
-    const source = sources[id];
-    if (!source) continue;
-    if (source.status === "ok") parts.push(`${(source.articles?.length || 0).toLocaleString()} from ${PROVIDER_LABEL[id]}`);
-    if (source.message) warnings.push(`${PROVIDER_LABEL[id]}: ${source.message}`);
-  }
-  const volume = sources.volume;
-  if (volume?.message && volume.status !== "ok" && volume.message !== sources.gdelt?.message) warnings.push(`News volume: ${volume.message}`);
+  if (["google", "gdelt"].some((id) => sources[id]?.message)) warnings.push("Some news couldn't be reached, so a few headlines may be missing.");
+  if (sources.volume?.message && sources.volume.status !== "ok") warnings.push("The news bars couldn't be loaded right now.");
   const loading = ["google", "gdelt", "volume"].some((id) => sources[id]?.loading);
-  return { line: parts.length ? `${count.toLocaleString()} headlines · ${parts.join(" · ")}` : "", warnings, loading };
+  return { line: answered ? `${count.toLocaleString()} ${count === 1 ? "headline" : "headlines"} found` : "", warnings, loading };
 }
 
 /**

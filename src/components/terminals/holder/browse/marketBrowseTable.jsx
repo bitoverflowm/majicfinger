@@ -154,7 +154,7 @@ export function MarketIcon({ market, className }) {
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={market.icon} alt="" loading="lazy" onError={() => setBroken(true)} className={cn("size-8 shrink-0 rounded-md bg-muted object-cover", className)} />
+    <img src={market.icon} alt="" loading="lazy" onError={() => setBroken(true)} className={cn("size-8 shrink-0 rounded-md bg-muted object-contain", className)} />
   );
 }
 

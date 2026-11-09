@@ -154,7 +154,7 @@ export function MarketBrowseCalendar({ markets, closedFeed, ...tableProps }) {
                     <span key={market.conditionId} className="flex min-w-0 items-center gap-1 rounded bg-background/80 px-1 py-0.5 text-[10.5px] leading-tight text-foreground shadow-[0_0_0_1px_rgb(0_0_0/0.04)]">
                       {market.icon ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={market.icon} alt="" loading="lazy" className="size-3 shrink-0 rounded-sm object-cover" />
+                        <img src={market.icon} alt="" loading="lazy" className="size-3 shrink-0 rounded-sm object-contain" />
                       ) : null}
                       <span className="truncate">{market.question}</span>
                     </span>

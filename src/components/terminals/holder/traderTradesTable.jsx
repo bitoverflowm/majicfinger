@@ -114,7 +114,7 @@ export function MarketIcon({ src, title, size = 22 }) {
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" onError={() => setBroken(true)} className="shrink-0 rounded-md bg-muted object-cover" style={{ width: size, height: size }} />
+    <img src={src} alt="" onError={() => setBroken(true)} className="shrink-0 rounded-md bg-muted object-contain" style={{ width: size, height: size }} />
   );
 }
 

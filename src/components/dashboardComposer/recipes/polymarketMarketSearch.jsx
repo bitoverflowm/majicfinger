@@ -98,7 +98,7 @@ function MarketAvatar({ icon, title }) {
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={icon} alt="" onError={() => setBroken(true)} className="size-10 shrink-0 rounded-lg bg-muted object-cover" />
+    <img src={icon} alt="" onError={() => setBroken(true)} className="size-10 shrink-0 rounded-lg bg-muted object-contain" />
   );
 }
 
