@@ -15,7 +15,6 @@ import RestLiveFeedManager from './components/restLiveFeedManager';
 import { RunYourselfLoaderGate } from './RunYourselfLoaderGate';
 import { HubQueryLoaderGate } from './HubQueryLoaderGate';
 
-import { Toaster } from "@/components/ui/sonner"
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state"
 import { WORKSPACE_PROJECT_PARAM, WorkspaceProjectProvider } from "@/components/projects/workspaceProjectContext"
 
@@ -61,7 +60,6 @@ function DashboardInner() {
                         <AuthenticatedJourneyInit user={user} />
                         <LiveStreamManager />
                         <RestLiveFeedManager />
-                        <Toaster />
                         <main className="flex min-h-svh flex-col">
                             <RunYourselfLoaderGate userId={user.userId} />
                             <HubQueryLoaderGate />

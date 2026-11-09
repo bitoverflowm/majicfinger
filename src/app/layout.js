@@ -6,6 +6,7 @@ import { GeistMono } from 'geist/font/mono'
 import { GeistSans } from 'geist/font/sans'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
+import { Toaster as Sonner } from '@/components/ui/sonner'
 import { VisitorJourneyInit } from '@/components/analytics/VisitorJourneyInit'
 import { NewsletterPopup } from '@/components/newsletter/newsletter-popup'
 import { DesktopOnlyDialog } from '@/components/desktop-only/desktop-only-dialog'
@@ -46,6 +47,7 @@ export default function RootLayout({ children }) {
           <NewsletterPopup />
           <DesktopOnlyDialog />
           <Toaster />
+          <Sonner />
         </ThemeProvider>
       </body>
     </html>

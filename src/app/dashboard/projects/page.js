@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import ProjectsView from "@/components/projects/projectsView";
-import { Toaster } from "@/components/ui/sonner";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { userSwrFetcher } from "@/lib/hooks";
 
@@ -24,10 +23,5 @@ export default function ProjectsPage() {
     );
   }
 
-  return (
-    <>
-      <Toaster />
-      <ProjectsView user={user} />
-    </>
-  );
+  return <ProjectsView user={user} />;
 }
