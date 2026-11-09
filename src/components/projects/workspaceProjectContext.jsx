@@ -29,6 +29,10 @@ export function dashboardUrlForProject(id) {
   return id ? `/dashboard?${WORKSPACE_PROJECT_PARAM}=${encodeURIComponent(id)}` : "/dashboard";
 }
 
+export function previewUrlForProject(id) {
+  return id ? `/dashboard/preview?${WORKSPACE_PROJECT_PARAM}=${encodeURIComponent(id)}` : "/dashboard/preview";
+}
+
 function setProjectInUrl(id) {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);

@@ -403,7 +403,9 @@ function writeLocalDashboard(store, draft) {
   }
 }
 
-export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) {
+/** `publishedDoc` shows a published page's content as given (read-only), instead of loading the signed-in user's project. */
+export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false, publishedDoc = null, children }) {
+  const readOnly = readOnlyProp || !!publishedDoc;
   const user = useUser();
   const ctx = useMyStateV2();
   const signedInRef = useRef("");
@@ -489,7 +491,17 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const welcomeRemoved = !!ctx?.welcomeTabRemoved;
 
   useEffect(() => {
-    if (!owner) return undefined;
+    if (!publishedDoc) return;
+    setDashboardName(String(publishedDoc.name || "").trim() || "Untitled");
+    setPreviewTabs(Array.isArray(publishedDoc.tabs) ? publishedDoc.tabs : []);
+    setPreviewActiveId(publishedDoc.active_tab_id || publishedDoc.tabs?.[0]?.id || "");
+    setTables(Array.isArray(publishedDoc.tables) ? publishedDoc.tables : []);
+    setBlocksByPage(blocksByPageFromDoc(publishedDoc));
+    setReady(true);
+  }, [publishedDoc]);
+
+  useEffect(() => {
+    if (publishedDoc || !owner) return undefined;
     if (owner === "local") {
       const loaded = readCanvasBlocks(storageKey);
       setBlocksByPage((prev) => ((prev[pageId] || []).length ? prev : { ...prev, [pageId]: loaded }));
@@ -2926,11 +2938,6 @@ export function WorkspaceCanvas() {
   const canvas = useWorkspaceCanvas();
   const ctx = useMyStateV2();
   const blocks = canvas?.blocks || [];
-  const lockedIds = useMemo(
-    () => (ctx?.landingDemo && !canvas?.runFeed ? demoLockedIds(blocks) : new Set()),
-    [blocks, canvas?.runFeed, ctx?.landingDemo],
-  );
-  const lockedBlocks = blocks.filter((block) => lockedIds.has(block.id));
   const scrollerRef = useRef(null);
   // Stands in for the scroller on an empty tab, so blocks placed there (a terminal's panels) use its real width.
   const sizerRef = useRef(null);
@@ -2940,8 +2947,17 @@ export function WorkspaceCanvas() {
 
   const pageTabId = tabIdFromPage(canvas?.pageId);
   const pageTab = ((canvas?.readOnly ? canvas?.previewTabs : ctx?.workspaceStartTabs) || []).find((tab) => tab?.id === pageTabId) || null;
-  // The landing demo still shows a terminal as one page over the canvas.
-  const terminalTab = !ctx?.landingDemo && pageTab?.terminal ? pageTab : null;
+  // The demo shows everything a terminal tab opens; saving it is what takes a membership.
+  const demoPaywalled = !!ctx?.landingDemo && !canvas?.runFeed && !pageTab?.terminal;
+  const lockedIds = useMemo(() => (demoPaywalled ? demoLockedIds(blocks) : new Set()), [blocks, demoPaywalled]);
+  const lockedBlocks = blocks.filter((block) => lockedIds.has(block.id));
+  // A preview keeps the layouts it works out here, since it saves nothing.
+  const [previewLayouts, setPreviewLayouts] = useState({});
+  const previewLayout = canvas?.readOnly && pageTab ? previewLayouts[pageTab.id] : null;
+  const terminalTab = useMemo(() => {
+    if (!pageTab?.terminal) return null;
+    return previewLayout ? { ...pageTab, terminalLayout: previewLayout } : pageTab;
+  }, [pageTab, previewLayout]);
   const pageTabRef = useRef(pageTab);
   pageTabRef.current = pageTab;
   const laidPageRef = useRef("");
@@ -2951,12 +2967,14 @@ export function WorkspaceCanvas() {
   useTerminalTabLayout({
     tab: terminalTab,
     blocks,
-    enabled: !!terminalTab && !canvas?.readOnly && !!canvas?.ready && !canvas?.tabLoading,
+    // A preview also lays out panels a tab never saved (one not opened since it was made), without keeping them.
+    enabled: !!terminalTab && !!canvas?.ready && !canvas?.tabLoading,
     onBlocks: (next) => canvas?.replacePageBlocks?.(canvas.pageId, next),
     onLayout: (layout) => {
       const tabId = terminalTab?.id;
       if (!tabId || JSON.stringify(terminalTab.terminalLayout || null) === JSON.stringify(layout)) return;
-      updateTerminalTab({ ctx, tabId, accountId, patch: { terminalLayout: layout } });
+      if (canvas?.readOnly) setPreviewLayouts((prev) => ({ ...prev, [tabId]: layout }));
+      else updateTerminalTab({ ctx, tabId, accountId, patch: { terminalLayout: layout } });
     },
   });
   const terminalToTop = useCallback(() => scrollerRef.current?.scrollTo({ top: 0, behavior: "smooth" }), []);
@@ -3118,9 +3136,7 @@ export function WorkspaceCanvas() {
     const apply = () => {
       const width = Math.floor(scroller.clientWidth);
       if (!Number.isFinite(width) || width < 320) return;
-      const tab = pageTabRef.current;
-      // The landing demo's terminal isn't laid out in panels, so its tab keeps the plain defaults.
-      const margins = resolveTabMargins(ctx?.landingDemo && tab?.terminal ? { margins: tab.margins } : tab, width);
+      const margins = resolveTabMargins(pageTabRef.current, width);
       // Blocks sit where the tab's grid was when they were saved; only a change on the tab on screen moves them.
       if (laidPageRef.current === page && relayoutPage && !sameTabMargins(margins, canvasGridMetrics().margins)) {
         relayoutPage(page, margins, width);
@@ -3149,7 +3165,7 @@ export function WorkspaceCanvas() {
     const observer = new ResizeObserver(apply);
     observer.observe(scroller);
     return () => observer.disconnect();
-  }, [canvas?.ready, canvas?.tabLoading, blocks.length, marginsKey, page, relayoutPage, ctx?.landingDemo]);
+  }, [canvas?.ready, canvas?.tabLoading, blocks.length, marginsKey, page, relayoutPage]);
 
   const hasBlocks = blocks.length > 0;
   const bootedPageRef = useRef("");

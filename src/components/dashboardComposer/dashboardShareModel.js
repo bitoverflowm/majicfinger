@@ -78,7 +78,7 @@ function blankSheet(block) {
   return !title || /^data sheet$/i.test(title);
 }
 
-function sheetAsset(block, tab) {
+export function sheetAsset(block, tab) {
   if (!block || block.type !== "sheet" || blankSheet(block)) return null;
   const market = sheetMarketName(block);
   const side = sheetMarketSide(block);

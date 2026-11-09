@@ -3,6 +3,7 @@ import dbConnect from "@/lib/dbConnect";
 import ChartDashboard from "@/models/ChartDashboards";
 import Chart from "@/models/Charts";
 import User from "@/models/Users";
+import WorkspacePublication from "@/models/WorkspacePublications";
 import { getAllContent } from "@/lib/content";
 import { isFeatureReleaseContent } from "@/lib/content/featureReleaseMatchers";
 import type { ContentItem, ContentType } from "@/lib/content/types";
@@ -183,9 +184,18 @@ export async function GET() {
       .select("user_id public_slug chart_name last_saved_date")
       .lean()) as any[];
 
+    const projects = (await WorkspacePublication.find({
+      published: true,
+      visibility: "public",
+      password_on: { $ne: true },
+    })
+      .select("user_id slug published_at")
+      .lean()) as any[];
+
     const userIds = new Set<string>();
     for (const d of dashboards) if (d?.user_id) userIds.add(String(d.user_id));
     for (const c of charts) if (c?.user_id) userIds.add(String(c.user_id));
+    for (const p of projects) if (p?.user_id) userIds.add(String(p.user_id));
 
     const users = userIds.size
       ? ((await User.find({ _id: { $in: Array.from(userIds) } })
@@ -206,6 +216,16 @@ export async function GET() {
       dashboardEntries.push({
         path: `/${encodeURIComponent(username)}/dashboards/${encodeURIComponent(slug)}`,
         lastmod: d.last_edited_date || d.published_at,
+      });
+    }
+
+    for (const p of projects) {
+      const username = usernameById.get(String(p.user_id)) || "";
+      const slug = String(p.slug || "").trim();
+      if (!username || !slug) continue;
+      dashboardEntries.push({
+        path: `/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`,
+        lastmod: p.published_at,
       });
     }
 

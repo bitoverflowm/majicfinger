@@ -235,6 +235,65 @@ export async function captureNodeThumbnail(node, { maxWidth = 640, aspect = 0.62
   }
 }
 
+/** PNG data URL of `node` with the same fixes as exports (no mid-animation frames, SVG colours resolved). */
+const BLANK_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// A canvas can't read cross-origin pictures (market icons, avatars), so swap them for same-origin copies.
+async function inlineForeignImages(node) {
+  const restore = [];
+  const images = [...node.querySelectorAll("img")].filter((img) => {
+    const src = img.currentSrc || img.src;
+    return src && !src.startsWith("data:") && new URL(src, location.href).origin !== location.origin;
+  });
+  await Promise.all(
+    images.map(async (img) => {
+      const src = img.currentSrc || img.src;
+      const previous = { src: img.getAttribute("src"), srcset: img.getAttribute("srcset") };
+      let data = BLANK_GIF;
+      try {
+        const res = await fetch(`/api/share/image?url=${encodeURIComponent(src)}`);
+        if (res.ok) data = await blobToDataUrl(await res.blob());
+      } catch {
+        /* keep the blank */
+      }
+      img.removeAttribute("srcset");
+      img.src = data;
+      await img.decode?.().catch(() => undefined);
+      restore.push(() => {
+        if (previous.srcset != null) img.setAttribute("srcset", previous.srcset);
+        if (previous.src != null) img.setAttribute("src", previous.src);
+      });
+    }),
+  );
+  return () => restore.forEach((undo) => undo());
+}
+
+export async function captureNodePng(node, options = {}) {
+  if (!node) throw new Error("Nothing to capture");
+  ensureStillStyle();
+  const restartAnimations = stopInlineAnimations(node);
+  const restorePaint = resolveSvgPaint(node);
+  const restoreImages = await inlineForeignImages(node);
+  node.classList.add(STILL_CLASS);
+  try {
+    return await snapshot(node, "png", { cacheBust: true, imagePlaceholder: BLANK_GIF, onImageErrorHandler: () => undefined, ...options });
+  } finally {
+    restoreImages();
+    restorePaint();
+    restartAnimations();
+    node.classList.remove(STILL_CLASS);
+  }
+}
+
 /** Snapshot of a block's content (title bar included) as an image file. */
 export async function exportNodeImage(node, format, title, { background } = {}) {
   if (!node) throw new Error("Nothing to export");

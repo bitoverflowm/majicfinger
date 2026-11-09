@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { ArrowLeft, BarChart3, Check, ChevronDown, ChevronRight, Database, Eye, Loader2, Play, Radio, RotateCcw, RotateCw, Save, SlidersHorizontal, Square, Table2, Type } from "lucide-react";
 import { ProvenanceMapButton } from "@/components/dashboardComposer/provenanceMap";
-import { PROJECTS_PATH, useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
+import { PROJECTS_PATH, previewUrlForProject, useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
 import { captureProjectThumbnail } from "@/lib/projectThumbnail";
 
 const DashboardShareDialog = dynamic(() =>
@@ -30,6 +30,7 @@ import { useUser } from "@/lib/hooks";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
+import { DemoSaveTip } from "@/components/dashboardComposer/demoSaveTip";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { canvasGridMetrics } from "@/components/dashboardComposer/clipLayout";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
@@ -603,6 +604,7 @@ function SaveDashboardButton({ onLocked }) {
 
 function PreviewDashboardButton({ onLocked }) {
   const canvas = useWorkspaceCanvas();
+  const project = useWorkspaceProject();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -612,7 +614,7 @@ function PreviewDashboardButton({ onLocked }) {
     setBusy(true);
     try {
       await canvas?.saveNow?.();
-      router.push("/dashboard/preview");
+      router.push(previewUrlForProject(project?.id));
     } finally {
       setBusy(false);
     }
@@ -746,6 +748,7 @@ function RightChromeControls({ onLogout, expanded }) {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareMounted, setShareMounted] = useState(false);
   const [membersOnly, setMembersOnly] = useState("");
+  const [saveTipForced, setSaveTipForced] = useState(false);
   const openShare = () => {
     setShareMounted(true);
     setShareOpen(true);
@@ -780,17 +783,25 @@ function RightChromeControls({ onLogout, expanded }) {
         </Button>
         </ChromeTip>
       )}
-      <SaveDashboardButton onLocked={lockedAs("Saving dashboards")} />
+      {landingDemo ? (
+        <DemoSaveTip forced={saveTipForced} onClose={() => setSaveTipForced(false)}>
+          <span className="inline-flex">
+            <SaveDashboardButton onLocked={() => setSaveTipForced(true)} />
+          </span>
+        </DemoSaveTip>
+      ) : (
+        <SaveDashboardButton />
+      )}
       <ChromeTip label="See where this dashboard's data came from">
         <ProvenanceMapButton />
       </ChromeTip>
-      <PreviewDashboardButton onLocked={lockedAs("Dashboard preview")} />
       <ReplayTabButton onLocked={lockedAs("Replaying queries")} />
       <RealtimeModeButton onLocked={lockedAs("Realtime data")} />
       <ChromeTip label="Switch between light and dark">
         <AnimatedThemeToggler className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10 [&_svg]:size-4" />
       </ChromeTip>
       <LiveTransportControls />
+      <PreviewDashboardButton onLocked={lockedAs("Dashboard preview")} />
       <ChromeTip label="Share this dashboard">
       <button
         type="button"

@@ -5,9 +5,7 @@ import { useFeatureTipDismissal } from "@/components/ui/feature-tip";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useUser } from "@/lib/hooks";
 import { siteConfig } from "@/lib/site";
-import { cn } from "@/lib/utils";
 import { exploreFromTerminal, nameTerminalSubject, placeTerminalSubjects } from "../openTerminalTab";
-import { PanelSizing } from "../terminalPanelFrame";
 import { MovedViewTip, currentViewTip, setViewTip, useViewTip } from "../terminalViewTip";
 import { HolderBrowse } from "./browse/holderBrowse";
 import {
@@ -176,7 +174,8 @@ export function HolderHost({ tab, customized = false, onTop, selectTab, children
   const actions = useMemo(() => {
     const pick = (subjects) => {
       const { ctx: state, accountId, tab: host, customized: keepHost, onTop: toTop, selectTab: select } = latest.current;
-      if (!host?.id) return;
+      // A published page or a share card has no editor tabs to open.
+      if (!host?.id || !state) return;
       if (currentViewTip()?.hostId === host.id) setViewTip(null);
       const ids = placeTerminalSubjects({ ctx: state, tabId: host.id, subjects, accountId, keepHost });
       if (keepHost) {
@@ -204,11 +203,11 @@ export function HolderHost({ tab, customized = false, onTop, selectTab, children
       },
       nameSubject: (title) => {
         const { ctx: state, accountId, tab: host } = latest.current;
-        if (host?.id) nameTerminalSubject({ ctx: state, tabId: host.id, accountId, title });
+        if (host?.id && state) nameTerminalSubject({ ctx: state, tabId: host.id, accountId, title });
       },
       explore: () => {
         const { ctx: state, accountId, tab: host, subject: shown, customized: keepHost, onTop: toTop, selectTab: select } = latest.current;
-        if (!host?.id || !shown) return;
+        if (!host?.id || !shown || !state) return;
         const result = exploreFromTerminal({ ctx: state, tabId: host.id, accountId, keepHost });
         if (!result) return;
         const moved = result.exploreId === host.id;
@@ -239,37 +238,5 @@ export function HolderHost({ tab, customized = false, onTop, selectTab, children
         <MovedViewTip tabId={tip.tabId} kind={tip.kind} moved={tip.moved} onOpen={() => openTab(tip.tabId)} onClose={closeTip} onSpent={spendTip} />
       ) : null}
     </HolderSessionProvider>
-  );
-}
-
-/** The blueprint as one page, for the landing demo, where the terminal isn't a dashboard to rearrange. */
-export function HolderPanelStack() {
-  const view = useHolderSessionView();
-  const entries = HOLDER_BLUEPRINT[view] || [];
-  return (
-    <PanelSizing fit>
-      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(24, minmax(0, 1fr))" }}>
-        {entries.map((entry) => {
-          const spec = HOLDER_PANELS[entry.panel];
-          if (!spec) return null;
-          const Panel = spec.Component;
-          return (
-            <section
-              key={entry.panel}
-              data-terminal-panel={entry.panel}
-              aria-label={spec.title}
-              className={cn(
-                "flex min-w-0 flex-col rounded-xl border border-border/70 bg-background shadow-sm",
-                spec.overflow ? "relative z-10" : "overflow-hidden",
-                entry.span < 24 ? "max-lg:!col-span-full" : "",
-              )}
-              style={{ gridColumn: `span ${entry.span} / span ${entry.span}` }}
-            >
-              <Panel />
-            </section>
-          );
-        })}
-      </div>
-    </PanelSizing>
   );
 }

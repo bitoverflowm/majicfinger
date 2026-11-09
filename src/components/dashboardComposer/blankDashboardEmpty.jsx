@@ -10,11 +10,9 @@ import {
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { connectHomeAnySheetHasData } from "@/lib/connectHomePullDestination";
 import { cn } from "@/lib/utils";
-import { shownTerminalId } from "@/lib/workspaceTerminals";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { WorkspaceStartTabs } from "@/components/dashboardComposer/workspaceStartTabBar";
-import { TerminalSurface } from "@/components/terminals/terminalSurface";
 
 const CHART_LOCKED_TIP = "Upload or connect data before adding a chart.";
 const TEXT_COMING_SOON_TIP = "Coming soon";
@@ -117,8 +115,6 @@ export function WorkspaceTabsLayer({ viewing, navChromeExpanded, connectHome }) 
   // Landing demo: the canvas is always the home view; the picker floats over it from dashBody.
   const landingCanvas = landingDemo && viewing === "connectDataHome";
   const landingConnect = landingCanvas && !!connect?.inlineOpen;
-  // Terminal tabs are canvas tabs with panels; only the landing demo still shows a terminal as one page.
-  const terminalId = landingConnect || !landingDemo ? "" : shownTerminalId({ ...ctx, viewing });
   const canvasTab = viewing === "welcome" || landingCanvas;
   // A terminal tab is empty only until its panels are laid out, unless the user cleared it.
   const terminalLayingOut = !!active?.terminal && !active.terminalLayout?.edited;
@@ -126,15 +122,6 @@ export function WorkspaceTabsLayer({ viewing, navChromeExpanded, connectHome }) 
     canvasTab && !landingConnect && !terminalLayingOut && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
   const cover = !canvasTab;
   const openTabs = () => ctx?.setViewing?.("welcome");
-
-  if (terminalId) {
-    return (
-      <div className="absolute inset-0 z-30 -my-1 flex min-h-0 flex-col bg-[#f5f5f5] dark:bg-[#1e1e1e]">
-        <WorkspaceStartTabs tabsActive={viewing === "welcome"} onOpenTabs={openTabs} />
-        <TerminalSurface terminalId={terminalId} tab={active} />
-      </div>
-    );
-  }
 
   return (
     <div

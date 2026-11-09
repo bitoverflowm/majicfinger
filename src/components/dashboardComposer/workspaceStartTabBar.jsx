@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy, MoreVertical, Pencil } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,7 +27,6 @@ import { tabMarginsField } from "@/lib/workspaceTabMargins";
 import { terminalTabField } from "@/lib/workspaceTerminals";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
-import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { useUser } from "@/lib/hooks";
 
 function StartTabChip({ tab, selected, userId, onSelect }) {
@@ -52,7 +51,7 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
     context?.setWorkspaceStartTabs?.(next.tabs);
     context?.setWelcomeTabRemoved?.(next.welcomeRemoved);
     context?.setActiveWorkspaceStartTabId?.(next.activeId);
-    saveWorkspaceStartTabs(userId, next);
+    if (!context?.landingDemo) saveWorkspaceStartTabs(userId, next);
   };
 
   const current = () => ({
@@ -210,14 +209,7 @@ export function WorkspaceStartTabs({ tabsActive, onOpenTabs }) {
     onOpenTabs?.();
   };
 
-  const [membersOnlyOpen, setMembersOnlyOpen] = useState(false);
-  const closeMembersOnly = useCallback(() => setMembersOnlyOpen(false), []);
-
   const addBlankTab = () => {
-    if (context?.landingDemo) {
-      setMembersOnlyOpen(true);
-      return;
-    }
     const state = {
       welcomeRemoved: !!context?.welcomeTabRemoved,
       tabs,
@@ -231,7 +223,7 @@ export function WorkspaceStartTabs({ tabsActive, onOpenTabs }) {
     const next = { ...state, tabs: [...tabs, tab] };
     context?.setWorkspaceStartTabs?.(next.tabs);
     context?.setWelcomeTabRemoved?.(next.welcomeRemoved);
-    saveWorkspaceStartTabs(sessionUser?.userId, { ...next, activeId: activeId || null });
+    if (!context?.landingDemo) saveWorkspaceStartTabs(sessionUser?.userId, { ...next, activeId: activeId || null });
     if (canvas?.requestTab) {
       canvas.requestTab(tab.id);
       return;
@@ -272,9 +264,6 @@ export function WorkspaceStartTabs({ tabsActive, onOpenTabs }) {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      {context?.landingDemo ? (
-        <LandingDemoMembersOnlyPortal open={membersOnlyOpen} onClose={closeMembersOnly} />
-      ) : null}
     </div>
   );
 }

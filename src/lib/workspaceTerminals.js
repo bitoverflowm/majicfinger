@@ -3,7 +3,6 @@
  * `terminalSubject`, what the tab is looking at. Its panels are canvas blocks of type
  * "terminal" laid out from a blueprint; `terminalLayout` records which view's blueprint the
  * tab was laid out from, at which version, and whether the user has rearranged it since.
- * The landing demo still shows the terminal as one surface over the canvas.
  */
 export const TERMINALS = [
   {
@@ -76,17 +75,6 @@ export function terminalTabField(tab) {
     ...(subject ? { terminalSubject: subject } : {}),
     ...(layout ? { terminalLayout: layout } : {}),
   };
-}
-
-/**
- * Terminal id of the tab on screen, or "". The landing demo's canvas is its
- * `connectDataHome` view; elsewhere tabs show under `welcome`.
- */
-export function shownTerminalId(ctx) {
-  const viewing = ctx?.viewing;
-  if (viewing !== "welcome" && !(ctx?.landingDemo && viewing === "connectDataHome")) return "";
-  const active = (ctx?.workspaceStartTabs || []).find((tab) => tab.id === ctx?.activeWorkspaceStartTabId);
-  return terminalTabField(active).terminal || "";
 }
 
 /** "Holder Terminal", then "Holder Terminal 2", "Holder Terminal 3"… */

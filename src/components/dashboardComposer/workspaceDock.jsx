@@ -15,7 +15,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { shownTerminalId } from "@/lib/workspaceTerminals";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
@@ -64,8 +63,6 @@ export function WorkspaceDock() {
   }, [handTipDue, tool, dismissHandTip]);
 
   if (ctx?.landingDemo && (!ctx?.landingDemoActive || connect?.inlineOpen)) return null;
-  // The landing demo's terminal is one page over the canvas, so blocks added there would sit underneath it.
-  if (ctx?.landingDemo && shownTerminalId(ctx)) return null;
   const sheetCount = (canvas?.blocks || []).filter((block) => block.type === "sheet").length;
 
   return (

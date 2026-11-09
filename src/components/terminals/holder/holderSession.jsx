@@ -23,7 +23,7 @@ import { useMarketPriceHistory } from "./useMarketPriceHistory";
  * `actions` come from the host: `pick(subjects)`, `pickTrader({ address, title })`,
  * `pickMarket(subject)`, `nameSubject(title)` and, when there's a subject, `explore()`.
  */
-const HolderSessionContext = createContext(null);
+export const HolderSessionContext = createContext(null);
 
 export function useHolderSession() {
   return useContext(HolderSessionContext);

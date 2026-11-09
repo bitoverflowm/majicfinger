@@ -257,7 +257,7 @@ function LandingDemoStage({
   }, [staged]);
 
   // Hub and guide sections sit in low z-index layers; lift them to the stage's level so the
-  // full-viewport demo isn't painted under the sticky site nav.
+  // full-viewport demo isn't painted under the sticky site nav or the promo strip.
   useEffect(() => {
     if (!staged) return;
     const lifted: Array<[HTMLElement, string]> = [];
@@ -265,7 +265,7 @@ function LandingDemoStage({
     while (el && el !== document.body) {
       if (getComputedStyle(el).zIndex !== "auto") {
         lifted.push([el, el.style.zIndex]);
-        el.style.zIndex = "50";
+        el.style.zIndex = "100";
       }
       el = el.parentElement;
     }

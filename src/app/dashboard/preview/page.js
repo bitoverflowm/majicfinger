@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 
 import { WorkspaceCanvas, WorkspaceCanvasProvider, useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import {
+  WORKSPACE_PROJECT_PARAM,
+  WorkspaceProjectProvider,
+  dashboardUrlForProject,
+  useWorkspaceProject,
+} from "@/components/projects/workspaceProjectContext";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { userSwrFetcher } from "@/lib/hooks";
 import { userHasDashboardAccess } from "@/lib/membershipAccess";
@@ -43,8 +49,10 @@ function PreviewTabs({ tabs, activeId, onSelect }) {
 
 function PreviewSurface({ tabId, onSelectTab }) {
   const canvas = useWorkspaceCanvas();
+  const project = useWorkspaceProject();
   const router = useRouter();
   const tabs = canvas?.previewTabs || [];
+  const exitUrl = dashboardUrlForProject(project?.id);
 
   useEffect(() => {
     if (tabId || !canvas?.previewActiveId) return;
@@ -54,11 +62,11 @@ function PreviewSurface({ tabId, onSelectTab }) {
   useEffect(() => {
     const onKey = (event) => {
       if (event.key !== "Escape") return;
-      router.push("/dashboard");
+      router.push(exitUrl);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [router]);
+  }, [exitUrl, router]);
 
   if (!canvas?.ready) {
     return (
@@ -79,7 +87,7 @@ function PreviewSurface({ tabId, onSelectTab }) {
       <div className={cn("fixed right-2 top-2 z-40 flex h-10 items-center rounded-[13px] px-1.5", PILL)}>
         <button
           type="button"
-          onClick={() => router.push("/dashboard")}
+          onClick={() => router.push(exitUrl)}
           className="inline-flex h-7 items-center rounded-md px-2.5 text-[13px] font-medium text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10"
         >
           Exit
@@ -103,8 +111,17 @@ function PreviewBody() {
   );
 }
 
-export default function DashboardPreviewPage() {
+function PreviewLoading() {
+  return (
+    <div className="flex min-h-svh items-center justify-center bg-background">
+      <SpectrumLoadingState label="Loading" />
+    </div>
+  );
+}
+
+function PreviewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher);
 
   const hasAccess = userHasDashboardAccess(user);
@@ -115,17 +132,21 @@ export default function DashboardPreviewPage() {
     else if (!hasAccess) router.replace("/dashboard");
   }, [hasAccess, isLoading, router, user]);
 
-  if (isLoading || !user || !hasAccess) {
-    return (
-      <div className="flex min-h-svh items-center justify-center bg-background">
-        <SpectrumLoadingState label="Loading" />
-      </div>
-    );
-  }
+  if (isLoading || !user || !hasAccess) return <PreviewLoading />;
 
   return (
-    <main className="min-h-svh bg-background">
-      <PreviewBody />
-    </main>
+    <WorkspaceProjectProvider userId={user.userId} urlProject={searchParams.get(WORKSPACE_PROJECT_PARAM) || ""} loading={<PreviewLoading />}>
+      <main className="min-h-svh bg-background">
+        <PreviewBody />
+      </main>
+    </WorkspaceProjectProvider>
+  );
+}
+
+export default function DashboardPreviewPage() {
+  return (
+    <Suspense fallback={<PreviewLoading />}>
+      <PreviewPage />
+    </Suspense>
   );
 }
