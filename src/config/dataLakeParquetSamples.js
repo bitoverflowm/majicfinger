@@ -64,6 +64,9 @@ export const ATHENA_SAMPLE_ROW_LIMIT = 100;
 /** Basic tier: max rows per historical pull request. */
 export const ATHENA_BASIC_QUERY_ROW_LIMIT = 12500;
 
+/** Lite tier: max rows per historical pull request. */
+export const ATHENA_LITE_QUERY_ROW_LIMIT = 125000;
+
 /** Pro / Elite: max rows per pull (server/env may lower; hard ceiling 500k). */
 export const ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT = 500000;
 

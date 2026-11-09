@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BLACK_FRIDAY } from "@/lib/promo/blackFriday";
 import { CountdownTiles } from "./CountdownTiles";
-import { useBlackFridayCountdown } from "./useBlackFriday";
+import { BLACK_FRIDAY_ANCHOR, SEE_BLACK_FRIDAY_EVENT, useBlackFridayCountdown } from "./useBlackFriday";
 
 const DISMISS_KEY = `lychee:promo-dismissed:${BLACK_FRIDAY.id}`;
 
@@ -82,7 +82,8 @@ export function BlackFridayBanner() {
             <CountdownTiles countdown={countdown} tone="inverse" className="hidden shrink-0 sm:flex" />
 
             <a
-              href="/#pricing"
+              href={`/#${BLACK_FRIDAY_ANCHOR}`}
+              onClick={() => window.dispatchEvent(new Event(SEE_BLACK_FRIDAY_EVENT))}
               className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-r from-secondary to-violet-500 px-3.5 text-[13px] font-medium text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_4px_14px_-4px_rgba(47,111,237,0.7)] transition-all hover:brightness-110 active:scale-[0.98]"
             >
               Get {BLACK_FRIDAY.percentOff}% off

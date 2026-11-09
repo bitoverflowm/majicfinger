@@ -61,6 +61,7 @@
     "@stripe/stripe-js": "^9.17.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/typography": "^0.5.19",
+    "@vercel/functions": "^2.2.13",
     "ag-charts-community": "^9.0.2",
     "ag-charts-react": "^9.0.2",
     "ag-grid-react": "^31.0.3",

@@ -3,6 +3,7 @@ import { EXPANDED_DATA_TIERS, TOP_DATA_TIERS } from "@/lib/membershipAccess";
 import {
   ATHENA_BASIC_QUERY_ROW_LIMIT,
   ATHENA_DEMO_ROW_LIMIT,
+  ATHENA_LITE_QUERY_ROW_LIMIT,
   ATHENA_SAMPLE_ROW_LIMIT,
   ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT,
 } from "@/config/dataLakeParquetSamples";
@@ -57,12 +58,22 @@ export function userHasBasicHistoricalAccess(userLike) {
   return normalizedSubscriptionTier(userLike) === "basic";
 }
 
+/**
+ * Lite (paid): every integration, with a 125k-row cap per pull.
+ */
+export function userHasLiteHistoricalAccess(userLike) {
+  if (!userLike || typeof userLike !== "object") return false;
+  if (!userHasPaidSubscription(userLike)) return false;
+  if (userHasExpandedAthenaAccess(userLike)) return false;
+  return normalizedSubscriptionTier(userLike) === "lite";
+}
+
 /** Landing demo: most sheets one Save and run may place, counting every sheet (charts follow their sheets). */
 export const DEMO_RUN_SHEET_LIMIT = 12;
 
 /**
  * How many markets may each get their own trades sheet in one pull.
- * Demo is 11 (plus the parent sheet makes its 12), Basic is 5, Pro / Researcher is 10, Elite / Quant is 50. More than 50 is an enterprise pull.
+ * Demo is 11 (plus the parent sheet makes its 12), Basic / Lite is 5, Pro / Researcher is 10, Elite / Quant is 50. More than 50 is an enterprise pull.
  */
 export function getJoinMarketCap(userLike, { isDemo = false } = {}) {
   if (isDemo) return DEMO_RUN_SHEET_LIMIT - 1;
@@ -82,6 +93,7 @@ export function joinTierLabel(userLike) {
   const tier = normalizedSubscriptionTier(userLike);
   if (tier === "quant") return "Quant";
   if (tier === "researcher") return "Researcher";
+  if (tier === "lite") return "Lite";
   if (tier === "elite" || tier === "premium") return "Elite";
   if (tier === "pro") return "Pro";
   return "Basic";
@@ -96,6 +108,7 @@ export function getHistoricalPullRowLimit(userLike, opts = {}) {
   if (opts.isDemo) return ATHENA_DEMO_ROW_LIMIT;
   if (String(userLike?.userId || "") === "dev-bypass-no-db") return ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT;
   if (userHasExpandedAthenaAccess(userLike)) return ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT;
+  if (userHasLiteHistoricalAccess(userLike)) return ATHENA_LITE_QUERY_ROW_LIMIT;
   if (userHasBasicHistoricalAccess(userLike)) return ATHENA_BASIC_QUERY_ROW_LIMIT;
   if (userHasPaidSubscription(userLike)) {
     return ATHENA_BASIC_QUERY_ROW_LIMIT;

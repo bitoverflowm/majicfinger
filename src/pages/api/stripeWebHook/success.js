@@ -21,6 +21,9 @@ export const config = {
 // Keep legacy plans so existing subscribers are not downgraded.
 const PLAN_MAP = {
   // Current plans
+  "900:week": { tier: "lite", cycle: "weekly" },
+  "2300:month": { tier: "lite", cycle: "monthly" },
+  "23000:year": { tier: "lite", cycle: "annual" },
   "1900:week": { tier: "researcher", cycle: "weekly" },
   "4900:month": { tier: "researcher", cycle: "monthly" },
   "49000:year": { tier: "researcher", cycle: "annual" },
@@ -65,7 +68,7 @@ function resolvePlan({ amount, interval, mode }) {
   return PLAN_MAP[key] || null;
 }
 
-const CURRENT_TIERS = new Set(["researcher", "quant"]);
+const CURRENT_TIERS = new Set(["lite", "researcher", "quant"]);
 
 function planLabel(mapping) {
   if (!mapping) return "Unknown plan";

@@ -28,10 +28,10 @@ import {
   Sigma,
   type LucideIcon,
 } from "lucide-react";
-import { useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { BlackFridayPricingCard } from "@/components/promo/BlackFridayPricingCard";
-import { useBlackFridayActive } from "@/components/promo/useBlackFriday";
-import { BLACK_FRIDAY, blackFridayActive, blackFridayCents } from "@/lib/promo/blackFriday";
+import { BLACK_FRIDAY_ANCHOR, SEE_BLACK_FRIDAY_EVENT, useBlackFridayActive } from "@/components/promo/useBlackFriday";
+import { BLACK_FRIDAY, blackFridayCents } from "@/lib/promo/blackFriday";
 import { VenueMark, type Venue } from "./venue-mark";
 
 export type BillingCycle = "weekly" | "monthly" | "annual";
@@ -466,7 +466,7 @@ export function PricingSection({
   showHeader?: boolean;
   /** The Free column links to the demo; hide it where there's no free plan to pick (billing). */
   includeFree?: boolean;
-  /** Starting position of the weekly / monthly / annual toggle. Annual while an annual promo runs, else monthly. */
+  /** Starting position of the weekly / monthly / annual toggle. Monthly unless the buyer came from the Black Friday offer. */
   defaultCycle?: BillingCycle;
   /** Highlights the member's tier; `cycle` marks the exact plan as current. */
   currentPlan?: { tier?: string | null; cycle?: string | null } | null;
@@ -474,10 +474,24 @@ export function PricingSection({
   getAction?: (args: PricingTierActionArgs) => PricingTierAction | null;
   className?: string;
 } = {}) {
-  const [toggleCycle, setToggleCycle] = useState<BillingCycle>(
-    () => defaultCycle ?? (blackFridayActive() ? "annual" : "monthly"),
-  );
+  const [toggleCycle, setToggleCycle] = useState<BillingCycle>(defaultCycle ?? "monthly");
   const promoActive = useBlackFridayActive();
+
+  // The Black Friday banner links to the offer; arriving that way opens the annual plans it applies to.
+  useEffect(() => {
+    if (!promoActive) return undefined;
+    const showAnnual = () => setToggleCycle("annual");
+    const onHash = () => {
+      if (window.location.hash === `#${BLACK_FRIDAY_ANCHOR}`) showAnnual();
+    };
+    onHash();
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener(SEE_BLACK_FRIDAY_EVENT, showAnnual);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener(SEE_BLACK_FRIDAY_EVENT, showAnnual);
+    };
+  }, [promoActive]);
   const plansRef = useRef<HTMLDivElement>(null);
   const currentTier = String(currentPlan?.tier || "").toLowerCase();
   const currentCycle = String(currentPlan?.cycle || "").toLowerCase();
@@ -524,7 +538,12 @@ export function PricingSection({
           </SectionHeader>
         )}
 
-        <div className={cn("mx-auto flex w-full flex-col gap-4", plans.length > 2 ? "max-w-6xl" : "max-w-4xl")}>
+        <div
+          className={cn(
+            "mx-auto flex w-full flex-col gap-4",
+            plans.length > 3 ? "max-w-7xl" : plans.length > 2 ? "max-w-6xl" : "max-w-4xl",
+          )}
+        >
           {showPromo ? <BlackFridayPricingCard onSeePlans={seePromoPlans} /> : null}
           {showCycleToggle ? (
             <div className={cn("mb-2 flex justify-center", showPromo && "mt-2")}>
@@ -539,7 +558,10 @@ export function PricingSection({
           ) : null}
           <div
             ref={plansRef}
-            className={cn("grid scroll-mt-28 gap-4", plans.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2")}
+            className={cn(
+              "grid scroll-mt-28 gap-4",
+              plans.length > 3 ? "md:grid-cols-2 xl:grid-cols-4" : plans.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2",
+            )}
           >
             {plans.map((plan) => {
               const isFree = plan.tier === "free";

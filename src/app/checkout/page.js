@@ -1,3 +1,4 @@
+import { preconnect } from "react-dom";
 import CheckoutClient from "@/components/checkout/CheckoutClient";
 
 export const metadata = {
@@ -6,6 +7,11 @@ export const metadata = {
 };
 
 export default function CheckoutPage({ searchParams }) {
+  // Stripe.js, its API calls, and the payment iframe each need their own connection.
+  preconnect("https://js.stripe.com");
+  preconnect("https://api.stripe.com", { crossOrigin: "anonymous" });
+  preconnect("https://m.stripe.network");
+
   const plan = typeof searchParams?.plan === "string" ? searchParams.plan : "";
   const cycle = typeof searchParams?.cycle === "string" ? searchParams.cycle : "";
   const referral =

@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { BLACK_FRIDAY, blackFridayActive } from "@/lib/promo/blackFriday";
 
+/** Id of the offer card on the pricing section; links to it open the annual plans. */
+export const BLACK_FRIDAY_ANCHOR = "black-friday";
+/** Fired when the buyer asks to see the offer from a page that's already showing pricing. */
+export const SEE_BLACK_FRIDAY_EVENT = "lychee:see-black-friday";
+
 /** Flips to false on its own when the offer ends, without a reload. */
 export function useBlackFridayActive() {
   const [active, setActive] = useState(() => blackFridayActive());

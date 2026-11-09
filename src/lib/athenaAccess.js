@@ -4,6 +4,7 @@ import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
 import {
   ATHENA_BASIC_QUERY_ROW_LIMIT,
+  ATHENA_LITE_QUERY_ROW_LIMIT,
   ATHENA_SAMPLE_ROW_LIMIT,
   ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT,
 } from "@/config/dataLakeParquetSamples";
@@ -11,6 +12,7 @@ import { COMPOSE_UNCONSTRAINED_ROW_CAP } from "@/lib/dataLake/buildComposeAthena
 import {
   userHasExpandedAthenaAccess,
   userHasBasicHistoricalAccess,
+  userHasLiteHistoricalAccess,
   userHasPaidSubscription,
 } from "@/lib/athenaEntitlement";
 import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
@@ -88,6 +90,14 @@ function basicLimits() {
   };
 }
 
+function liteLimits() {
+  return {
+    maxSelectRows: ATHENA_LITE_QUERY_ROW_LIMIT,
+    maxComposeRows: ATHENA_LITE_QUERY_ROW_LIMIT,
+    unlimitedComposeRows: false,
+  };
+}
+
 function freeLimits() {
   return {
     maxSelectRows: ATHENA_SAMPLE_ROW_LIMIT,
@@ -101,6 +111,7 @@ function limitsForDbUser(dbUser) {
   if (!dbUser) return freeLimits();
   const merged = { ...dbUser };
   if (userHasExpandedAthenaAccess(merged)) return subscriberLimits();
+  if (userHasLiteHistoricalAccess(merged)) return liteLimits();
   if (userHasBasicHistoricalAccess(merged)) return basicLimits();
   if (userHasPaidSubscription(merged)) return basicLimits();
   return freeLimits();

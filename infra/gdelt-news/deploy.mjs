@@ -17,7 +17,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
-import { fileURLToPath } from "node:url";
 import { AthenaClient, GetQueryExecutionCommand, StartQueryExecutionCommand } from "@aws-sdk/client-athena";
 import { GetRoleCommand, CreateRoleCommand, IAMClient, PutRolePolicyCommand, UpdateAssumeRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
@@ -37,9 +36,8 @@ import {
 import { CreateScheduleCommand, SchedulerClient, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
 import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { STSClient, GetCallerIdentityCommand } from "@aws-sdk/client-sts";
+import { HERE, ROOT, loadEnv } from "./env.mjs";
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, "../..");
 const NAME = "lychee-gdelt-news";
 const LAMBDA_ROLE = `${NAME}-lambda`;
 const SCHEDULER_ROLE = `${NAME}-scheduler`;
@@ -51,18 +49,6 @@ const SCHEDULE_EXPRESSION = "cron(4/15 * * * ? *)";
 /** Days built at once, so GDELT's file server sees at most this many times four downloads. */
 const BACKFILL_AT_ONCE = 8;
 const FIRST_GKG_DAY = "2015-02-18";
-
-function loadEnv() {
-  for (const file of [".env.local", ".env"]) {
-    const full = path.join(ROOT, file);
-    if (!fs.existsSync(full)) continue;
-    for (const line of fs.readFileSync(full, "utf8").split("\n")) {
-      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
-      if (!m || process.env[m[1]] !== undefined) continue;
-      process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2");
-    }
-  }
-}
 
 loadEnv();
 const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";

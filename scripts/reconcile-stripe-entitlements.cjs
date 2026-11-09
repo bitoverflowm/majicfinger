@@ -38,8 +38,17 @@ if (!Number.isFinite(SINCE_DAYS) || SINCE_DAYS <= 0) throw new Error("Invalid SI
 // Keep this mapping aligned with src/pages/api/stripeWebHook/success.js
 const PLAN_MAP = {
   // Current plans
-  "19900:year": { tier: "researcher", cycle: "annual" },
+  "900:week": { tier: "lite", cycle: "weekly" },
+  "2300:month": { tier: "lite", cycle: "monthly" },
+  "23000:year": { tier: "lite", cycle: "annual" },
+  "1900:week": { tier: "researcher", cycle: "weekly" },
+  "4900:month": { tier: "researcher", cycle: "monthly" },
+  "49000:year": { tier: "researcher", cycle: "annual" },
+  "3900:week": { tier: "quant", cycle: "weekly" },
   "9900:month": { tier: "quant", cycle: "monthly" },
+  "99000:year": { tier: "quant", cycle: "annual" },
+  // Launch prices for Researcher ($199/yr) and Quant ($999/yr)
+  "19900:year": { tier: "researcher", cycle: "annual" },
   "99900:year": { tier: "quant", cycle: "annual" },
 
   // Basic / Pro / Elite: off the pricing page, still billed for existing subscribers

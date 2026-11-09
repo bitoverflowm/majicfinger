@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { waitUntil } from "@vercel/functions";
 import dbConnect from "@/lib/dbConnect";
 import CheckoutAttempt from "@/models/CheckoutAttempt";
 import {
@@ -41,8 +42,38 @@ function checkoutSource(req) {
   };
 }
 
+/** Runs after the response so the buyer isn't waiting on Mongo or Telegram. */
+async function recordAttempt({ attempt, visitorSessionId, plan, sessionId }) {
+  try {
+    await dbConnect();
+    const visitorContext = visitorSessionId
+      ? buildCheckoutVisitorContext(visitorSessionId).catch(() => null)
+      : Promise.resolve(null);
+    await CheckoutAttempt.create(attempt);
+    const context = await visitorContext;
+    if (context) await CheckoutAttempt.updateOne({ attemptId: attempt.attemptId }, { $set: { visitorContext: context } });
+    // Open the live Telegram immediately so expire/abandon alerts aren't a blank slate.
+    await publishCheckoutTelegram(attempt.attemptId);
+  } catch (err) {
+    await notifyCheckoutAlert({
+      title: "Checkout session created but was not saved",
+      fields: {
+        Plan: plan.key,
+        "Stripe session": sessionId,
+        Error: err?.message || String(err),
+      },
+    });
+  }
+}
+
+/**
+ * `hosted: true` opens Stripe's hosted page instead of the in-app form. The
+ * checkout page offers it when the in-app form is slow or fails to load.
+ */
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
+  const startedAt = Date.now();
+  const hosted = req.body?.hosted === true;
 
   const plan = planFromQuery(req.body?.plan, req.body?.cycle);
   if (!plan) {
@@ -105,13 +136,18 @@ export default async function handler(req, res) {
       planKey: plan.key,
       ...(referral ? { referral } : {}),
     };
+    const returnUrl = `${origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`;
     const createSession = () =>
       stripe.checkout.sessions.create({
-        ui_mode: "elements",
-        integration_identifier: INTEGRATION_IDENTIFIER,
+        ...(hosted
+          ? {
+              success_url: returnUrl,
+              cancel_url: `${origin}/#pricing`,
+              ...(loginEmail ? { customer_email: loginEmail } : {}),
+            }
+          : { ui_mode: "elements", integration_identifier: INTEGRATION_IDENTIFIER, return_url: returnUrl }),
         mode: plan.mode,
         line_items: [{ price: resolved.priceId, quantity: 1 }],
-        return_url: `${origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
         client_reference_id: referral || attemptId,
         metadata: promo ? { ...metadata, promo: promo.id } : metadata,
         ...(plan.mode === "subscription"
@@ -143,49 +179,50 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!session?.client_secret) {
-      throw new Error("Stripe did not return a client secret");
+    if (hosted ? !session?.url : !session?.client_secret) {
+      throw new Error(`Stripe did not return a ${hosted ? "checkout URL" : "client secret"}`);
     }
 
-    res.setHeader("Set-Cookie", attemptCookieHeader(attemptId));
-    try {
-      await dbConnect();
-      const visitorSessionId = String(req.body?.visitorSessionId || "").trim().slice(0, 80) || undefined;
-      const visitorContext = visitorSessionId
-        ? await buildCheckoutVisitorContext(visitorSessionId)
-        : null;
-      await CheckoutAttempt.create({
-        attemptId,
-        stripeSessionId: session.id,
-        planKey: plan.key,
-        priceId: resolved.priceId,
-        mode: plan.mode,
-        referral: referral || undefined,
-        status: "open",
-        granted: false,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        planLabel: promo ? `${plan.label} (${promo.name})` : plan.label,
-        amount: promo ? blackFridayCents(plan.amount) : plan.amount,
-        interval: plan.mode === "subscription" ? plan.interval : undefined,
-        testMode: isStripeTestKey(),
-        prefillEmail: loginEmail || undefined,
-        source: checkoutSource(req),
+    const visitorSessionId = String(req.body?.visitorSessionId || "").trim().slice(0, 80) || undefined;
+    waitUntil(
+      recordAttempt({
+        plan,
+        sessionId: session.id,
         visitorSessionId,
-        visitorContext: visitorContext || undefined,
-        steps: [{ step: "opened", at: new Date(), data: { from: String(req.body?.from || "").slice(0, 160) || undefined } }],
-      });
-      // Open the live Telegram immediately so expire/abandon alerts aren't a blank slate.
-      await publishCheckoutTelegram(attemptId);
-    } catch (err) {
-      await notifyCheckoutAlert({
-        title: "Checkout session created but was not saved",
-        fields: {
-          Plan: plan.key,
-          "Stripe session": session.id,
-          Error: err?.message || String(err),
+        attempt: {
+          attemptId,
+          stripeSessionId: session.id,
+          planKey: plan.key,
+          priceId: resolved.priceId,
+          mode: plan.mode,
+          referral: referral || undefined,
+          status: "open",
+          granted: false,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          planLabel: promo ? `${plan.label} (${promo.name})` : plan.label,
+          amount: promo ? blackFridayCents(plan.amount) : plan.amount,
+          interval: plan.mode === "subscription" ? plan.interval : undefined,
+          testMode: isStripeTestKey(),
+          prefillEmail: loginEmail || undefined,
+          source: checkoutSource(req),
+          visitorSessionId,
+          steps: [
+            {
+              step: "opened",
+              at: new Date(),
+              data: {
+                from: String(req.body?.from || "").slice(0, 160) || undefined,
+                hosted: hosted || undefined,
+                serverMs: Date.now() - startedAt,
+              },
+            },
+          ],
         },
-      });
-    }
+      }),
+    );
+
+    res.setHeader("Set-Cookie", attemptCookieHeader(attemptId));
+    if (hosted) return res.status(200).json({ url: session.url });
     return res.status(200).json({
       clientSecret: session.client_secret,
       publishableKey: stripePublishableKey(),

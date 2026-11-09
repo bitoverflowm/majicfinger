@@ -61,6 +61,16 @@ const API_VERSION = "2026-08-26.dahlia";
 // Keep aligned with CHECKOUT_PLANS in src/lib/stripe/catalog.js and PLAN_MAP in the webhook.
 const PRODUCTS = [
   {
+    tier: "lite",
+    name: "Lychee Lite",
+    description: "Every integration and the full no-code workflow, sized for lighter research.",
+    prices: [
+      { key: "lite_weekly", amount: 900, interval: "week", nickname: "Lite weekly" },
+      { key: "lite_monthly", amount: 2300, interval: "month", nickname: "Lite monthly" },
+      { key: "lite_annual", amount: 23000, interval: "year", nickname: "Lite annual" },
+    ],
+  },
+  {
     tier: "researcher",
     name: "Lychee Researcher",
     description: "A complete workspace for traders, analysts, journalists, and researchers.",

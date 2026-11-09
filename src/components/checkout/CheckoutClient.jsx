@@ -11,7 +11,7 @@ import {
   PaymentElement,
   useCheckoutElements,
 } from "@stripe/react-stripe-js/checkout";
-import { ArrowLeft, Check, Loader2, Lock, Tag, X } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, Loader2, Lock, Tag, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,17 +28,28 @@ function stripeFor(publishableKey) {
   return stripePromises.get(publishableKey);
 }
 
+/** Past this, the buyer is offered Stripe's hosted checkout page instead. */
+const SLOW_FORM_MS = 8000;
+
+function postCheckoutSession(body) {
+  return fetch("/api/checkout/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then(async (res) => ({ ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) }));
+}
+
 /** One Checkout Session per page load, even when React mounts effects twice. */
 const sessionRequests = new Map();
 
 function requestCheckoutSession(body) {
   const key = `${body.plan}:${body.cycle}`;
   if (!sessionRequests.has(key)) {
-    const request = fetch("/api/checkout/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }).then(async (res) => ({ ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) }));
+    const started = performance.now();
+    const request = postCheckoutSession(body).then((result) => ({
+      ...result,
+      ms: Math.round(performance.now() - started),
+    }));
     sessionRequests.set(key, request);
     request.finally(() => setTimeout(() => sessionRequests.delete(key), 1000));
   }
@@ -160,6 +171,7 @@ function planDisplay(summary) {
     return {
       name: current.name,
       description: current.description,
+      includesLabel: current.includesLabel && current.includesLabel !== "All features in Free +" ? current.includesLabel : "",
       features: (current.features || []).map((feature) => feature.text),
       legacy: false,
     };
@@ -193,16 +205,26 @@ export default function CheckoutClient({ plan, cycle, referral }) {
     summary: null,
     email: "",
     promoCodes: false,
+    sessionMs: null,
   });
   const [error, setError] = useState("");
+  const [formReady, setFormReady] = useState(false);
+  const [slow, setSlow] = useState(false);
   const mountedAt = useRef(typeof performance !== "undefined" ? performance.now() : 0);
 
   useEffect(() => {
+    if (formReady) return undefined;
+    const id = window.setTimeout(() => setSlow(true), Math.max(0, SLOW_FORM_MS - msSinceCheckoutClick(mountedAt.current)));
+    return () => window.clearTimeout(id);
+  }, [formReady]);
+
+  useEffect(() => {
     let cancelled = false;
+    // The server reads the marketing journey after it replies, so this only has to land
+    // before then for the checkout Telegram to include the pricing path.
+    flushJourneyQueue(false).catch(() => {});
     (async () => {
       try {
-        // Flush marketing journey events so the checkout Telegram can include pricing path.
-        await flushJourneyQueue(false);
         const res = await requestCheckoutSession({
           plan,
           cycle,
@@ -226,6 +248,7 @@ export default function CheckoutClient({ plan, cycle, referral }) {
           summary: data.plan || null,
           email: data.email || "",
           promoCodes: !!data.promoCodes,
+          sessionMs: res.ms ?? null,
         });
       } catch {
         if (!cancelled) setError("We couldn't open checkout. Please try again.");
@@ -251,6 +274,8 @@ export default function CheckoutClient({ plan, cycle, referral }) {
     [state.clientSecret],
   );
 
+  const showSlow = slow && !formReady;
+  const hostedFallback = { plan, cycle, referral };
   const stripePromise = stripeFor(state.publishableKey);
   if (error || (options && !stripePromise)) {
     return (
@@ -259,7 +284,7 @@ export default function CheckoutClient({ plan, cycle, referral }) {
           <p className="font-medium text-foreground">{error || "Checkout is not configured."}</p>
           <p className="mt-1 text-muted-foreground">
             Nothing was charged. Go back to{" "}
-            <Link href="/#pricing" className="underline underline-offset-4 hover:text-foreground">
+            <Link href="/#pricing" prefetch={false} className="underline underline-offset-4 hover:text-foreground">
               pricing
             </Link>{" "}
             or email{" "}
@@ -276,6 +301,7 @@ export default function CheckoutClient({ plan, cycle, referral }) {
   if (!options) {
     return (
       <CheckoutLayout summary={state.summary}>
+        {showSlow ? <HostedCheckoutNotice {...hostedFallback} /> : null}
         <PaymentSkeleton />
       </CheckoutLayout>
     );
@@ -288,9 +314,73 @@ export default function CheckoutClient({ plan, cycle, referral }) {
         promoCodes={state.promoCodes}
         theme={theme}
         sessionId={sessionIdFromSecret(state.clientSecret)}
+        sessionMs={state.sessionMs}
         mountedAt={mountedAt.current}
+        slow={showSlow}
+        hostedFallback={hostedFallback}
+        onFormReady={() => setFormReady(true)}
       />
     </CheckoutElementsProvider>
+  );
+}
+
+/** Stripe's own checkout page, for when the in-app payment form is slow or blocked. */
+function HostedCheckoutNotice({ plan, cycle, referral, title = "Taking longer than usual", body, onOpen }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const open = async () => {
+    if (busy) return;
+    setBusy(true);
+    setFailed(false);
+    onOpen?.();
+    try {
+      const res = await postCheckoutSession({
+        plan,
+        cycle,
+        hosted: true,
+        referral: referralFromWindow(referral),
+        from: checkoutEntryPage(),
+        visitorSessionId: getOrCreateVisitorSessionId() || undefined,
+      });
+      const data = res.data || {};
+      if (data.code === "ALREADY_MEMBER" && data.redirect) {
+        window.location.assign(data.redirect);
+        return;
+      }
+      if (res.ok && data.url) {
+        window.location.assign(data.url);
+        return;
+      }
+    } catch {
+      // Falls through to the retry message.
+    }
+    setBusy(false);
+    setFailed(true);
+  };
+
+  return (
+    <div role="status" aria-live="polite" className="mb-6 rounded-xl border border-border bg-card p-4 text-sm">
+      <p className="font-medium text-foreground">{title}</p>
+      <p className="mt-1 text-muted-foreground">
+        {body || "The payment form is still loading. You can keep waiting, or pay on Stripe's secure checkout page instead."}
+      </p>
+      <button
+        type="button"
+        onClick={open}
+        disabled={busy}
+        className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted disabled:opacity-70"
+      >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
+        {busy ? "Opening Stripe checkout…" : "Continue on Stripe checkout"}
+        {busy ? null : <ArrowUpRight className="h-3.5 w-3.5" />}
+      </button>
+      {failed ? (
+        <p className="mt-2 text-xs text-destructive">
+          That didn&apos;t open. Refresh the page, or email kash@lycheedata.com and we&apos;ll send you a payment link.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -298,7 +388,17 @@ function sessionIdFromSecret(clientSecret) {
   return String(clientSecret || "").split("_secret_")[0];
 }
 
-function ConnectedCheckout({ summary, promoCodes, theme, sessionId, mountedAt }) {
+function ConnectedCheckout({
+  summary,
+  promoCodes,
+  theme,
+  sessionId,
+  sessionMs,
+  mountedAt,
+  slow,
+  hostedFallback,
+  onFormReady,
+}) {
   const result = useCheckoutElements();
   const checkout = result.type === "success" ? result.checkout : null;
   const journey = useRef({ submitted: false, paid: false, left: false, method: "", email: "" });
@@ -342,24 +442,46 @@ function ConnectedCheckout({ summary, promoCodes, theme, sessionId, mountedAt })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme, Boolean(checkout)]);
 
+  useEffect(() => {
+    if (slow) track("form_slow", { ms: msSinceCheckoutClick(mountedAt), sessionMs: sessionMs ?? undefined }, { once: true });
+  }, [slow, track, mountedAt, sessionMs]);
+
+  const formReady = useCallback(() => {
+    track("form_ready", { ms: msSinceCheckoutClick(mountedAt), sessionMs: sessionMs ?? undefined }, { once: true });
+    onFormReady?.();
+  }, [track, mountedAt, sessionMs, onFormReady]);
+
+  const openHosted = useCallback(() => {
+    // The buyer is moving to another session, so this one shouldn't report them as gone.
+    journey.current.left = true;
+    track("hosted_fallback", { ms: msSinceCheckoutClick(mountedAt), sessionMs: sessionMs ?? undefined }, { keepalive: true });
+  }, [track, mountedAt, sessionMs]);
+
   return (
     <CheckoutLayout summary={summary} checkout={checkout} onLeave={leave}>
       {result.type === "error" ? (
-        <div className="rounded-xl border border-border bg-card p-6 text-sm">
-          <p className="font-medium text-foreground">We couldn&apos;t load the payment form.</p>
-          <p className="mt-1 text-muted-foreground">{result.error?.message || "Refresh the page to try again."}</p>
-        </div>
-      ) : checkout ? (
-        <PaymentForm
-          checkout={checkout}
-          summary={summary}
-          promoCodes={promoCodes}
-          journey={journey}
-          track={track}
-          mountedAt={mountedAt}
+        <HostedCheckoutNotice
+          {...hostedFallback}
+          title="We couldn't load the payment form."
+          body={`${String(result.error?.message || "Refresh the page to try again").replace(/\.?$/, ".")} You can also pay on Stripe's secure checkout page.`}
+          onOpen={openHosted}
         />
       ) : (
-        <PaymentSkeleton />
+        <>
+          {slow ? <HostedCheckoutNotice {...hostedFallback} onOpen={openHosted} /> : null}
+          {checkout ? (
+            <PaymentForm
+              checkout={checkout}
+              summary={summary}
+              promoCodes={promoCodes}
+              journey={journey}
+              track={track}
+              onReady={formReady}
+            />
+          ) : (
+            <PaymentSkeleton />
+          )}
+        </>
       )}
     </CheckoutLayout>
   );
@@ -374,6 +496,7 @@ function CheckoutLayout({ summary, checkout = null, onLeave, children }) {
             <div className="flex items-center justify-between">
               <Link
                 href="/#pricing"
+                prefetch={false}
                 onClick={() => onLeave?.("clicked back to Pricing")}
                 className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
@@ -382,6 +505,7 @@ function CheckoutLayout({ summary, checkout = null, onLeave, children }) {
               </Link>
               <Link
                 href="/"
+                prefetch={false}
                 onClick={() => onLeave?.("clicked the Lychee logo")}
                 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground"
               >
@@ -455,8 +579,9 @@ function OrderSummary({ summary, checkout }) {
         {perMonth ? ` · ${perMonth}/month equivalent` : ""}
       </p>
 
+      {display.includesLabel ? <p className="mt-8 hidden text-sm text-muted-foreground sm:block">{display.includesLabel}</p> : null}
       {display.features.length ? (
-        <ul className="mt-8 hidden space-y-2.5 text-sm text-muted-foreground sm:block">
+        <ul className={`${display.includesLabel ? "mt-3" : "mt-8"} hidden space-y-2.5 text-sm text-muted-foreground sm:block`}>
           {display.features.slice(0, 6).map((feature) => (
             <li key={feature} className="flex gap-2.5">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
@@ -605,11 +730,12 @@ function PromoCode({ checkout, track }) {
   );
 }
 
-function PaymentForm({ checkout, summary, promoCodes, journey, track, mountedAt }) {
+function PaymentForm({ checkout, summary, promoCodes, journey, track, onReady }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [paid, setPaid] = useState(false);
+  const [ready, setReady] = useState(false);
 
   const isSubscription = summary?.mode === "subscription";
   const dueToday = checkout.total?.total?.amount || formatCents(summary?.amount);
@@ -619,9 +745,10 @@ function PaymentForm({ checkout, summary, promoCodes, journey, track, mountedAt 
   const goToAccount = () => router.push(returnUrl);
   const complete = checkout.status?.type === "complete";
 
+  // Waits for the payment form so the prefetch doesn't compete with Stripe's iframe.
   useEffect(() => {
-    router.prefetch(returnUrl);
-  }, [router, returnUrl]);
+    if (ready) router.prefetch(returnUrl);
+  }, [ready, router, returnUrl]);
 
   useEffect(() => {
     if (complete) router.push(returnUrl);
@@ -726,7 +853,10 @@ function PaymentForm({ checkout, summary, promoCodes, journey, track, mountedAt 
         <Label>Payment method</Label>
         <PaymentElement
           options={{ layout: { type: "tabs" }, terms: { card: "never" } }}
-          onReady={() => track("form_ready", { ms: msSinceCheckoutClick(mountedAt) }, { once: true })}
+          onReady={() => {
+            setReady(true);
+            onReady();
+          }}
           onLoadError={(event) => track("form_load_failed", { message: event?.error?.message }, { once: true })}
           onFocus={() => track("payment_started", {}, { once: true })}
           onChange={(event) => {
@@ -761,11 +891,11 @@ function PaymentForm({ checkout, summary, promoCodes, journey, track, mountedAt 
           ? `By subscribing, you allow Lychee to charge your payment method ${checkout.recurring?.dueNext?.total?.amount || formatCents(summary?.amount)} every ${interval} until you cancel. `
           : ""}
         Payments are processed securely by Stripe. See our{" "}
-        <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">
+        <Link href="/terms" prefetch={false} className="underline underline-offset-4 hover:text-foreground">
           Terms
         </Link>{" "}
         and{" "}
-        <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
+        <Link href="/privacy" prefetch={false} className="underline underline-offset-4 hover:text-foreground">
           Privacy Policy
         </Link>
         .

@@ -3,12 +3,14 @@ import { LARGE_STORAGE_TIERS } from "@/lib/membershipAccess";
 /** Included workspace storage for Researcher, Elite + Lifetime (display + quota enforcement hooks). */
 export const ELITE_WORKSPACE_CAP_BYTES = 10 * 1024 * 1024 * 1024;
 export const QUANT_WORKSPACE_CAP_BYTES = 25 * 1024 * 1024 * 1024;
+export const LITE_WORKSPACE_CAP_BYTES = 1 * 1024 * 1024 * 1024;
 
 /** @param {object | null | undefined} userLike */
 export function workspaceCapBytesForUser(userLike) {
-  return String(userLike?.subscriptionTier || "").toLowerCase() === "quant"
-    ? QUANT_WORKSPACE_CAP_BYTES
-    : ELITE_WORKSPACE_CAP_BYTES;
+  const tier = String(userLike?.subscriptionTier || "").toLowerCase();
+  if (tier === "quant") return QUANT_WORKSPACE_CAP_BYTES;
+  if (tier === "lite") return LITE_WORKSPACE_CAP_BYTES;
+  return ELITE_WORKSPACE_CAP_BYTES;
 }
 
 /** Planning assumption for “~rows” copy (tabular JSON ≈ 0.5–2 KB/row). */

@@ -1,7 +1,7 @@
 import { CLIENT_CHECKOUT_STEPS, recordCheckoutStep } from "@/lib/telegram/checkoutJourney";
 
 const STRING_KEYS = ["method", "message", "code", "declineCode", "paymentStatus", "email", "via", "promo", "kind"];
-const NUMBER_KEYS = ["ms"];
+const NUMBER_KEYS = ["ms", "sessionMs"];
 const BOOLEAN_KEYS = ["afterSubmit", "existing"];
 
 function cleanData(raw) {

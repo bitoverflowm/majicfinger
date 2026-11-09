@@ -2198,10 +2198,10 @@ const Nav = () => {
     <AlertDialog open={largeProjectUpgradeOpen} onOpenChange={setLargeProjectUpgradeOpen}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Researcher plan required</AlertDialogTitle>
+          <AlertDialogTitle>Paid plan required</AlertDialogTitle>
           <AlertDialogDescription className="space-y-3">
             <span className="block">
-              Hey, upgrade to Researcher or Quant because you are working with extremely large data
+              Hey, upgrade to Lite, Researcher, or Quant because you are working with extremely large data
               ({upgradeSizeLabel} estimated), or use aggregations and operations to reduce data size.
             </span>
             {upgradeLargestSheet && (

@@ -3,13 +3,16 @@
 import { ArrowDown } from "lucide-react";
 import { BLACK_FRIDAY } from "@/lib/promo/blackFriday";
 import { CountdownTiles } from "./CountdownTiles";
-import { useBlackFridayCountdown } from "./useBlackFriday";
+import { BLACK_FRIDAY_ANCHOR, useBlackFridayCountdown } from "./useBlackFriday";
 
 export function BlackFridayPricingCard({ onSeePlans }: { onSeePlans: () => void }) {
   const countdown = useBlackFridayCountdown();
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-secondary/25 bg-gradient-to-br from-secondary/[0.07] via-background to-violet-500/[0.06] p-5 shadow-[0_16px_40px_-22px_rgba(47,111,237,0.45)] sm:p-6 dark:from-secondary/[0.16] dark:to-violet-500/[0.1]">
+    <div
+      id={BLACK_FRIDAY_ANCHOR}
+      className="relative scroll-mt-28 overflow-hidden rounded-2xl border border-secondary/25 bg-gradient-to-br from-secondary/[0.07] via-background to-violet-500/[0.06] p-5 shadow-[0_16px_40px_-22px_rgba(47,111,237,0.45)] sm:p-6 dark:from-secondary/[0.16] dark:to-violet-500/[0.1]"
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute -right-16 -top-24 size-64 rounded-full bg-[radial-gradient(circle,rgba(168,85,247,0.18),transparent_65%)]"

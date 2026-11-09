@@ -14,6 +14,8 @@ export const CHECKOUT_STEPS = {
   opened: { label: "Opened checkout", stage: "Loading checkout" },
   form_ready: { label: "Payment form loaded", stage: "Looking at checkout", once: true },
   form_load_failed: { label: "Payment form failed to load", stage: "Payment form failed to load", ping: "issue" },
+  form_slow: { label: "Payment form slow, offered Stripe hosted checkout", stage: "Waiting on the payment form", once: true },
+  hosted_fallback: { label: "Switched to Stripe hosted checkout", stage: "Went to Stripe hosted checkout", once: true },
   contact_started: { label: "Started entering email", stage: "Entering email", once: true },
   payment_started: { label: "Started entering payment details", stage: "Entering payment details", once: true },
   method_changed: { label: "Switched payment method", stage: "Entering payment details" },
@@ -41,6 +43,8 @@ export const CHECKOUT_STEPS = {
 export const CLIENT_CHECKOUT_STEPS = new Set([
   "form_ready",
   "form_load_failed",
+  "form_slow",
+  "hosted_fallback",
   "contact_started",
   "payment_started",
   "method_changed",
@@ -212,6 +216,8 @@ function journeyStatus(steps) {
     return { emoji: "❌", title: failures > 1 ? `Payment failed (${failures} tries)` : "Payment failed" };
   }
   if (last?.step === "form_load_failed") return { emoji: "⚠️", title: "Payment form failed to load" };
+  if (last?.step === "hosted_fallback") return { emoji: "↗️", title: "Moved to Stripe hosted checkout" };
+  if (last?.step === "form_slow") return { emoji: "🐢", title: "Payment form slow to load" };
   return { emoji: "🛒", title: "In checkout" };
 }
 
@@ -222,9 +228,14 @@ function stepDetail(step, steps, index) {
   switch (step.step) {
     case "opened":
       if (data.from) parts.push(`from ${data.from}`);
+      if (data.hosted) parts.push("Stripe hosted checkout");
+      if (data.serverMs != null) parts.push(`server ${formatDuration(data.serverMs)}`);
       break;
     case "form_ready":
+    case "form_slow":
+    case "hosted_fallback":
       if (data.ms != null) parts.push(`${formatDuration(data.ms)} after click`);
+      if (data.sessionMs != null) parts.push(`checkout API ${formatDuration(data.sessionMs)}`);
       break;
     case "payment_started":
     case "method_changed":
@@ -309,7 +320,10 @@ function stepTimes(attempt, steps) {
   const end = steps.length ? new Date(steps[steps.length - 1].at).getTime() : start;
   const lines = [];
   const ready = steps.find((s) => s.step === "form_ready");
-  if (ready?.data?.ms != null) lines.push(`Page load: ${formatDuration(ready.data.ms)}`);
+  if (ready?.data?.ms != null) {
+    const api = ready.data.sessionMs != null ? ` (checkout API ${formatDuration(ready.data.sessionMs)})` : "";
+    lines.push(`Page load: ${formatDuration(ready.data.ms)}${api}`);
+  }
 
   const began = firstAt(steps, ["contact_started", "payment_started", "details_complete"]);
   const submitted = firstAt(steps, ["submit"]);
