@@ -1,3 +1,4 @@
+import { archiveConfigured, fromArchive } from "@/lib/newsArchive";
 import { cleanTerms } from "@/lib/newsQuery";
 import {
   GDELT_REACH_MS,
@@ -15,8 +16,11 @@ import {
  *
  * Headlines (or, for `volume`, article counts over time) mentioning every term inside the window.
  * Answers `{ status, articles | volume, message? }` where status is ok, limited (GDELT asked us to
- * slow down), busy (too many GDELT lookups queued), unavailable (GDELT didn't answer), out_of_range
- * or error. The first three are worth retrying shortly.
+ * slow down), busy (too many GDELT lookups queued), unavailable (GDELT or the archive didn't
+ * answer), out_of_range or error. The first three are worth retrying shortly.
+ *
+ * GDELT results come from the news archive in the data lake when it's configured, and from
+ * GDELT's own rate-limited search API otherwise.
  */
 
 const MINUTE = 60_000;
@@ -29,7 +33,7 @@ const FETCH_TIMEOUT_MS = 30_000;
 /** A window ending this close to now is live: GDELT refreshes every 15 minutes, Google News within minutes. */
 const LIVE_EDGE_MS = 30 * MINUTE;
 const TTL = {
-  live: { google: 2 * MINUTE, gdelt: 8 * MINUTE, volume: 8 * MINUTE },
+  live: { google: 2 * MINUTE, gdelt: 5 * MINUTE, volume: 5 * MINUTE },
   past: 6 * 60 * MINUTE,
   limited: 45_000,
   error: MINUTE,
@@ -99,6 +103,17 @@ async function fromGdelt(source, terms, start, end) {
   return { status: "ok", articles: withinWindow(gdeltArticles(read.json), start, end), ...clipped };
 }
 
+async function fromGdeltAnywhere(source, terms, start, end) {
+  if (!archiveConfigured()) return fromGdelt(source, terms, start, end);
+  try {
+    return await fromArchive(source, terms, start, end);
+  } catch (err) {
+    if (err?.code === "CONFIG") return fromGdelt(source, terms, start, end);
+    console.warn("News archive query failed:", err?.code || err?.name, err?.message);
+    return { status: "unavailable", message: "The news archive didn't answer; trying again shortly." };
+  }
+}
+
 async function fromGoogle(terms, start, end) {
   try {
     const res = await fetch(googleNewsUrl(terms, start, end), {
@@ -141,7 +156,7 @@ export default async function handler(req, res) {
   if (!result) {
     let pending = inflight.get(key);
     if (!pending) {
-      pending = (source === "google" ? fromGoogle(terms, start, end) : fromGdelt(source, terms, start, end)).finally(() =>
+      pending = (source === "google" ? fromGoogle(terms, start, end) : fromGdeltAnywhere(source, terms, start, end)).finally(() =>
         inflight.delete(key),
       );
       inflight.set(key, pending);

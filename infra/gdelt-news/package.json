@@ -1,0 +1,20 @@
+{
+  "name": "lychee-gdelt-news-infra",
+  "private": true,
+  "type": "module",
+  "description": "Deploys the GDELT news archive (Lambda, schedule, Athena table). The Lambda itself needs no dependencies.",
+  "scripts": {
+    "deploy": "node deploy.mjs deploy",
+    "backfill": "node deploy.mjs backfill",
+    "run-once": "node deploy.mjs run",
+    "status": "node deploy.mjs status"
+  },
+  "dependencies": {
+    "@aws-sdk/client-athena": "^3.995.0",
+    "@aws-sdk/client-iam": "^3.995.0",
+    "@aws-sdk/client-lambda": "^3.995.0",
+    "@aws-sdk/client-s3": "^3.995.0",
+    "@aws-sdk/client-scheduler": "^3.995.0",
+    "@aws-sdk/client-sts": "^3.995.0"
+  }
+}

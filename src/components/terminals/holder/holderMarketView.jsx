@@ -193,7 +193,7 @@ export function HolderMarketView({ subject, onPickTrader }) {
           Headlines that mention every word below, from Google News and GDELT, the open global news index. The words start from
           the market&apos;s title; remove them, add your own or pick a suggestion, and it remembers your choice for this market.
           Bars show how many matching articles came out when, so spikes line up with price moves; click one to look closer.
-          {meta.closed ? "" : " New headlines show up within a few minutes."} GDELT only searches the last three months.
+          {meta.closed ? "" : " New headlines show up within a few minutes."}
         </p>
       </div>
       <MarketNewsSection meta={meta} />
