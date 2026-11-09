@@ -1,5 +1,6 @@
 /** Browser-local copy of the workspace tab bar. The saved dashboard document is the source of truth. */
 
+import { tabMarginsField } from "@/lib/workspaceTabMargins";
 import { terminalTabField } from "@/lib/workspaceTerminals";
 import { scopedLocalOwner } from "@/lib/workspaceProjectScope";
 
@@ -56,7 +57,7 @@ function sanitizeTabs(tabs, welcomeRemoved) {
     if (!id || !name || seen.has(id)) continue;
     if (welcomeRemoved && id === WELCOME_START_TAB_ID) continue;
     seen.add(id);
-    clean.push({ id, name, blank: !!tab.blank, ...terminalTabField(tab) });
+    clean.push({ id, name, blank: !!tab.blank, ...terminalTabField(tab), ...tabMarginsField(tab) });
   }
   return clean;
 }
@@ -94,6 +95,25 @@ export function saveWorkspaceStartTabs(userId, state) {
   } catch {
     // Private mode can block storage. The in-memory tabs still update this visit.
   }
+}
+
+/** Changes one tab's fields on screen and in the browser copy. `patch` is the changes, or `(tab) => changes | null`. */
+export function updateWorkspaceTab({ ctx, tabId, accountId, patch }) {
+  const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
+  const host = tabs.find((tab) => tab.id === tabId);
+  if (!host) return false;
+  const changes = typeof patch === "function" ? patch(host) : patch;
+  if (!changes) return false;
+  const next = tabs.map((tab) => (tab.id === tabId ? { ...tab, ...changes } : tab));
+  ctx?.setWorkspaceStartTabs?.(next);
+  if (!ctx?.landingDemo) {
+    saveWorkspaceStartTabs(accountId || "local", {
+      welcomeRemoved: !!ctx?.welcomeTabRemoved,
+      tabs: next,
+      activeId: ctx?.activeWorkspaceStartTabId || null,
+    });
+  }
+  return true;
 }
 
 export function newStartTabId() {

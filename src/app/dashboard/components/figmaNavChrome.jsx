@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, BarChart3, Check, ChevronDown, ChevronRight, Database, Eye, Loader2, Play, Radio, RotateCcw, RotateCw, Save, Square, Table2, Type } from "lucide-react";
+import * as SliderPrimitive from "@radix-ui/react-slider";
+import { ArrowLeft, BarChart3, Check, ChevronDown, ChevronRight, Database, Eye, Loader2, Play, Radio, RotateCcw, RotateCw, Save, SlidersHorizontal, Square, Table2, Type } from "lucide-react";
 import { ProvenanceMapButton } from "@/components/dashboardComposer/provenanceMap";
 import { PROJECTS_PATH, useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
 import { captureProjectThumbnail } from "@/lib/projectThumbnail";
@@ -30,7 +31,9 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { canvasGridMetrics } from "@/components/dashboardComposer/clipLayout";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
+import { TAB_MARGIN_SIDES, resolveTabMargins } from "@/lib/workspaceTabMargins";
 import { realtimeAssets } from "@/lib/realtime/sheetRealtime";
 import { showRealtimeMenu, tabHasLiveMarket } from "@/components/dashboardComposer/realtimeMode";
 import { DASHBOARD_FREE_TEXT_PLACEHOLDER } from "@/lib/dashboardFreeTextTheme";
@@ -370,6 +373,121 @@ function LiveTransportControls() {
   );
 }
 
+const MARGIN_LABELS = { left: "Left", right: "Right", top: "Top", bottom: "Bottom" };
+
+function MarginSlider({ side, value, max, onChange }) {
+  return (
+    <div className="px-2 py-1.5">
+      <div className="mb-1.5 flex items-center justify-between text-[12px]">
+        <span className="text-neutral-700 dark:text-neutral-200">{MARGIN_LABELS[side]}</span>
+        <span className="tabular-nums text-neutral-500">{value}px</span>
+      </div>
+      <SliderPrimitive.Root
+        min={0}
+        max={max}
+        step={1}
+        value={[Math.min(value, max)]}
+        onValueChange={([next]) => onChange(next)}
+        className="relative flex h-4 w-full touch-none select-none items-center"
+      >
+        <SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-black/[0.08] dark:bg-white/15">
+          <SliderPrimitive.Range className="absolute h-full bg-[#0d99ff]" />
+        </SliderPrimitive.Track>
+        <SliderPrimitive.Thumb
+          aria-label={`${MARGIN_LABELS[side]} margin`}
+          className="block size-3.5 rounded-full border border-black/10 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0d99ff]/40"
+        />
+      </SliderPrimitive.Root>
+    </div>
+  );
+}
+
+/** Properties of the tab on screen. Its margins move the tab's blocks as the sliders change. */
+function TabPropertiesPanel() {
+  const ctx = useMyStateV2();
+  const canvas = useWorkspaceCanvas();
+  const viewing = ctx?.viewing;
+  const onTab = viewing === "welcome" || (ctx?.landingDemo && viewing === "connectDataHome");
+  const tab = onTab ? (ctx?.workspaceStartTabs || []).find((item) => item.id === ctx?.activeWorkspaceStartTabId) : null;
+
+  if (!tab || !canvas?.setTabMargins || canvas?.readOnly) {
+    return <p className="px-3.5 py-3 text-[12px] leading-relaxed text-neutral-500">Open a dashboard tab to set its properties.</p>;
+  }
+
+  const { width } = canvasGridMetrics();
+  const margins = resolveTabMargins(tab, width);
+  const sideMax = Math.max(240, Math.floor((width - 320) / 2));
+  const max = { left: sideMax, right: sideMax, top: 240, bottom: 480 };
+  const set = (side, value) => canvas.setTabMargins(tab.id, { ...margins, [side]: value });
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto py-2">
+      <p className="truncate px-3.5 pb-2 text-[11px] text-neutral-500">{tab.name}</p>
+      <div className="flex items-center justify-between px-3.5 pb-1">
+        <h3 className="text-[12px] font-medium text-neutral-800 dark:text-neutral-100">Tab margins</h3>
+        <button
+          type="button"
+          disabled={!tab.margins}
+          onClick={() => canvas.setTabMargins(tab.id, null)}
+          className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-800 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-white/10 dark:hover:text-neutral-100"
+        >
+          <RotateCcw className="size-3" aria-hidden />
+          Reset
+        </button>
+      </div>
+      <div className="px-1.5">
+        {TAB_MARGIN_SIDES.map((side) => (
+          <MarginSlider key={side} side={side} value={margins[side]} max={max[side]} onChange={(value) => set(side, value)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const SIDE_PANELS = [
+  { id: "realtime", label: "Realtime", icon: Radio },
+  { id: "tab", label: "Tab properties", icon: SlidersHorizontal },
+];
+
+function RightSidePanel() {
+  const [panel, setPanel] = useState("realtime");
+  const canvas = useWorkspaceCanvas();
+  const liveCount = useMemo(
+    () => realtimeAssets(canvas?.blocksByPage || {}, canvas?.realtimeById || {}).length,
+    [canvas?.blocksByPage, canvas?.realtimeById],
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div role="tablist" aria-label="Side panel" className="flex h-9 shrink-0 items-center gap-0.5 border-b border-black/[0.06] px-2 dark:border-white/10">
+        {SIDE_PANELS.map(({ id, label, icon: Icon }) => {
+          const active = panel === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setPanel(id)}
+              className={cn(
+                "inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium transition-colors",
+                active
+                  ? "bg-[#e5f4ff] text-[#0d99ff] dark:bg-[#0d99ff]/20 dark:text-[#8ecaff]"
+                  : "text-neutral-600 hover:bg-black/[0.04] hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-white/[0.06] dark:hover:text-neutral-100",
+              )}
+            >
+              <Icon className="size-3.5" aria-hidden />
+              {label}
+              {id === "realtime" && liveCount ? <span className="tabular-nums">{liveCount}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+      {panel === "tab" ? <TabPropertiesPanel /> : <RealtimeSidePanel />}
+    </div>
+  );
+}
+
 function RealtimeSidePanel() {
   const canvas = useWorkspaceCanvas();
   const assets = useMemo(
@@ -379,13 +497,6 @@ function RealtimeSidePanel() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-9 shrink-0 items-center border-b border-black/[0.06] px-2 dark:border-white/10">
-        <span className="inline-flex h-7 items-center gap-1.5 rounded-md bg-[#e5f4ff] px-2 text-[12px] font-medium text-[#0d99ff] dark:bg-[#0d99ff]/20 dark:text-[#8ecaff]">
-          <Radio className="size-3.5" aria-hidden />
-          Realtime
-          {assets.length ? <span className="tabular-nums">{assets.length}</span> : null}
-        </span>
-      </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
         {assets.length ? (
           assets.map((asset) => (
@@ -643,7 +754,7 @@ function RightChromeControls({ onLogout, expanded }) {
 
   return (
     <TooltipProvider delayDuration={300}>
-    <div className={cn("flex items-center gap-0.5", expanded && "min-w-0 flex-wrap")}>
+    <div className={cn("flex items-center gap-0.5", expanded && "min-w-0 flex-wrap gap-y-1")}>
       {user ? (
         <AccountMenu onLogout={onLogout} />
       ) : landingDemo ? (
@@ -870,10 +981,15 @@ export default function FigmaNavChrome({ onLogout, dashboardName: fixedName }) {
           expanded ? "bottom-2 top-2 w-[260px]" : "top-2 h-10 w-auto",
         )}
       >
-        <div className={cn("flex h-10 shrink-0 items-center px-1.5", expanded && "border-b border-black/[0.06] dark:border-white/10")}>
+        <div
+          className={cn(
+            "flex shrink-0 items-center px-1.5",
+            expanded ? "min-h-10 py-1 border-b border-black/[0.06] dark:border-white/10" : "h-10",
+          )}
+        >
           <RightChromeControls onLogout={onLogout} expanded={expanded} />
         </div>
-        {expanded ? <RealtimeSidePanel /> : null}
+        {expanded ? <RightSidePanel /> : null}
       </aside>
     </>
   );

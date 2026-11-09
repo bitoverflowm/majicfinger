@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
-import { CLIP, widthForSpan, xForCol } from "@/components/dashboardComposer/clipLayout";
+import { CLIP, canvasGridMetrics, widthForSpan, xForCol } from "@/components/dashboardComposer/clipLayout";
 import { cn } from "@/lib/utils";
 import { terminalViewOf } from "@/lib/workspaceTerminals";
 import { PanelSizing } from "./terminalPanelFrame";
@@ -95,9 +95,10 @@ export function terminalLayoutPatch(tab, blocks, { checkScreen = false } = {}) {
   const panels = list.filter(isTerminalBlock);
   const own = list.filter((block) => !isTerminalBlock(block));
   const layout = tab.terminalLayout || null;
+  const { originY } = canvasGridMetrics();
   // An empty tab the user never touched lost its panels somewhere (a save that didn't land); lay it out again.
   if (!layout || layout.view !== view || (!list.length && !layout.edited)) {
-    const placed = placeEntries(terminal, kit, entries, CLIP.originY);
+    const placed = placeEntries(terminal, kit, entries, originY);
     const top = own.reduce((min, block) => Math.min(min, block.y || 0), Infinity);
     const lift = own.length ? Math.max(0, bottomOf(placed) + CLIP.gap * 3 - top) : 0;
     return {
@@ -113,7 +114,7 @@ export function terminalLayoutPatch(tab, blocks, { checkScreen = false } = {}) {
       terminal,
       kit,
       sorted.map((block) => ({ panel: block.panel, span: entries[order.get(block.panel)]?.span || CLIP.cols, h: block.h })),
-      CLIP.originY,
+      originY,
     );
     const relaid = sorted.map((block, index) => ({ ...block, x: placed[index].x, y: placed[index].y, w: placed[index].w }));
     if (relaid.some((block, index) => ["x", "y", "w"].some((key) => Math.abs(block[key] - (sorted[index][key] || 0)) > 1))) {

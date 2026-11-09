@@ -1,9 +1,12 @@
 /**
  * Twenty-four-column canvas grid. Rows continue as far as the tab needs.
  * A block's width is a column span (1–24) and its height is a row span.
- * Move and resize snap to that grid.
+ * Move and resize snap to that grid. The tab on screen sets the grid's margins.
  */
 
+import { DEFAULT_TAB_MARGINS, sanitizeTabMargins } from "@/lib/workspaceTabMargins";
+
+/** `x0` and `originY` are the grid's edges with the default margins; `canvasGridMetrics` has the tab's own. */
 export const CLIP = {
   x0: 28,
   gap: 8,
@@ -14,8 +17,13 @@ export const CLIP = {
 };
 
 const DEFAULT_CANVAS_WIDTH = 1142;
+/** The tab bar sits over the top of the canvas; a tab's top margin starts below it. */
+const TAB_BAR_CLEARANCE = CLIP.originY - DEFAULT_TAB_MARGINS.top;
+/** Side margins give way so the grid keeps at least this much width. */
+const MIN_GRID_WIDTH = 320;
 
 let canvasWidth = DEFAULT_CANVAS_WIDTH;
+let tabMargins = { ...DEFAULT_TAB_MARGINS };
 
 const guideListeners = new Set();
 let guideState = { active: false, preview: null };
@@ -42,12 +50,56 @@ export function setCanvasGridWidth(width) {
   canvasWidth = next;
 }
 
+/** The margins of the tab on screen. Unknown or missing margins mean the defaults. */
+export function setCanvasGridMargins(margins) {
+  tabMargins = sanitizeTabMargins(margins) || { ...DEFAULT_TAB_MARGINS };
+}
+
 export function canvasGridMetrics() {
   const width = canvasWidth;
-  const inner = Math.max(CLIP.cols, width - CLIP.x0 * 2);
+  let { left, right } = tabMargins;
+  const room = Math.max(0, width - MIN_GRID_WIDTH);
+  if (left + right > room) {
+    const scale = room / (left + right);
+    left = Math.floor(left * scale);
+    right = Math.floor(right * scale);
+  }
+  const inner = Math.max(CLIP.cols, width - left - right);
   const track = (inner - CLIP.gap * (CLIP.cols - 1)) / CLIP.cols;
   const unit = track + CLIP.gap;
-  return { width, inner, track, unit, x0: CLIP.x0, originY: CLIP.originY, gap: CLIP.gap, cols: CLIP.cols };
+  return {
+    width,
+    inner,
+    track,
+    unit,
+    x0: left,
+    originY: TAB_BAR_CLEARANCE + tabMargins.top,
+    bottom: tabMargins.bottom,
+    margins: tabMargins,
+    gap: CLIP.gap,
+    cols: CLIP.cols,
+  };
+}
+
+/**
+ * The tab's blocks on the grid `margins` (and `width`, when given) make, which becomes the grid.
+ * Each block keeps its columns, its height and how far below the top margin it sits.
+ */
+export function relayoutForMargins(blocks, margins, width) {
+  const before = metrics();
+  const spots = (blocks || []).map((block) => {
+    const span = spanOf(block);
+    return { block, span, col: colForX(block.x, span) };
+  });
+  if (width != null) setCanvasGridWidth(width);
+  setCanvasGridMargins(margins);
+  const after = metrics();
+  return spots.map(({ block, span, col }) => ({
+    ...block,
+    x: xForCol(col),
+    w: widthForSpan(span),
+    y: Math.max(0, Math.round((block.y || 0) - before.originY + after.originY)),
+  }));
 }
 
 function metrics() {
@@ -282,8 +334,8 @@ export function packClippedBlocks(blocks) {
   }
 
   const placed = [];
-  const { gap } = metrics();
-  let y = CLIP.originY;
+  const { gap, originY } = metrics();
+  let y = originY;
 
   for (const sheet of wideSheets) {
     const height = sheet.h || heightForRows(9);
@@ -332,11 +384,12 @@ function boxesOverlap(x, y, w, h, other) {
 export function separateOverlaps(blocks) {
   const ordered = [...(blocks || [])].sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
   const placed = [];
-  const rightEdge = CLIP.x0 + widthForSpan(CLIP.cols);
+  const { x0, originY } = metrics();
+  const rightEdge = x0 + widthForSpan(CLIP.cols);
   const gap = CLIP.gap;
   for (const block of ordered) {
-    let x = block.x ?? CLIP.x0;
-    let y = block.y ?? CLIP.originY;
+    let x = block.x ?? x0;
+    let y = block.y ?? originY;
     const w = block.w || widthForSpan(12);
     const h = block.h || heightForRows(CLIP.minRows);
     let guard = 0;
@@ -351,11 +404,11 @@ export function separateOverlaps(blocks) {
           x = beside;
           y = hit.y || 0;
         } else {
-          x = CLIP.x0;
+          x = x0;
           y = (hit.y || 0) + (hit.h || 0) + gap;
         }
       } else {
-        x = CLIP.x0;
+        x = x0;
         y += h + gap;
       }
       guard += 1;
@@ -372,5 +425,5 @@ export function separateOverlaps(blocks) {
  */
 export function packReadingOrder(blocks) {
   const ordered = [...(blocks || [])].sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
-  return flowPlace(ordered, CLIP.originY);
+  return flowPlace(ordered, metrics().originY);
 }

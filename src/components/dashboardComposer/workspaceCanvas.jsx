@@ -41,7 +41,9 @@ import {
   loadWorkspaceStartTabs,
   retireWelcomeTab,
   saveWorkspaceStartTabs,
+  updateWorkspaceTab,
 } from "@/lib/workspaceStartTabs";
+import { defaultMarginsForTab, resolveTabMargins, sameTabMargins, sanitizeTabMargins } from "@/lib/workspaceTabMargins";
 import { scopedLocalOwner, workspaceProjectScope } from "@/lib/workspaceProjectScope";
 import { useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
@@ -60,7 +62,9 @@ import {
   canvasGridMetrics,
   packClippedBlocks,
   packReadingOrder,
+  relayoutForMargins,
   separateOverlaps,
+  setCanvasGridMargins,
   setCanvasGridWidth,
   setLayoutGuide,
   snapMove,
@@ -1089,7 +1093,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         const block = {
           id,
           type,
-          x: below ? CLIP.x0 : 32 + (n % 4) * 24,
+          x: below ? canvasGridMetrics().x0 : 32 + (n % 4) * 24,
           y: below ? bottom + CLIP.gap * 3 : 72 + (n % 5) * 24,
           w: size.w,
           h: size.h,
@@ -1129,6 +1133,35 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       });
     },
     [pageId],
+  );
+
+  /** Move the page's blocks onto the grid `margins` (and `width`, when given) make. */
+  const relayoutPage = useCallback((page, margins, width) => {
+    const list = blocksByPageRef.current[page] || [];
+    const next = relayoutForMargins(list, margins, width);
+    if (list.length) setBlocksByPage((prev) => ({ ...prev, [page]: next }));
+  }, []);
+
+  /**
+   * Set a tab's margins, or clear them with null so the tab follows its defaults again. On the tab
+   * on screen its blocks move onto the new grid as it changes.
+   */
+  const setTabMargins = useCallback(
+    (tabId, margins) => {
+      const clean = margins == null ? null : sanitizeTabMargins(margins);
+      if (!tabId || readOnly || (margins != null && !clean)) return;
+      if (pageIdForTab(tabId) === pageId) {
+        const tab = (ctxRef.current?.workspaceStartTabs || []).find((item) => item.id === tabId);
+        relayoutPage(pageId, clean || defaultMarginsForTab(tab, canvasGridMetrics().width));
+      }
+      updateWorkspaceTab({
+        ctx: ctxRef.current,
+        tabId,
+        accountId: user?.userId || signedInRef.current,
+        patch: { margins: clean || undefined },
+      });
+    },
+    [pageId, readOnly, relayoutPage, user?.userId],
   );
 
   const replacePageBlocks = useCallback((targetPageId, nextBlocks) => {
@@ -1598,12 +1631,14 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       updateBlock,
       fitBlock,
       replacePageBlocks,
+      relayoutPage,
+      setTabMargins,
       duplicateBlock,
       removeBlock,
       createChartFromBlock,
       generateChartsForSheets,
     }),
-    [fitBlock, replacePageBlocks, addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, deleteTab, dismissRun, duplicateBlock, endTour, focusBlock, focusSheetRow, generateChartsForSheets, getPageId, handDown, hasContent, leavePrompt, markTabSettled, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, setTourStep, startRealtimeMode, startSheetRealtime, startTour, stopRealtimeMode, stopSheetRealtime, tables, tool, tour, updateBlock],
+    [fitBlock, replacePageBlocks, relayoutPage, setTabMargins, addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, deleteTab, dismissRun, duplicateBlock, endTour, focusBlock, focusSheetRow, generateChartsForSheets, getPageId, handDown, hasContent, leavePrompt, markTabSettled, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, setTourStep, startRealtimeMode, startSheetRealtime, startTour, stopRealtimeMode, stopSheetRealtime, tables, tool, tour, updateBlock],
   );
 
   return (
@@ -2904,10 +2939,14 @@ export function WorkspaceCanvas() {
   const accountId = useUser()?.userId || "";
 
   const pageTabId = tabIdFromPage(canvas?.pageId);
+  const pageTab = ((canvas?.readOnly ? canvas?.previewTabs : ctx?.workspaceStartTabs) || []).find((tab) => tab?.id === pageTabId) || null;
   // The landing demo still shows a terminal as one page over the canvas.
-  const terminalTab = ctx?.landingDemo
-    ? null
-    : ((canvas?.readOnly ? canvas?.previewTabs : ctx?.workspaceStartTabs) || []).find((tab) => tab?.id === pageTabId && tab.terminal) || null;
+  const terminalTab = !ctx?.landingDemo && pageTab?.terminal ? pageTab : null;
+  const pageTabRef = useRef(pageTab);
+  pageTabRef.current = pageTab;
+  const laidPageRef = useRef("");
+  const savedMargins = sanitizeTabMargins(pageTab?.margins);
+  const marginsKey = savedMargins ? JSON.stringify(savedMargins) : pageTab?.terminal ? "terminal" : "";
   const terminalCustomized = !!terminalTab?.terminalLayout?.edited || blocks.some((block) => !isTerminalBlock(block));
   useTerminalTabLayout({
     tab: terminalTab,
@@ -3071,16 +3110,38 @@ export function WorkspaceCanvas() {
     };
   }, [canvas?.setHandDown, canvas?.tool]);
 
+  const relayoutPage = canvas?.readOnly ? null : canvas?.relayoutPage;
+  const page = canvas?.pageId;
   useLayoutEffect(() => {
     const scroller = scrollerRef.current || sizerRef.current;
     if (!scroller) return undefined;
     const apply = () => {
       const width = Math.floor(scroller.clientWidth);
       if (!Number.isFinite(width) || width < 320) return;
-      setCanvasGridWidth(width);
+      const tab = pageTabRef.current;
+      // The landing demo's terminal isn't laid out in panels, so its tab keeps the plain defaults.
+      const margins = resolveTabMargins(ctx?.landingDemo && tab?.terminal ? { margins: tab.margins } : tab, width);
+      // Blocks sit where the tab's grid was when they were saved; only a change on the tab on screen moves them.
+      if (laidPageRef.current === page && relayoutPage && !sameTabMargins(margins, canvasGridMetrics().margins)) {
+        relayoutPage(page, margins, width);
+      } else {
+        setCanvasGridWidth(width);
+        setCanvasGridMargins(margins);
+      }
+      laidPageRef.current = page;
       setGridMetrics((prev) => {
         const next = canvasGridMetrics();
-        if (prev.width === next.width && prev.unit === next.unit && prev.track === next.track && prev.inner === next.inner) return prev;
+        if (
+          prev.width === next.width &&
+          prev.unit === next.unit &&
+          prev.track === next.track &&
+          prev.inner === next.inner &&
+          prev.x0 === next.x0 &&
+          prev.originY === next.originY &&
+          prev.bottom === next.bottom
+        ) {
+          return prev;
+        }
         return next;
       });
     };
@@ -3088,7 +3149,7 @@ export function WorkspaceCanvas() {
     const observer = new ResizeObserver(apply);
     observer.observe(scroller);
     return () => observer.disconnect();
-  }, [canvas?.ready, canvas?.tabLoading, blocks.length]);
+  }, [canvas?.ready, canvas?.tabLoading, blocks.length, marginsKey, page, relayoutPage, ctx?.landingDemo]);
 
   const hasBlocks = blocks.length > 0;
   const bootedPageRef = useRef("");
@@ -3298,7 +3359,7 @@ export function WorkspaceCanvas() {
       <div
         className="relative min-h-full min-w-full"
         style={{
-          height: blocks.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 120), 0),
+          height: blocks.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + gridMetrics.bottom), 0),
           width: Math.max(
             gridMetrics.width,
             blocks.reduce((max, block) => Math.max(max, (block.x || 0) + (block.w || 0) + 32), 0),

@@ -2,6 +2,7 @@ import { ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT } from "@/config/dataLakeParquetSampl
 import { recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
 import { DATASET_TYPES } from "@/lib/visualizations/datasetDescriptor";
 import { isSavedChartView } from "@/lib/visualizations/presetRegistry";
+import { tabMarginsField } from "@/lib/workspaceTabMargins";
 import { terminalTabField } from "@/lib/workspaceTerminals";
 import { defaultStartTab } from "@/lib/workspaceStartTabs";
 
@@ -567,7 +568,7 @@ export function sanitizeWorkspaceDashboard(input) {
     const name = cleanText(tab?.name, 80);
     if (!id || !name || seen.has(id)) continue;
     seen.add(id);
-    tabs.push({ id, name, blank: !!tab.blank, ...terminalTabField(tab) });
+    tabs.push({ id, name, blank: !!tab.blank, ...terminalTabField(tab), ...tabMarginsField(tab) });
   }
   if (!tabs.length) tabs.push(defaultStartTab());
 

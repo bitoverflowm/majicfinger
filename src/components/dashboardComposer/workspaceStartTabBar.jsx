@@ -23,6 +23,7 @@ import {
   newStartTabId,
   saveWorkspaceStartTabs,
 } from "@/lib/workspaceStartTabs";
+import { tabMarginsField } from "@/lib/workspaceTabMargins";
 import { terminalTabField } from "@/lib/workspaceTerminals";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
@@ -67,6 +68,7 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
       name: duplicateTabName(tab.name, state.tabs.map((item) => item.name)),
       blank: !!tab.blank,
       ...terminalTabField(tab),
+      ...tabMarginsField(tab),
     };
     const index = state.tabs.findIndex((item) => item.id === tab.id);
     const at = index < 0 ? state.tabs.length : index + 1;
