@@ -1,26 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { BadgeCheck, Loader2 } from "lucide-react";
 import { formatUsd, Stat } from "@/components/dashboardComposer/recipes/polymarketMarketSearch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { retryImport } from "@/lib/retryImport";
-import { TRADER_PNL_ENDPOINT_ID } from "@/lib/polymarketLive/traderPnlCompose";
 import { cn } from "@/lib/utils";
+import { TerminalPanelFrame, usePanelFill } from "../terminalPanelFrame";
 import { scoreTitle } from "./holderHoldersTable";
+import { chosenName, clockTime, shortWallet, useHolderSession } from "./holderSession";
 import { LiveDot } from "./liveDot";
-import { sheetChartBlock, traderSheet } from "./holderTerminalSheets";
-import { SCORE_TIERS, SKILL_SCORE_NAME, loadTraderScore, scoreTier } from "./traderScore";
-import { arrivalKey } from "./holderTradesTable";
-import { FinishedBetsSummary, FinishedBetsTable, finishedBetList, useFinishedBets } from "./traderFinishedBets";
+import { SCORE_TIERS, SKILL_SCORE_NAME, scoreTier } from "./traderScore";
+import { FinishedBetsSummary, FinishedBetsTable } from "./traderFinishedBets";
 import { TraderMarketFocus } from "./traderMarketFocus";
-import { TraderPnlBreakdown } from "./traderPnlBreakdown";
+import { CATEGORY_TABLE_DETAIL, CategoryChart, CategoryTable, HoldingEdge, PeriodChart } from "./traderPnlBreakdown";
 import { TraderPnlByQuestion } from "./traderPnlByQuestion";
-import { TraderPositionsTable, useTraderPositions } from "./traderPositionsTable";
-import { TradeAlertsToggle, useTraderTradeAlerts } from "./traderTradeAlerts";
+import { TraderPositionsTable } from "./traderPositionsTable";
+import { TradeAlertsToggle } from "./traderTradeAlerts";
 import { TraderTradesTable, tradeTime } from "./traderTradesTable";
-import { useLiveTrader } from "./useLiveTrader";
 
 const SheetBlockChart = dynamic(
   () => retryImport(() => import("@/components/dashboardComposer/sheetBlockChart")).then((m) => m.SheetBlockChart),
@@ -43,28 +40,6 @@ function joinedDay(row) {
   const n = Number(raw);
   const ms = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : Date.parse(String(raw || ""));
   return Number.isFinite(ms) && ms > 0 ? new Date(ms).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "—";
-}
-
-function shortWallet(address) {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
-
-/** The wallet's Lychee Skill Score across every market it has finished. */
-function useSkillScore(address) {
-  const wallet = String(address || "").toLowerCase();
-  const [state, setState] = useState({ wallet: "", status: "loading", score: null });
-  useEffect(() => {
-    if (!wallet) return undefined;
-    let alive = true;
-    loadTraderScore(wallet, "").then(
-      (score) => alive && setState({ wallet, status: "ready", score }),
-      () => alive && setState({ wallet, status: "error", score: null }),
-    );
-    return () => {
-      alive = false;
-    };
-  }, [wallet]);
-  return state.wallet === wallet ? state : { wallet, status: "loading", score: null };
 }
 
 /** The gauge spans ±GAUGE_SPAN; scores past it pin to the ends. */
@@ -131,12 +106,6 @@ function SkillScorePanel({ skill }) {
   );
 }
 
-/** Polymarket names accounts that never picked a username after their wallet, sometimes with a timestamp. */
-function chosenName(value) {
-  const name = String(value || "").trim();
-  return name && !/^0x[a-fA-F0-9]{40}(-\d+)?$/.test(name) ? name : "";
-}
-
 function TraderHandles({ row, address }) {
   const username = chosenName(row.name);
   const x = String(row.xUsername || "").trim().replace(/^@/, "");
@@ -164,7 +133,7 @@ function TraderStatsCard({ subject, part, skill }) {
   const name = chosenName(row.name) || row.pseudonym || chosenName(subject.title) || shortWallet(subject.address);
   if (part.status === "loading") {
     return (
-      <div className="overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      <div>
         <div className="border-b border-border/50 px-4 py-3">
           <p className="text-[15px] font-semibold text-foreground">{name}</p>
           <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{subject.address}</p>
@@ -181,7 +150,7 @@ function TraderStatsCard({ subject, part, skill }) {
   const realized = num(row.realized_pnl);
   const unrealized = num(row.unrealized_pnl);
   return (
-    <article className="overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <article className="animate-in fade-in duration-300">
       <header className="flex items-center gap-3 border-b border-border/50 px-4 py-3">
         {row.profileImage ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -217,82 +186,53 @@ function TraderStatsCard({ subject, part, skill }) {
   );
 }
 
-function PanelState({ part, empty }) {
+function PanelState({ part, empty, className }) {
   return (
-    <div className="flex h-full items-center justify-center gap-2 px-4 text-center text-[12px] text-muted-foreground">
+    <div className={cn("flex h-full min-h-40 items-center justify-center gap-2 px-4 text-center text-[12px] text-muted-foreground", className)}>
       {part.status === "loading" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
       {part.status === "loading" ? "Loading" : part.status === "error" ? part.error : empty}
     </div>
   );
 }
 
-/**
- * One trader: live profile stats, PnL over time and their trades as they happen, with an alert
- * when they place a new one. `onPickMarket(subject)` opens a market from the trades table.
- */
-export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
-  const { profile, activity, pnl } = useLiveTrader(subject.address);
-  const skill = useSkillScore(subject.address);
-  const lastTradeKey = activity.rows[0] ? arrivalKey(activity.rows[0]) : "";
-  const positions = useTraderPositions(subject.address, lastTradeKey);
-  const finishedPart = useFinishedBets(subject.address, lastTradeKey);
-  const finishedBets = useMemo(
-    () => finishedBetList(finishedPart.rows, positions.rows, finishedPart.done),
-    [finishedPart.rows, finishedPart.done, positions.rows],
-  );
-  const positionsUpdated = positions.updatedAt
-    ? new Date(positions.updatedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" })
-    : "";
-  const profileName = chosenName(profile.rows[0]?.name) || String(profile.rows[0]?.pseudonym || "").trim();
-  useEffect(() => {
-    if (profileName && !subject.title) onProfileName?.(profileName);
-  }, [onProfileName, profileName, subject.title]);
-  const pnlSheet = useMemo(() => traderSheet(TRADER_PNL_ENDPOINT_ID, pnl, subject), [pnl, subject]);
-  const pnlChart = useMemo(() => sheetChartBlock(pnlSheet), [pnlSheet]);
-  const updated = activity.updatedAt ? new Date(activity.updatedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" }) : "";
-  const tradesRef = useRef(null);
-  const displayName = chosenName(subject.title) || profileName || shortWallet(subject.address);
-  const alerts = useTraderTradeAlerts({
-    rows: activity.rows,
-    ready: activity.status === "ready",
-    name: displayName,
-    address: subject.address,
-    viewRef: tradesRef,
-    onView: () => tradesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-  });
-
+export function TraderStatsPanel() {
+  const { subject, profile, skill, activity } = useHolderSession();
+  const updated = clockTime(activity.updatedAt);
   return (
-    <div className="mt-8 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-      <div className="grid gap-4 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <LiveDot on={activity.status === "ready"} label={activity.status === "ready" ? "Live" : "Connecting"} />
-            {updated ? <span className="text-[11px] text-muted-foreground">Checked {updated}</span> : null}
-          </div>
-          <TraderStatsCard subject={subject} part={profile} skill={skill} />
-        </div>
-        {/* Out of flow on wide screens so the chart takes the stats column's height instead of setting it. */}
-        <div className="relative h-[420px] min-w-0 lg:h-auto lg:min-h-[420px]">
-          <section
-            aria-label="PnL chart"
-            data-block-type={pnlChart.type}
-            data-source-sheet={pnlChart.sourceSheetId}
-            className="absolute inset-0 flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background p-3 shadow-sm"
-          >
-            {pnl.rows.length ? <SheetBlockChart sheet={pnlSheet} view={pnlChart.chartView} /> : <PanelState part={pnl} empty="No PnL history for this wallet yet." />}
-          </section>
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center justify-between px-4 pt-3 pr-9">
+        <LiveDot on={activity.status === "ready"} label={activity.status === "ready" ? "Live" : "Connecting"} />
+        {updated ? <span className="text-[11px] text-muted-foreground">Checked {updated}</span> : null}
       </div>
+      <TraderStatsCard subject={subject} part={profile} skill={skill} />
+    </div>
+  );
+}
 
-      <div ref={tradesRef} className="flex scroll-mt-4 items-end justify-between gap-3 pt-4">
-        <div className="max-w-3xl">
-          <h3 className="text-[15px] font-semibold text-foreground">Trades</h3>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Every trade this wallet has made, newest first, checked every 10 seconds. New trades slide in at the top and raise an
-            alert while you&apos;re on this tab. Click a column to sort by it, or pick a market to open it in the terminal.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
+export function TraderPnlChartPanel() {
+  const { pnl, pnlSheet, pnlChart } = useHolderSession();
+  const fill = usePanelFill("h-[440px]");
+  return (
+    <section
+      aria-label="PnL chart"
+      data-block-type={pnlChart.type}
+      data-source-sheet={pnlChart.sourceSheetId}
+      className={cn("flex min-w-0 flex-col p-3 pr-8", fill)}
+    >
+      {pnl.rows.length ? <SheetBlockChart sheet={pnlSheet} view={pnlChart.chartView} /> : <PanelState part={pnl} empty="No PnL history for this wallet yet." />}
+    </section>
+  );
+}
+
+export function TraderTradesPanel() {
+  const { activity, alerts, actions } = useHolderSession();
+  const fill = usePanelFill("h-[560px]");
+  return (
+    <TerminalPanelFrame
+      title="Trades"
+      description="Every trade this wallet has made, newest first, checked every 10 seconds. New trades slide in at the top and raise an alert while you're on this tab. Click a column to sort by it, or pick a market to open it in the terminal."
+      aside={
+        <>
           {activity.rows.length ? (
             <span className="text-[12px] tabular-nums text-muted-foreground">
               {activity.rows.length.toLocaleString()} trades
@@ -300,95 +240,127 @@ export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
             </span>
           ) : null}
           <TradeAlertsToggle paused={alerts.paused} onChange={alerts.setPaused} />
-        </div>
-      </div>
-      <section aria-label="Trader trades" className="flex h-[560px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+        </>
+      }
+      flush
+    >
+      <section aria-label="Trader trades" className={cn("flex flex-col overflow-hidden border-t border-border/60", fill)}>
         {activity.rows.length ? (
-          <TraderTradesTable rows={activity.rows} ready={activity.status === "ready"} empty="No trades for this wallet yet." onPickMarket={onPickMarket} />
+          <TraderTradesTable rows={activity.rows} ready={activity.status === "ready"} empty="No trades for this wallet yet." onPickMarket={actions?.pickMarket} />
         ) : (
           <PanelState part={activity} empty="No trades for this wallet yet." />
         )}
       </section>
+    </TerminalPanelFrame>
+  );
+}
 
-      <div className="flex items-end justify-between gap-3 pt-4">
-        <div className="max-w-3xl">
-          <h3 className="text-[15px] font-semibold text-foreground">Active positions</h3>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Everything this wallet holds in markets still trading, biggest first. Prices and PnL refresh every 20 seconds, and
-            again right after each new trade.
-          </p>
-        </div>
-        {positionsUpdated ? <span className="shrink-0 text-[11px] text-muted-foreground">Checked {positionsUpdated}</span> : null}
-      </div>
-      <section aria-label="Active positions" className="flex h-[520px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+export function TraderPositionsPanel() {
+  const { positions, actions } = useHolderSession();
+  const fill = usePanelFill("h-[520px]");
+  const checked = clockTime(positions.updatedAt);
+  return (
+    <TerminalPanelFrame
+      title="Active positions"
+      description="Everything this wallet holds in markets still trading, biggest first. Prices and PnL refresh every 20 seconds, and again right after each new trade."
+      aside={checked ? <span className="text-[11px] text-muted-foreground">Checked {checked}</span> : null}
+      flush
+    >
+      <section aria-label="Active positions" className={cn("flex flex-col overflow-hidden border-t border-border/60", fill)}>
         {positions.status === "ready" ? (
-          <TraderPositionsTable part={positions} onPickMarket={onPickMarket} />
+          <TraderPositionsTable part={positions} onPickMarket={actions?.pickMarket} />
         ) : (
           <PanelState part={positions} empty="No open positions right now." />
         )}
       </section>
+    </TerminalPanelFrame>
+  );
+}
 
-      <div className="max-w-3xl pt-4">
-        <h3 className="text-[15px] font-semibold text-foreground">Finished bets</h3>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          Bets this wallet is done with: sold out of, or the market resolved. An amber dot marks resolved winnings not yet
-          redeemed. The PnL above covers every bet loaded below, and older bets load as you scroll.
-        </p>
-      </div>
+export function TraderFinishedPanel() {
+  const { finishedPart, finishedBets, actions } = useHolderSession();
+  const fill = usePanelFill("h-[560px]");
+  return (
+    <TerminalPanelFrame
+      title="Finished bets"
+      description="Bets this wallet is done with: sold out of, or the market resolved. An amber dot marks resolved winnings not yet redeemed. The PnL here covers every bet loaded in the table, and older bets load as you scroll."
+    >
       {finishedPart.status === "ready" ? (
-        <>
-          <FinishedBetsSummary bets={finishedBets} done={finishedPart.done} onPickMarket={onPickMarket} />
-          <section aria-label="Finished bets" className="flex h-[560px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
-            <FinishedBetsTable bets={finishedBets} part={finishedPart} onPickMarket={onPickMarket} />
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <FinishedBetsSummary bets={finishedBets} done={finishedPart.done} onPickMarket={actions?.pickMarket} />
+          <section aria-label="Finished bets" className={cn("flex flex-col overflow-hidden rounded-lg border border-border/60", fill)}>
+            <FinishedBetsTable bets={finishedBets} part={finishedPart} onPickMarket={actions?.pickMarket} />
           </section>
-        </>
+        </div>
       ) : (
-        <section aria-label="Finished bets" className="flex h-40 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
-          <PanelState part={finishedPart} empty="No finished bets yet." />
-        </section>
+        <PanelState part={finishedPart} empty="No finished bets yet." />
       )}
+    </TerminalPanelFrame>
+  );
+}
 
-      <div className="max-w-3xl pt-4">
-        <h3 className="text-[15px] font-semibold text-foreground">PnL by question</h3>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          Which questions made this wallet its money and which lost it. Each question nets every outcome traded in it, across
-          the finished bets loaded above and the open positions at their current prices. The biggest five get their own slice;
-          the rest share Other. Dots show the outcomes held.
-        </p>
-      </div>
+export function TraderPnlQuestionPanel() {
+  const { finishedPart, finishedBets, positions, actions } = useHolderSession();
+  return (
+    <TerminalPanelFrame
+      title="PnL by question"
+      description="Which questions made this wallet its money and which lost it. Each question nets every outcome traded in it, across the finished bets loaded and the open positions at their current prices. The biggest five get their own slice; the rest share Other. Dots show the outcomes held."
+    >
       {finishedPart.status === "ready" && positions.status === "ready" ? (
-        <TraderPnlByQuestion bets={finishedBets} openRows={positions.rows} onPickMarket={onPickMarket} />
+        <TraderPnlByQuestion bets={finishedBets} openRows={positions.rows} onPickMarket={actions?.pickMarket} />
       ) : (
-        <section aria-label="PnL by question" className="flex h-40 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
-          <PanelState part={finishedPart.status === "ready" ? positions : finishedPart} empty="No bets yet." />
-        </section>
+        <PanelState part={finishedPart.status === "ready" ? positions : finishedPart} empty="No bets yet." />
       )}
+    </TerminalPanelFrame>
+  );
+}
 
-      <div className="max-w-3xl pt-4">
-        <h3 className="text-[15px] font-semibold text-foreground">Where the PnL comes from</h3>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          The finished bets loaded above, split by the category of each market, by when they finished (by weekday in your time
-          zone, or by month, quarter or year), and by how long they were held. Categories come from the tags Polymarket puts on
-          each event. Hover a bar for its bets, win rate and return.
-        </p>
-      </div>
-      {finishedPart.status === "ready" ? (
-        <TraderPnlBreakdown bets={finishedBets} />
-      ) : (
-        <section aria-label="Where the PnL comes from" className="flex h-40 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
-          <PanelState part={finishedPart} empty="No finished bets yet." />
-        </section>
-      )}
+function useFinishedReady() {
+  const session = useHolderSession();
+  return session.finishedPart.status === "ready" ? null : <PanelState part={session.finishedPart} empty="No finished bets yet." />;
+}
 
-      <div className="max-w-3xl pt-4">
-        <h3 className="text-[15px] font-semibold text-foreground">Market specific</h3>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          Pick any market this wallet has traded. Its price is charted for both outcomes, with a dot for every move this wallet
-          made there: filled for buys, hollow for sells, bigger for more money. Hover a dot for the details, or click it to pin
-          them. New moves pulse in as they happen and the price follows the market live.
-          {subject.fromMarket ? " It opens on the market you found this trader from." : ""}
-        </p>
-      </div>
+export function TraderCategoryChartPanel() {
+  const { categories } = useHolderSession();
+  const waiting = useFinishedReady();
+  return waiting ? (
+    <TerminalPanelFrame title="PnL by category">{waiting}</TerminalPanelFrame>
+  ) : (
+    <CategoryChart groups={categories.groups} pending={categories.pending} bare />
+  );
+}
+
+export function TraderPeriodPanel() {
+  const { finishedBets } = useHolderSession();
+  const waiting = useFinishedReady();
+  return waiting ? <TerminalPanelFrame title="PnL by day of week">{waiting}</TerminalPanelFrame> : <PeriodChart bets={finishedBets} bare />;
+}
+
+export function TraderCategoryTablePanel() {
+  const { categories } = useHolderSession();
+  const waiting = useFinishedReady();
+  return (
+    <TerminalPanelFrame title="By category and sub-category" description={CATEGORY_TABLE_DETAIL} flush>
+      {waiting || <CategoryTable groups={categories.groups} pending={categories.pending} bare />}
+    </TerminalPanelFrame>
+  );
+}
+
+export function TraderHoldingEdgePanel() {
+  const { finishedBets } = useHolderSession();
+  const waiting = useFinishedReady();
+  return waiting ? <TerminalPanelFrame title="Edge by holding duration">{waiting}</TerminalPanelFrame> : <HoldingEdge bets={finishedBets} bare />;
+}
+
+export function TraderMarketFocusPanel() {
+  const { subject, activity, positions, finishedBets, actions } = useHolderSession();
+  return (
+    <TerminalPanelFrame
+      title="Market specific"
+      description={`Pick any market this wallet has traded. Its price is charted for both outcomes, with a dot for every move this wallet made there: filled for buys, hollow for sells, bigger for more money. Hover a dot for the details, or click it to pin them. New moves pulse in as they happen and the price follows the market live.${
+        subject.fromMarket ? " It opens on the market you found this trader from." : ""
+      }`}
+    >
       <TraderMarketFocus
         address={subject.address}
         fromMarket={subject.fromMarket}
@@ -396,8 +368,8 @@ export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
         positions={positions.rows}
         bets={finishedBets}
         lastTrade={activity.rows[0]}
-        onPickMarket={onPickMarket}
+        onPickMarket={actions?.pickMarket}
       />
-    </div>
+    </TerminalPanelFrame>
   );
 }

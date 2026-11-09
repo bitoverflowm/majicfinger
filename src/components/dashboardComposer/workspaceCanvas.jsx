@@ -56,6 +56,7 @@ import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "@
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { layoutRunCharts, layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
 import {
+  CLIP,
   canvasGridMetrics,
   packClippedBlocks,
   packReadingOrder,
@@ -108,6 +109,18 @@ import { closedLifeMessage, lifeCountdown, sheetLife, sheetMarketCaption, sheetM
 import { enqueueMarketLookup, lookupSheetMarket, marketMetaComplete, marketMetaPatch } from "@/components/dashboardComposer/sheetMarketLookup";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { RunProgressCard } from "@/components/dashboardComposer/integrationRunProgress";
+import { markTerminalTabEdited, updateTerminalTab } from "@/components/terminals/openTerminalTab";
+import {
+  TerminalCanvasSession,
+  TerminalPanelBody,
+  TerminalPanelFull,
+  isTerminalBlock,
+  panelClassName,
+  scrollsInsideTerminalPanel,
+  terminalPanelSpec,
+  useTerminalPanelTable,
+  useTerminalTabLayout,
+} from "@/components/terminals/terminalCanvas";
 import { cn } from "@/lib/utils";
 
 // Charts pull in recharts, liveline and the spectrum chart engine; an empty canvas doesn't need them.
@@ -1067,14 +1080,17 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       const size = BLOCK_SIZE[type] || BLOCK_SIZE.text;
       const copy = BLOCK_COPY[type] || BLOCK_COPY.text;
       const id = newId();
+      // A terminal tab is a long page of panels; new blocks go after them rather than under them.
+      const below = (blocksByPageRef.current[pageId] || []).some(isTerminalBlock);
       setBlocksByPage((prev) => {
         const list = prev[pageId] || [];
         const n = list.length;
+        const bottom = list.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0)), 0);
         const block = {
           id,
           type,
-          x: 32 + (n % 4) * 24,
-          y: 72 + (n % 5) * 24,
+          x: below ? CLIP.x0 : 32 + (n % 4) * 24,
+          y: below ? bottom + CLIP.gap * 3 : 72 + (n % 5) * 24,
           w: size.w,
           h: size.h,
           title: copy.title,
@@ -1084,9 +1100,41 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       });
       setSelectedId(id);
       setTool("select");
+      if (below) {
+        setSpotlightId(id);
+        setRevealNonce((nonce) => nonce + 1);
+      }
     },
     [pageId],
   );
+
+  /** A fitted terminal panel's content changed height: resize it and move what's below with it. */
+  const fitBlock = useCallback(
+    (id, h) => {
+      setBlocksByPage((prev) => {
+        const list = prev[pageId] || [];
+        const current = list.find((block) => block.id === id);
+        if (!current || !current.fit || Math.abs((current.h || 0) - h) < 2) return prev;
+        const top = current.y || 0;
+        // Blocks beside it share its row; what's below moves by how far the row's bottom moved.
+        const row = list.filter((block) => block.id !== id && (block.y || 0) < top + (current.h || 0) && (block.y || 0) + (block.h || 0) > top);
+        const besideBottom = row.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0)), 0);
+        const bottom = Math.max(besideBottom, top + (current.h || 0));
+        const delta = Math.max(besideBottom, top + h) - bottom;
+        const next = list.map((block) => {
+          if (block.id === id) return { ...block, h };
+          return delta && (block.y || 0) >= bottom - 1 ? { ...block, y: Math.max(0, (block.y || 0) + delta) } : block;
+        });
+        return { ...prev, [pageId]: separateOverlaps(next) };
+      });
+    },
+    [pageId],
+  );
+
+  const replacePageBlocks = useCallback((targetPageId, nextBlocks) => {
+    if (!targetPageId || !Array.isArray(nextBlocks)) return;
+    setBlocksByPage((prev) => ({ ...prev, [targetPageId]: nextBlocks }));
+  }, []);
 
   const duplicateBlock = useCallback(
     (id) => {
@@ -1548,12 +1596,14 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       endTour,
       getPageId,
       updateBlock,
+      fitBlock,
+      replacePageBlocks,
       duplicateBlock,
       removeBlock,
       createChartFromBlock,
       generateChartsForSheets,
     }),
-    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, deleteTab, dismissRun, duplicateBlock, endTour, focusBlock, focusSheetRow, generateChartsForSheets, getPageId, handDown, hasContent, leavePrompt, markTabSettled, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, setTourStep, startRealtimeMode, startSheetRealtime, startTour, stopRealtimeMode, stopSheetRealtime, tables, tool, tour, updateBlock],
+    [fitBlock, replacePageBlocks, addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, deleteTab, dismissRun, duplicateBlock, endTour, focusBlock, focusSheetRow, generateChartsForSheets, getPageId, handDown, hasContent, leavePrompt, markTabSettled, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, setTourStep, startRealtimeMode, startSheetRealtime, startTour, stopRealtimeMode, stopSheetRealtime, tables, tool, tour, updateBlock],
   );
 
   return (
@@ -2232,6 +2282,15 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     return () => window.clearTimeout(timer);
   }, [dataReady]);
   const sheetDataset = block.type === "sheet" ? describeSheet(block) : null;
+  const terminalPanel = isTerminalBlock(block);
+  const panelTable = useTerminalPanelTable(block);
+  const ctxState = useMyStateV2();
+  const accountId = useUser()?.userId || "";
+  // Read when a gesture ends, so it must see the tabs as they are then.
+  const markEditedRef = useRef(null);
+  markEditedRef.current = () => {
+    if (isTerminalBlock(blockRef.current)) markTerminalTabEdited({ ctx: ctxState, tabId: tabIdFromPage(canvas?.pageId), accountId });
+  };
   const createLabel =
     sheetDataset &&
     resolveVisualization(sheetDataset, {
@@ -2246,11 +2305,25 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const bodyRef = useRef(null);
   const richTable = block.type === "sheet" && block.presentation === "visual" && hasVisualTable(sheetDataset);
   const exportFormats =
-    block.type === "sheet" ? (richTable ? IMAGE_EXPORT_FORMATS : SHEET_EXPORT_FORMATS) : block.type === "chart" ? IMAGE_EXPORT_FORMATS : null;
+    block.type === "sheet"
+      ? richTable
+        ? IMAGE_EXPORT_FORMATS
+        : SHEET_EXPORT_FORMATS
+      : block.type === "chart"
+        ? IMAGE_EXPORT_FORMATS
+        : terminalPanel
+          ? panelTable
+            ? [...IMAGE_EXPORT_FORMATS, ...SHEET_EXPORT_FORMATS]
+            : IMAGE_EXPORT_FORMATS
+          : null;
   const runExport = async (format) => {
     try {
       if (block.type === "sheet" && !richTable) {
         await exportSheet(liveBlock(block, canvas), format);
+        return;
+      }
+      if (panelTable && SHEET_EXPORT_FORMATS.some((item) => item.id === format)) {
+        await exportSheet(panelTable, format);
         return;
       }
       await exportNodeImage(bodyRef.current, format, block.title || (block.type === "chart" ? "chart" : "table"), {
@@ -2325,7 +2398,10 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     setLayoutGuide(false);
     if (commit && drag.moved && drag.snapped) {
       paintSnap(drag.snapped);
-      onChangeRef.current(drag.snapped);
+      const panel = isTerminalBlock(blockRef.current);
+      // A panel the user sized keeps that size instead of following its content.
+      onChangeRef.current(panel && drag.mode === "resize" ? { ...drag.snapped, fit: false } : drag.snapped);
+      if (panel) markEditedRef.current?.();
       notifyBlockGesture(drag.mode);
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => setResizing(false));
@@ -2494,9 +2570,10 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
         readOnly ? "border-border/70" : "group/block",
         !readOnly && spotlight
           ? "border-emerald-500 ring-2 ring-emerald-400/80"
-          : !readOnly && selected
-            ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
-            : !readOnly && "border-border/70 hover:border-[#0d99ff]",
+            : !readOnly && selected
+              ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
+              : !readOnly && "border-border/70 hover:border-[#0d99ff]",
+        panelClassName(block),
       )}
       style={{
         left: block.x,
@@ -2543,7 +2620,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
           onClick={(event) => event.stopPropagation()}
           onInteractOutside={touring ? (event) => event.preventDefault() : undefined}
         >
-          {block.type === "sheet" || block.type === "chart" ? (
+          {block.type === "sheet" || block.type === "chart" || terminalPanel ? (
             <DropdownMenuItem
               className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
               onSelect={() => setFullscreen(true)}
@@ -2609,7 +2686,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
               ) : null}
               <DropdownMenuSeparator />
             </>
-          ) : block.type === "chart" ? (
+          ) : block.type === "chart" || terminalPanel ? (
             <DropdownMenuSeparator />
           ) : null}
           {exportFormats && landingDemo ? (
@@ -2656,24 +2733,33 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
               </DropdownMenuPortal>
             </DropdownMenuSub>
           ) : null}
-          <DropdownMenuItem
-            className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
-            onSelect={() => canvas?.duplicateBlock?.(block.id)}
-          >
-            <Copy className="size-4 text-muted-foreground" />
-            Duplicate
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
-            onSelect={() => {
-              onSelect(block.id);
-              canvas?.setRenameId?.(block.id);
+          {terminalPanel ? null : (
+            <>
+              <DropdownMenuItem
+                className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
+                onSelect={() => canvas?.duplicateBlock?.(block.id)}
+              >
+                <Copy className="size-4 text-muted-foreground" />
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
+                onSelect={() => {
+                  onSelect(block.id);
+                  canvas?.setRenameId?.(block.id);
+                }}
+              >
+                <Pencil className="size-4 text-muted-foreground" />
+                Rename
+              </DropdownMenuItem>
+            </>
+          )}
+          <DestructiveConfirmMenuItem
+            onConfirm={() => {
+              canvas?.removeBlock?.(block.id);
+              markEditedRef.current?.();
             }}
-          >
-            <Pencil className="size-4 text-muted-foreground" />
-            Rename
-          </DropdownMenuItem>
-          <DestructiveConfirmMenuItem onConfirm={() => canvas?.removeBlock?.(block.id)} />
+          />
         </DropdownMenuContent>
       </DropdownMenu>
       )}
@@ -2683,9 +2769,22 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
         <SheetFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} />
       ) : fullscreen && block.type === "chart" && !readOnly ? (
         <ChartFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} booting={booting} />
+      ) : fullscreen && terminalPanel ? (
+        <FullscreenFrame
+          icon={<Maximize2 className="size-4 text-muted-foreground" aria-hidden />}
+          title={block.title || terminalPanelSpec(block)?.title || "Panel"}
+          caption={<span className="min-w-0 flex-1" />}
+          onClose={() => setFullscreen(false)}
+        >
+          <TerminalPanelFull block={block} />
+        </FullscreenFrame>
       ) : (
         <div ref={bodyRef} className={cn("flex min-h-0 min-w-0 flex-1 flex-col", arriveRef.current && dataReady && "lychee-sheet-fill")}>
-          <BlockBody block={block} onChange={onChange} booting={booting || !dataReady} />
+          {terminalPanel ? (
+            <TerminalPanelBody block={block} booting={booting} onFit={(h) => canvas?.fitBlock?.(block.id, h)} />
+          ) : (
+            <BlockBody block={block} onChange={onChange} booting={booting || !dataReady} />
+          )}
         </div>
       )}
       {block.pulse ? <span key={block.pulse} aria-hidden className="lychee-sheet-pulse pointer-events-none absolute inset-0 z-20 rounded-xl" /> : null}
@@ -2798,8 +2897,31 @@ export function WorkspaceCanvas() {
   );
   const lockedBlocks = blocks.filter((block) => lockedIds.has(block.id));
   const scrollerRef = useRef(null);
+  // Stands in for the scroller on an empty tab, so blocks placed there (a terminal's panels) use its real width.
+  const sizerRef = useRef(null);
   const blocksRef = useRef(blocks);
   blocksRef.current = blocks;
+  const accountId = useUser()?.userId || "";
+
+  const pageTabId = tabIdFromPage(canvas?.pageId);
+  // The landing demo still shows a terminal as one page over the canvas.
+  const terminalTab = ctx?.landingDemo
+    ? null
+    : ((canvas?.readOnly ? canvas?.previewTabs : ctx?.workspaceStartTabs) || []).find((tab) => tab?.id === pageTabId && tab.terminal) || null;
+  const terminalCustomized = !!terminalTab?.terminalLayout?.edited || blocks.some((block) => !isTerminalBlock(block));
+  useTerminalTabLayout({
+    tab: terminalTab,
+    blocks,
+    enabled: !!terminalTab && !canvas?.readOnly && !!canvas?.ready && !canvas?.tabLoading,
+    onBlocks: (next) => canvas?.replacePageBlocks?.(canvas.pageId, next),
+    onLayout: (layout) => {
+      const tabId = terminalTab?.id;
+      if (!tabId || JSON.stringify(terminalTab.terminalLayout || null) === JSON.stringify(layout)) return;
+      updateTerminalTab({ ctx, tabId, accountId, patch: { terminalLayout: layout } });
+    },
+  });
+  const terminalToTop = useCallback(() => scrollerRef.current?.scrollTo({ top: 0, behavior: "smooth" }), []);
+  const selectTab = useCallback((id) => canvas?.requestTab?.(id), [canvas]);
 
   const firstPullTip = useFeatureTipDismissal(FIRST_PULL_TIP_ID);
   const exportTip = useFeatureTipDismissal(EXPORT_TIP_ID);
@@ -2950,7 +3072,7 @@ export function WorkspaceCanvas() {
   }, [canvas?.setHandDown, canvas?.tool]);
 
   useLayoutEffect(() => {
-    const scroller = scrollerRef.current;
+    const scroller = scrollerRef.current || sizerRef.current;
     if (!scroller) return undefined;
     const apply = () => {
       const width = Math.floor(scroller.clientWidth);
@@ -2966,7 +3088,7 @@ export function WorkspaceCanvas() {
     const observer = new ResizeObserver(apply);
     observer.observe(scroller);
     return () => observer.disconnect();
-  }, [canvas?.ready, blocks.length]);
+  }, [canvas?.ready, canvas?.tabLoading, blocks.length]);
 
   const hasBlocks = blocks.length > 0;
   const bootedPageRef = useRef("");
@@ -3070,6 +3192,7 @@ export function WorkspaceCanvas() {
     const scroller = scrollerRef.current;
     if (!scroller) return undefined;
     const onWheel = (event) => {
+      if (scrollsInsideTerminalPanel(event.target, event.deltaX, event.deltaY)) return;
       const visual = event.target instanceof Element ? event.target.closest("[data-visual-scroll]") : null;
       if (visual instanceof HTMLElement) {
         const vertical = Math.abs(event.deltaY) >= Math.abs(event.deltaX);
@@ -3141,7 +3264,29 @@ export function WorkspaceCanvas() {
     );
   }
 
-  if (!blocks.length) return progress;
+  if (!blocks.length) {
+    return (
+      <>
+        <div ref={sizerRef} aria-hidden="true" className="pointer-events-none invisible absolute inset-0" />
+        {progress}
+      </>
+    );
+  }
+
+  const blockElements = blocks.map((block) => (
+    <CanvasBlock
+      key={block.id}
+      block={block}
+      booting={bootingIds.has(block.id)}
+      locked={lockedIds.has(block.id)}
+      exportTour={exportTourId === block.id}
+      onExportTourDone={endExportTour}
+      selected={canvas.selectedId === block.id}
+      spotlight={canvas.spotlightId === block.id}
+      onSelect={canvas.setSelectedId}
+      onChange={(patch) => canvas.updateBlock(block.id, patch)}
+    />
+  ));
 
   return (
     <>
@@ -3185,20 +3330,13 @@ export function WorkspaceCanvas() {
           }}
         />
       </div>
-      {blocks.map((block) => (
-        <CanvasBlock
-          key={block.id}
-          block={block}
-          booting={bootingIds.has(block.id)}
-          locked={lockedIds.has(block.id)}
-          exportTour={exportTourId === block.id}
-          onExportTourDone={endExportTour}
-          selected={canvas.selectedId === block.id}
-          spotlight={canvas.spotlightId === block.id}
-          onSelect={canvas.setSelectedId}
-          onChange={(patch) => canvas.updateBlock(block.id, patch)}
-        />
-      ))}
+      {terminalTab ? (
+        <TerminalCanvasSession key={terminalTab.id} tab={terminalTab} customized={terminalCustomized} onTop={terminalToTop} selectTab={selectTab}>
+          {blockElements}
+        </TerminalCanvasSession>
+      ) : (
+        blockElements
+      )}
       {lockedBlocks.length ? <DemoPaywall top={paywallTop(blocks, lockedIds)} locked={lockedBlocks} /> : null}
       {editTip === "resize" && tipBlock ? (
         <div

@@ -116,7 +116,7 @@ async function loadEventTags(ids, signal) {
 
 /** The tags on every event these bets are in, looked up in batches as more bets load. */
 function useEventTags(bets) {
-  const ids = useMemo(() => [...new Set(bets.map((bet) => String(bet.event_id ?? "")).filter(Boolean))].sort().join(","), [bets]);
+  const ids = useMemo(() => [...new Set((bets || []).map((bet) => String(bet.event_id ?? "")).filter(Boolean))].sort().join(","), [bets]);
   const [state, setState] = useState({ tags: new Map(), checked: null });
   useEffect(() => {
     const list = ids ? ids.split(",") : [];
@@ -321,10 +321,10 @@ function betCount(count) {
   return `${count.toLocaleString()} ${count === 1 ? "bet" : "bets"}`;
 }
 
-function Panel({ title, detail, action, children, className }) {
+function Panel({ title, detail, action, children, className, bare }) {
   return (
-    <figure className={cn("min-w-0 rounded-xl border border-border/70 bg-background p-4 shadow-sm", className)}>
-      <figcaption className="flex items-start justify-between gap-3">
+    <figure className={cn("min-w-0 bg-background", bare ? "px-4 pb-4 pt-3" : "rounded-xl border border-border/70 p-4 shadow-sm", className)}>
+      <figcaption className={cn("flex items-start justify-between gap-3", bare && "pr-5")}>
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-semibold text-foreground">{title}</div>
           {detail ? <div className="mt-0.5 text-[12px] text-muted-foreground">{detail}</div> : null}
@@ -358,10 +358,11 @@ function BarTip({ active, payload }) {
 
 const axisTick = { fontSize: 11, fill: "var(--muted-foreground)" };
 
-function CategoryChart({ groups, pending }) {
+export function CategoryChart({ groups, pending, bare = false }) {
   const height = Math.max(160, groups.length * CATEGORY_ROW_PX + 36);
   return (
     <Panel
+      bare={bare}
       title="PnL by category"
       detail={pending ? `Sorting ${betCount(pending)} into categories` : "Each bet counted under its event's broad category"}
       action={pending ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden /> : null}
@@ -390,7 +391,7 @@ function CategoryChart({ groups, pending }) {
   );
 }
 
-function PeriodChart({ bets }) {
+export function PeriodChart({ bets, bare = false }) {
   const [period, setPeriod] = useState("weekday");
   const rows = useMemo(() => byPeriod(bets, period), [bets, period]);
   const best = rows.reduce((top, row) => (row.bets && (!top || row.pnl > top.pnl) ? row : top), null);
@@ -398,6 +399,7 @@ function PeriodChart({ bets }) {
   const name = PERIODS.find((item) => item.id === period).label.toLowerCase();
   return (
     <Panel
+      bare={bare}
       title={`PnL by ${name}`}
       detail={best && worst && best !== worst ? `Best ${best.label} ${signedUsd(best.pnl)} · worst ${worst.label} ${signedUsd(worst.pnl)}` : "By when each bet finished, in your time zone"}
       action={<Segmented label="Group PnL by" value={period} options={PERIODS} onChange={setPeriod} />}
@@ -442,7 +444,7 @@ function StatCells({ row, muted }) {
   );
 }
 
-function CategoryTable({ groups, pending }) {
+export function CategoryTable({ groups, pending, bare = false }) {
   const [flipped, setFlipped] = useState(() => new Set());
   const toggle = (label) =>
     setFlipped((prev) => {
@@ -452,7 +454,10 @@ function CategoryTable({ groups, pending }) {
       return next;
     });
   return (
-    <section aria-label="PnL by category and sub-category" className="overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+    <section
+      aria-label="PnL by category and sub-category"
+      className={cn("overflow-hidden bg-background", bare ? "border-t border-border/60" : "rounded-xl border border-border/70 shadow-sm")}
+    >
       {groups.length ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse">
@@ -510,11 +515,12 @@ function CategoryTable({ groups, pending }) {
   );
 }
 
-function HoldingEdge({ bets }) {
+export function HoldingEdge({ bets, bare = false }) {
   const { rows, unknown } = useMemo(() => byHold(bets), [bets]);
   const widest = rows.reduce((max, row) => Math.max(max, Math.abs(row.roi ?? 0)), 0) || 1;
   return (
     <Panel
+      bare={bare}
       title="Edge by holding duration"
       detail={`Does the edge fade the longer a bet is held? Return is PnL over what was paid in.${unknown ? ` ${betCount(unknown)} without dates left out.` : ""}`}
     >
@@ -560,29 +566,10 @@ function HoldingEdge({ bets }) {
   );
 }
 
-/**
- * Where a wallet's finished bets made and lost money: by category, by when they finished, by
- * category and sub-category, and by how long they were held.
- */
-export function TraderPnlBreakdown({ bets }) {
+export const CATEGORY_TABLE_DETAIL = `Each broad category totals the sub-categories under it: the sport for sports bets, otherwise the Polymarket tag most of this wallet's markets in that category share. Click a category to open or fold it; ones with more than ${FOLDED_OVER_SUBS} start folded.`;
+
+/** Finished bets grouped by category and sub-category, from the tags on each bet's event. `bets` null while they load. */
+export function useCategoryGroups(bets) {
   const eventTags = useEventTags(bets);
-  const { groups, pending } = useMemo(() => byCategory(bets, eventTags.tags, eventTags.loading), [bets, eventTags.tags, eventTags.loading]);
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <CategoryChart groups={groups} pending={pending} />
-        <PeriodChart bets={bets} />
-      </div>
-      <div className="max-w-3xl pt-2">
-        <h4 className="text-[14px] font-semibold text-foreground">By category and sub-category</h4>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          Each broad category totals the sub-categories under it: the sport for sports bets, otherwise the Polymarket tag most of
-          this wallet&apos;s markets in that category share. Click a category to open or fold it; ones with more than{" "}
-          {FOLDED_OVER_SUBS} start folded.
-        </p>
-      </div>
-      <CategoryTable groups={groups} pending={pending} />
-      <HoldingEdge bets={bets} />
-    </div>
-  );
+  return useMemo(() => byCategory(bets || [], eventTags.tags, eventTags.loading), [bets, eventTags.tags, eventTags.loading]);
 }

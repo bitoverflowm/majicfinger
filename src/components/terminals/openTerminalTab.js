@@ -59,7 +59,7 @@ export function terminalProjectDraft(terminalId, subject = null) {
  * the explore tab and the subject it was showing moves to a new tab right after it.
  * Returns `{ exploreId, viewId }`: the explore tab, and the tab now showing the subject.
  */
-export function exploreFromTerminal({ ctx, tabId, accountId }) {
+export function exploreFromTerminal({ ctx, tabId, accountId, keepHost = false }) {
   const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
   const index = tabs.findIndex((tab) => tab.id === tabId);
   const host = tabs[index];
@@ -68,6 +68,11 @@ export function exploreFromTerminal({ ctx, tabId, accountId }) {
   if (!host || !terminal || !subject) return null;
   const existing = tabs.find((tab) => tab.id !== tabId && tab.terminal === terminal.id && !sanitizeTerminalSubject(tab.terminalSubject));
   if (existing) return { exploreId: existing.id, viewId: tabId };
+  if (keepHost) {
+    const explore = terminalTab(terminal, null, tabs.map((tab) => tab.name));
+    commitTabs(ctx, [...tabs.slice(0, index + 1), explore, ...tabs.slice(index + 1)], accountId, explore.id);
+    return { exploreId: explore.id, viewId: tabId };
+  }
   const moved = terminalTab(terminal, subject, []);
   const others = tabs.filter((tab) => tab.id !== tabId).map((tab) => tab.name);
   const explore = { ...host, name: terminalTabName(terminal.title, [...others, moved.name]) };
@@ -79,14 +84,22 @@ export function exploreFromTerminal({ ctx, tabId, accountId }) {
 
 /**
  * Points `tabId` at the first subject and opens one more terminal tab for each of the rest,
- * all in one update. The open tab stays on screen.
+ * all in one update. The open tab stays on screen. With `keepHost` (the user has customized
+ * the tab, so it's their dashboard now) every subject opens in a new tab right after it, and
+ * the first of those becomes the active one.
  */
-export function placeTerminalSubjects({ ctx, tabId, subjects, accountId }) {
+export function placeTerminalSubjects({ ctx, tabId, subjects, accountId, keepHost = false }) {
   const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
-  const host = tabs.find((tab) => tab.id === tabId);
+  const index = tabs.findIndex((tab) => tab.id === tabId);
+  const host = tabs[index];
   const terminal = findTerminal(host?.terminal);
   const clean = (subjects || []).map(sanitizeTerminalSubject).filter(Boolean);
   if (!host || !terminal || !clean.length) return [];
+  if (keepHost) {
+    const opened = clean.map((subject) => terminalTab(terminal, subject, []));
+    commitTabs(ctx, [...tabs.slice(0, index + 1), ...opened, ...tabs.slice(index + 1)], accountId, opened[0].id);
+    return opened.map((tab) => tab.id);
+  }
   const [first, ...rest] = clean;
   const added = rest.map((subject) => terminalTab(terminal, subject, []));
   const nextTabs = [
@@ -97,4 +110,39 @@ export function placeTerminalSubjects({ ctx, tabId, subjects, accountId }) {
   ];
   commitTabs(ctx, nextTabs, accountId, tabId);
   return [tabId, ...added.map((tab) => tab.id)];
+}
+
+/** Merges `patch(tab)` into one terminal tab, leaving the rest and the active tab alone. */
+export function updateTerminalTab({ ctx, tabId, accountId, patch }) {
+  const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
+  const host = tabs.find((tab) => tab.id === tabId);
+  if (!host?.terminal) return;
+  const changes = typeof patch === "function" ? patch(host) : patch;
+  if (!changes) return;
+  commitTabs(ctx, tabs.map((tab) => (tab.id === tabId ? { ...tab, ...changes } : tab)), accountId);
+}
+
+/** Fills in a subject's title once it's known (a trader's profile name), keeping the tab where it is. */
+export function nameTerminalSubject({ ctx, tabId, accountId, title }) {
+  updateTerminalTab({
+    ctx,
+    tabId,
+    accountId,
+    patch: (tab) => {
+      const subject = sanitizeTerminalSubject({ ...tab.terminalSubject, title });
+      const terminal = findTerminal(tab.terminal);
+      if (!subject || !terminal || tab.terminalSubject?.title === subject.title) return null;
+      return { terminalSubject: subject, name: terminalSubjectTabName(subject, terminal.title) };
+    },
+  });
+}
+
+/** The user moved, resized or removed one of the tab's terminal panels. */
+export function markTerminalTabEdited({ ctx, tabId, accountId }) {
+  updateTerminalTab({
+    ctx,
+    tabId,
+    accountId,
+    patch: (tab) => (tab.terminalLayout && !tab.terminalLayout.edited ? { terminalLayout: { ...tab.terminalLayout, edited: true } } : null),
+  });
 }

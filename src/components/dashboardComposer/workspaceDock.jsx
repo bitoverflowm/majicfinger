@@ -64,8 +64,8 @@ export function WorkspaceDock() {
   }, [handTipDue, tool, dismissHandTip]);
 
   if (ctx?.landingDemo && (!ctx?.landingDemoActive || connect?.inlineOpen)) return null;
-  // Canvas tools would add blocks underneath a terminal's surface.
-  if (shownTerminalId(ctx)) return null;
+  // The landing demo's terminal is one page over the canvas, so blocks added there would sit underneath it.
+  if (ctx?.landingDemo && shownTerminalId(ctx)) return null;
   const sheetCount = (canvas?.blocks || []).filter((block) => block.type === "sheet").length;
 
   return (

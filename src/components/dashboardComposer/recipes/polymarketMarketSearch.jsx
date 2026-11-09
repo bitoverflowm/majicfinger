@@ -102,12 +102,17 @@ function MarketAvatar({ icon, title }) {
   );
 }
 
-export function MarketStatsCard({ meta, compact = false }) {
+export function MarketStatsCard({ meta, compact = false, bare = false }) {
   const ended = meta.closed || (meta.closeMs && meta.closeMs < Date.now());
   const [first = "Yes", second = "No"] = meta.outcomes;
   const [firstPrice = null, secondPrice = null] = meta.prices;
   return (
-    <article className="overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <article
+      className={cn(
+        "bg-background animate-in fade-in duration-300",
+        bare ? "" : "overflow-hidden rounded-xl border border-border/70 shadow-sm slide-in-from-bottom-2",
+      )}
+    >
       <header className="flex items-start gap-3 border-b border-border/50 px-4 py-3">
         <MarketAvatar key={meta.icon} icon={meta.icon} title={meta.title} />
         <div className="min-w-0 flex-1">

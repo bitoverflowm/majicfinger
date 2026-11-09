@@ -1,6 +1,9 @@
 /**
- * Terminals are out-of-the-box dashboards. A terminal tab carries `terminal: <id>`, and its
- * surface replaces the canvas for that tab. `terminalSubject` is what the tab is looking at.
+ * Terminals are out-of-the-box dashboards. A terminal tab carries `terminal: <id>` and
+ * `terminalSubject`, what the tab is looking at. Its panels are canvas blocks of type
+ * "terminal" laid out from a blueprint; `terminalLayout` records which view's blueprint the
+ * tab was laid out from, at which version, and whether the user has rearranged it since.
+ * The landing demo still shows the terminal as one surface over the canvas.
  */
 export const TERMINALS = [
   {
@@ -44,12 +47,35 @@ export function sanitizeTerminalSubject(subject) {
   return null;
 }
 
-/** `{ terminal, terminalSubject? }` for a tab whose terminal id is known, otherwise nothing. Spread into saved tabs. */
+export const TERMINAL_VIEWS = ["browse", "market", "trader"];
+
+/** Which blueprint a subject is shown with: no subject browses. */
+export function terminalViewOf(subject) {
+  const kind = sanitizeTerminalSubject(subject)?.kind;
+  return kind || "browse";
+}
+
+function sanitizeTerminalLayout(layout) {
+  if (!layout || typeof layout !== "object" || !TERMINAL_VIEWS.includes(layout.view)) return null;
+  const version = Math.floor(Number(layout.version));
+  return {
+    view: layout.view,
+    version: Number.isFinite(version) && version > 0 ? Math.min(version, 999) : 0,
+    ...(layout.edited ? { edited: true } : {}),
+  };
+}
+
+/** `{ terminal, terminalSubject?, terminalLayout? }` for a tab whose terminal id is known, otherwise nothing. Spread into saved tabs. */
 export function terminalTabField(tab) {
   const id = String(tab?.terminal || "").trim();
   if (!TERMINAL_IDS.has(id)) return {};
   const subject = sanitizeTerminalSubject(tab?.terminalSubject);
-  return subject ? { terminal: id, terminalSubject: subject } : { terminal: id };
+  const layout = sanitizeTerminalLayout(tab?.terminalLayout);
+  return {
+    terminal: id,
+    ...(subject ? { terminalSubject: subject } : {}),
+    ...(layout ? { terminalLayout: layout } : {}),
+  };
 }
 
 /**

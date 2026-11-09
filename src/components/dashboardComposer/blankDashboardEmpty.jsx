@@ -117,10 +117,13 @@ export function WorkspaceTabsLayer({ viewing, navChromeExpanded, connectHome }) 
   // Landing demo: the canvas is always the home view; the picker floats over it from dashBody.
   const landingCanvas = landingDemo && viewing === "connectDataHome";
   const landingConnect = landingCanvas && !!connect?.inlineOpen;
-  const terminalId = landingConnect ? "" : shownTerminalId({ ...ctx, viewing });
+  // Terminal tabs are canvas tabs with panels; only the landing demo still shows a terminal as one page.
+  const terminalId = landingConnect || !landingDemo ? "" : shownTerminalId({ ...ctx, viewing });
   const canvasTab = viewing === "welcome" || landingCanvas;
+  // A terminal tab is empty only until its panels are laid out, unless the user cleared it.
+  const terminalLayingOut = !!active?.terminal && !active.terminalLayout?.edited;
   const showEmpty =
-    canvasTab && !landingConnect && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
+    canvasTab && !landingConnect && !terminalLayingOut && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
   const cover = !canvasTab;
   const openTabs = () => ctx?.setViewing?.("welcome");
 
