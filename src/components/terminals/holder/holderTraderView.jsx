@@ -9,12 +9,13 @@ import { retryImport } from "@/lib/retryImport";
 import { TRADER_PNL_ENDPOINT_ID } from "@/lib/polymarketLive/traderPnlCompose";
 import { cn } from "@/lib/utils";
 import { scoreTitle } from "./holderHoldersTable";
-import { LiveDot } from "./holderMarketView";
+import { LiveDot } from "./liveDot";
 import { sheetChartBlock, traderSheet } from "./holderTerminalSheets";
 import { SCORE_TIERS, SKILL_SCORE_NAME, loadTraderScore, scoreTier } from "./traderScore";
 import { arrivalKey } from "./holderTradesTable";
 import { FinishedBetsSummary, FinishedBetsTable, finishedBetList, useFinishedBets } from "./traderFinishedBets";
 import { TraderMarketFocus } from "./traderMarketFocus";
+import { TraderPnlBreakdown } from "./traderPnlBreakdown";
 import { TraderPnlByQuestion } from "./traderPnlByQuestion";
 import { TraderPositionsTable, useTraderPositions } from "./traderPositionsTable";
 import { TradeAlertsToggle, useTraderTradeAlerts } from "./traderTradeAlerts";
@@ -360,6 +361,22 @@ export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
       ) : (
         <section aria-label="PnL by question" className="flex h-40 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
           <PanelState part={finishedPart.status === "ready" ? positions : finishedPart} empty="No bets yet." />
+        </section>
+      )}
+
+      <div className="max-w-3xl pt-4">
+        <h3 className="text-[15px] font-semibold text-foreground">Where the PnL comes from</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          The finished bets loaded above, split by the category of each market, by when they finished (by weekday in your time
+          zone, or by month, quarter or year), and by how long they were held. Categories come from the tags Polymarket puts on
+          each event. Hover a bar for its bets, win rate and return.
+        </p>
+      </div>
+      {finishedPart.status === "ready" ? (
+        <TraderPnlBreakdown bets={finishedBets} />
+      ) : (
+        <section aria-label="Where the PnL comes from" className="flex h-40 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+          <PanelState part={finishedPart} empty="No finished bets yet." />
         </section>
       )}
 

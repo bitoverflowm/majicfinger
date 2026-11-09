@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import { MarketCardSkeleton, MarketStatsCard } from "@/components/dashboardComposer/recipes/polymarketMarketSearch";
 import { retryImport } from "@/lib/retryImport";
-import { cn } from "@/lib/utils";
 import { marketTradeSheet, sheetChartBlock } from "./holderTerminalSheets";
 import { HolderFlagToggles, HolderHoldersTable, holderFlagCounts, useHolderFlags } from "./holderHoldersTable";
 import { HolderEntryHistogram } from "./holderEntryHistogram";
@@ -13,7 +12,8 @@ import { HEATMAP_TILES, HolderHeatmap } from "./holderHeatmap";
 import { HolderScoreDistribution } from "./holderScoreDistribution";
 import { HolderSupplyPanels } from "./holderSupplyPanels";
 import { HolderTradesTable, MergeOutcomesButton } from "./holderTradesTable";
-import { MarketNewsSection } from "./marketNews";
+import { LiveDot } from "./liveDot";
+import { MarketPriceNews } from "./marketPriceNews";
 import { useHolderDetails } from "./useHolderDetails";
 import { useHolderSupply } from "./useHolderSupply";
 import { useMarketHolders } from "./useMarketHolders";
@@ -32,18 +32,6 @@ function PanelLoading({ label }) {
       <Loader2 className="size-4 animate-spin" aria-hidden />
       {label}
     </div>
-  );
-}
-
-export function LiveDot({ on, label }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-      <span className="relative flex size-2">
-        {on ? <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" /> : null}
-        <span className={cn("relative inline-flex size-2 rounded-full", on ? "bg-emerald-500" : "bg-neutral-300 dark:bg-neutral-600")} />
-      </span>
-      {label}
-    </span>
   );
 }
 
@@ -188,15 +176,17 @@ export function HolderMarketView({ subject, onPickTrader }) {
       </section>
 
       <div className="max-w-3xl pt-8">
-        <h3 className="text-[15px] font-semibold text-foreground">News about this market</h3>
+        <h3 className="text-[15px] font-semibold text-foreground">Price and news over the market&apos;s life</h3>
         <p className="mt-0.5 text-[13px] text-muted-foreground">
-          Headlines that mention every word below, from Google News and GDELT, the open global news index. The words start from
-          the market&apos;s title; remove them, add your own or pick a suggestion, and it remembers your choice for this market.
-          Bars show how many matching articles came out when, so spikes line up with price moves; click one to look closer.
+          The price from the day before the market opened to {meta.closed ? "its close" : "now"}, with headlines that mention
+          every word below marked where they came out, from Google News and GDELT, the open global news index. The bars under the
+          chart show how many matching articles came out when, so spikes line up with price moves; click one to look closer. The
+          words start from the market&apos;s title; remove them, add your own or pick a suggestion, and it remembers your choice
+          for this market.
           {meta.closed ? "" : " New headlines show up within a few minutes."}
         </p>
       </div>
-      <MarketNewsSection meta={meta} />
+      <MarketPriceNews meta={meta} livePrices={stats.prices} />
 
       <div className="max-w-3xl pt-8">
         <h3 className="text-[15px] font-semibold text-foreground">Who holds this market</h3>

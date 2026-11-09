@@ -5,7 +5,7 @@ import { ChevronsUpDown, ExternalLink, Loader2, Search, X, ZoomIn, ZoomOut } fro
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from "recharts";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { LiveDot } from "./holderMarketView";
+import { LiveDot } from "./liveDot";
 import { DAY_MS, DAY_YEAR, FULL_TIME, HOUR, MINUTE, timeTicks } from "./chartTime";
 import { NEWS_COLOR, NewsList, NewsMarkers, NewsNearMove, NewsTermsBar, NewsVolumeBars, newsVolume, useNewsTerms } from "./marketNews";
 import { useMarketNews } from "./useMarketNews";
@@ -45,8 +45,8 @@ const MIN_VIEW_MS = 5 * MINUTE;
 /** Wait this long after the view stops moving before fetching finer prices for it. */
 const DETAIL_DELAY_MS = 350;
 /** Plot area offsets inside the chart: the left margin plus the price axis, the right margin, the top margin and the time axis. */
-const PLOT_LEFT = 48;
-const PLOT_RIGHT = 18;
+export const PLOT_LEFT = 48;
+export const PLOT_RIGHT = 18;
 const PLOT_TOP = 18;
 const X_AXIS_HEIGHT = 30;
 
@@ -689,6 +689,72 @@ function resolveView(view, full) {
   return [view.start, view.end];
 }
 
+/**
+ * Zoom state for a price chart, cleared whenever `resetKey` changes. `detail` is the zoomed range to fetch
+ * finer prices for; it's needed before the price lines exist, so it lives here rather than in `useZoomedDomain`.
+ */
+export function useChartZoom(resetKey) {
+  const [view, setView] = useState(null);
+  const [detail, setDetail] = useState(null);
+  useEffect(() => setView(null), [resetKey]);
+  return { view, setView, detail, setDetail };
+}
+
+/**
+ * The range on screen for `zoom` over `full`, with ways to change it. Once zoomed past a quarter of the
+ * whole range it asks for finer prices (and news) for just that stretch, after the view settles.
+ */
+export function useZoomedDomain(zoom, full) {
+  const { view, setView, setDetail } = zoom;
+  const domain = full ? resolveView(view, full) : null;
+  const changeView = (start, end) => {
+    if (full) setView(clampView(start, end, full));
+  };
+  const zoomBy = (factor) => {
+    if (!domain) return;
+    const middle = (domain[0] + domain[1]) / 2;
+    const half = ((domain[1] - domain[0]) * factor) / 2;
+    changeView(middle - half, middle + half);
+  };
+  const wantsDetail = !!(view && full && domain[1] - domain[0] < (full.end - full.start) / 4);
+  const detailSig = wantsDetail ? `${Math.floor(domain[0] / MINUTE)}|${view.anchored ? "now" : Math.ceil(domain[1] / MINUTE)}` : "";
+  const domainRef = useRef(domain);
+  domainRef.current = domain;
+  useEffect(() => {
+    if (!detailSig) {
+      setDetail(null);
+      return undefined;
+    }
+    const anchored = detailSig.endsWith("|now");
+    const id = window.setTimeout(() => {
+      const [start, end] = domainRef.current || [];
+      if (start != null) setDetail({ start, end, anchored });
+    }, DETAIL_DELAY_MS);
+    return () => window.clearTimeout(id);
+  }, [detailSig, setDetail]);
+  return { domain, zoomed: !!view, changeView, zoomBy, reset: () => setView(null) };
+}
+
+/** Where news is searched: the finer zoomed stretch once there is one, otherwise the whole range. */
+export function newsWindow(full, detail) {
+  if (!full) return null;
+  if (detail) return { start: detail.start, end: detail.end, live: detail.anchored && full.follow };
+  return { start: full.start, end: full.end, live: full.follow };
+}
+
+/** The last price at or before `t`, or null before the line starts. */
+function priceAt(points, t) {
+  let lo = 0;
+  let hi = points.length - 1;
+  if (hi < 0 || points[0].t > t) return null;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (points[mid].t <= t) lo = mid;
+    else hi = mid - 1;
+  }
+  return points[lo].p;
+}
+
 /** A price axis fitted to what's on screen, in steps of 1¢ up to 25¢. */
 function priceAxis(lines, dots, from, to) {
   let lo = Infinity;
@@ -734,7 +800,7 @@ function livePriceList(prices) {
  * Both outcomes' price lines over `win`, refreshed each minute and extended by each live price while it
  * follows now. Inside `detail` (a zoomed range) the line is swapped for a finer fetch of just that range.
  */
-function usePriceWindow(meta, win, livePrices, detail) {
+export function usePriceWindow(meta, win, livePrices, detail) {
   const tokens = (meta?.tokenIds || []).slice(0, 2).join(",");
   const startSec = win ? Math.floor(win.start / 60_000) * 60 : 0;
   const endSec = win && !win.follow ? Math.ceil(win.end / 1000) : 0;
@@ -839,7 +905,7 @@ function useBox(ref) {
   return box;
 }
 
-function useNow(intervalMs) {
+export function useNow(intervalMs) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!intervalMs) return undefined;
@@ -979,9 +1045,11 @@ function MoveTip({ shown, pinned, box, outcomes, livePrices, news, onClose }) {
 /**
  * The price lines and move dots over `domain`. Pinch or ⌘/Ctrl-scroll zooms around the pointer,
  * sideways scroll or a drag pans, double-click zooms in. `onView(start, end)` asks for a new range.
+ * With no moves to hover, a crosshair reads both prices at the pointer instead.
  */
-function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPinned, onView, zoomed, news, newsArrivals, pinnedNews, setPinnedNews }) {
+export function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPinned, onView, zoomed, news, newsArrivals, pinnedNews, setPinnedNews }) {
   const [hover, setHover] = useState(null);
+  const [cursor, setCursor] = useState(null);
   const [dragging, setDragging] = useState(false);
   const wrapRef = useRef(null);
   const suppressClick = useRef(false);
@@ -1060,6 +1128,7 @@ function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPin
         moved = true;
         setDragging(true);
         setHover(null);
+        setCursor(null);
       }
       const shift = (-dx / plotWidth) * (end - start);
       latest.current.onView(start + shift, end + shift);
@@ -1102,7 +1171,15 @@ function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPin
         const begin = anchor - (anchor - from) / 2;
         onView(begin, begin + (to - from) / 2);
       }}
-      onMouseLeave={() => setHover(null)}
+      onMouseMove={(event) => {
+        if (moves.length || dragging) return;
+        const t = timeAt(event.clientX);
+        setCursor(t >= from && t <= to && !event.target.closest?.("[role=dialog]") ? t : null);
+      }}
+      onMouseLeave={() => {
+        setHover(null);
+        setCursor(null);
+      }}
       onClick={() => {
         if (suppressClick.current) return;
         setPinned(null);
@@ -1172,7 +1249,48 @@ function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPin
       {shown ? (
         <MoveTip shown={shown} pinned={!!pinned} box={box} outcomes={outcomes} livePrices={livePrices} news={news} onClose={() => setPinned(null)} />
       ) : null}
+      {cursor != null && !moves.length && !pinnedNews ? (
+        <PriceReadout t={cursor} lines={lines} outcomes={outcomes} x={PLOT_LEFT + ((cursor - from) / (to - from)) * plot.width} box={box} plot={plot} low={low} high={high} />
+      ) : null}
     </div>
+  );
+}
+
+function PriceReadout({ t, lines, outcomes, x, box, plot, low, high }) {
+  const prices = lines.map((points) => priceAt(points, t));
+  if (prices.every((price) => price == null)) return null;
+  const y = (price) => PLOT_TOP + (1 - (price - low) / (high - low || 1)) * plot.height;
+  const width = 150;
+  const flip = x + width + 12 > box.width;
+  return (
+    <>
+      <div className="pointer-events-none absolute w-px bg-foreground/25" style={{ left: x, top: PLOT_TOP, height: plot.height }} aria-hidden />
+      {prices.map((price, index) =>
+        price == null ? null : (
+          <span
+            key={outcomes[index]}
+            className="pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-background"
+            style={{ left: x, top: y(price), backgroundColor: OUTCOME_COLORS[index] }}
+            aria-hidden
+          />
+        ),
+      )}
+      <div
+        className="pointer-events-none absolute rounded-md border border-border/70 bg-background/95 px-2 py-1 text-[11px] shadow-sm"
+        style={{ left: flip ? x - width - 8 : x + 8, top: PLOT_TOP + plot.height - 48, width }}
+      >
+        <div className="truncate text-muted-foreground">{FULL_TIME.format(t)}</div>
+        <div className="flex gap-3 font-mono tabular-nums">
+          {prices.map((price, index) =>
+            price == null ? null : (
+              <span key={outcomes[index]} className="truncate" style={{ color: OUTCOME_COLORS[index] }}>
+                {outcomes[index]} {cents(price)}
+              </span>
+            ),
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1180,7 +1298,7 @@ function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPin
  * The whole range in miniature with the zoomed part outlined. Drag the outline to move it, its edges
  * to resize it, or across the strip to pick a new range; a click centres the view there.
  */
-function RangeStrip({ lines, moves, full, domain, zoomed, onView }) {
+export function RangeStrip({ lines, moves, full, domain, zoomed, onView }) {
   const ref = useRef(null);
   const span = Math.max(1, full.end - full.start);
   const frac = (t) => Math.min(1, Math.max(0, (t - full.start) / span));
@@ -1278,7 +1396,7 @@ function RangeStrip({ lines, moves, full, domain, zoomed, onView }) {
   );
 }
 
-function ZoomControls({ zoomed, onZoom, onReset }) {
+export function ZoomControls({ zoomed, onZoom, onReset }) {
   const button = "rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40";
   return (
     <div className="inline-flex items-center gap-0.5">
@@ -1301,7 +1419,7 @@ function ZoomControls({ zoomed, onZoom, onReset }) {
   );
 }
 
-function ChartLegend({ outcomes, livePrices, maxUsd, news }) {
+export function ChartLegend({ outcomes, livePrices, maxUsd, news, moves = true }) {
   const prices = livePriceList(livePrices);
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 pt-2 text-[11.5px] text-muted-foreground">
@@ -1312,25 +1430,29 @@ function ChartLegend({ outcomes, livePrices, maxUsd, news }) {
           {Number.isFinite(prices[index]) ? <span className="font-mono tabular-nums text-foreground">{cents(prices[index])}</span> : null}
         </span>
       ))}
-      <span className="inline-flex items-center gap-1.5">
-        <svg width="12" height="12" aria-hidden>
-          <circle cx="6" cy="6" r="5" fill="currentColor" fillOpacity={0.7} />
-        </svg>
-        Buy
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <svg width="12" height="12" aria-hidden>
-          <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth={1.75} />
-        </svg>
-        Sell
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <svg width="30" height="16" aria-hidden>
-          <circle cx="5" cy="8" r="3" fill="currentColor" fillOpacity={0.5} />
-          <circle cx="20" cy="8" r="7" fill="currentColor" fillOpacity={0.5} />
-        </svg>
-        Bigger dot, bigger move{maxUsd > 0 ? ` (largest ${usd(maxUsd)})` : ""}
-      </span>
+      {moves ? (
+        <>
+          <span className="inline-flex items-center gap-1.5">
+            <svg width="12" height="12" aria-hidden>
+              <circle cx="6" cy="6" r="5" fill="currentColor" fillOpacity={0.7} />
+            </svg>
+            Buy
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <svg width="12" height="12" aria-hidden>
+              <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth={1.75} />
+            </svg>
+            Sell
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <svg width="30" height="16" aria-hidden>
+              <circle cx="5" cy="8" r="3" fill="currentColor" fillOpacity={0.5} />
+              <circle cx="20" cy="8" r="7" fill="currentColor" fillOpacity={0.5} />
+            </svg>
+            Bigger dot, bigger move{maxUsd > 0 ? ` (largest ${usd(maxUsd)})` : ""}
+          </span>
+        </>
+      ) : null}
       {news ? (
         <>
           <span className="inline-flex items-center gap-1.5">
@@ -1376,7 +1498,7 @@ function RangeToggle({ range, onChange }) {
   );
 }
 
-function Waiting({ label }) {
+export function Waiting({ label }) {
   return (
     <div className="flex h-full items-center justify-center gap-2 text-[12px] text-muted-foreground">
       <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -1409,13 +1531,11 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
   const [range, setRange] = useState("moves");
   const [pinned, setPinned] = useState(null);
   const [pinnedNews, setPinnedNews] = useState(null);
-  const [view, setView] = useState(null);
-  const [detail, setDetail] = useState(null);
+  const zoom = useChartZoom(`${conditionId}|${range}`);
   const chartRef = useRef(null);
   useEffect(() => {
     setPinned(null);
     setPinnedNews(null);
-    setView(null);
   }, [conditionId, range]);
 
   const live = useLiveMarketMeta(conditionId);
@@ -1429,7 +1549,7 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
     () => (meta && fills.status !== "loading" ? chartWindow(range, meta, moves, now) : null),
     [meta, fills.status, range, moves, now],
   );
-  const prices = usePriceWindow(meta, win, stats?.prices, detail);
+  const prices = usePriceWindow(meta, win, stats?.prices, zoom.detail);
   const totals = useMemo(() => marketTotals(allMoves, positions, bets, conditionId), [allMoves, positions, bets, conditionId]);
   const maxUsd = useMemo(() => moves.reduce((max, move) => Math.max(max, move.usd), 0), [moves]);
   const polymarketRealized = useMemo(() => {
@@ -1446,40 +1566,10 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
   const full = win
     ? { start: win.start, end: win.follow ? Math.max(now, lastLine, moves.at(-1)?.t ?? 0) : win.end, follow: win.follow }
     : null;
-  const domain = full ? resolveView(view, full) : null;
-  const changeView = (start, end) => {
-    if (full) setView(clampView(start, end, full));
-  };
-  const zoomBy = (factor) => {
-    if (!domain) return;
-    const middle = (domain[0] + domain[1]) / 2;
-    const half = ((domain[1] - domain[0]) * factor) / 2;
-    changeView(middle - half, middle + half);
-  };
-  const wantsDetail = !!(view && full && domain[1] - domain[0] < (full.end - full.start) / 4);
-  const detailSig = wantsDetail ? `${Math.floor(domain[0] / MINUTE)}|${view.anchored ? "now" : Math.ceil(domain[1] / MINUTE)}` : "";
-  const domainRef = useRef(domain);
-  domainRef.current = domain;
-  useEffect(() => {
-    if (!detailSig) {
-      setDetail(null);
-      return undefined;
-    }
-    const anchored = detailSig.endsWith("|now");
-    const id = window.setTimeout(() => {
-      const [start, end] = domainRef.current || [];
-      if (start != null) setDetail({ start, end, anchored });
-    }, DETAIL_DELAY_MS);
-    return () => window.clearTimeout(id);
-  }, [detailSig]);
+  const { domain, zoomed, changeView, zoomBy, reset } = useZoomedDomain(zoom, full);
 
   const newsTerms = useNewsTerms(meta);
-  const newsWin = !full
-    ? null
-    : detail
-      ? { start: detail.start, end: detail.end, live: detail.anchored && full.follow }
-      : { start: full.start, end: full.end, live: full.follow };
-  const news = useMarketNews(newsTerms.terms, newsWin);
+  const news = useMarketNews(newsTerms.terms, newsWindow(full, zoom.detail));
   const newsBars = domain ? newsVolume(news, domain) : null;
   const showNews = (article) => {
     if (!full) return;
@@ -1560,7 +1650,7 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
         <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
           <div className="flex flex-wrap items-center gap-2">
             <RangeToggle range={range} onChange={setRange} />
-            {domain && prices.lines ? <ZoomControls zoomed={!!view} onZoom={zoomBy} onReset={() => setView(null)} /> : null}
+            {domain && prices.lines ? <ZoomControls zoomed={zoomed} onZoom={zoomBy} onReset={reset} /> : null}
           </div>
           <div className="flex min-w-0 items-center gap-3">
             <span className={cn("truncate text-[12px]", fills.status === "error" ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")}>
@@ -1585,7 +1675,7 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
               pinned={pinned}
               setPinned={setPinned}
               onView={changeView}
-              zoomed={!!view}
+              zoomed={zoomed}
               news={news.articles}
               newsArrivals={news.arrivals}
               pinnedNews={pinnedNews}
@@ -1603,7 +1693,7 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
               <NewsVolumeBars volume={newsBars.volume} domain={domain} left={PLOT_LEFT} right={PLOT_RIGHT} label={newsBars.counted ? "Found" : "News"} />
             ) : null}
             <div className="h-2" />
-            <RangeStrip lines={prices.lines} moves={moves} full={full} domain={domain} zoomed={!!view} onView={changeView} />
+            <RangeStrip lines={prices.lines} moves={moves} full={full} domain={domain} zoomed={zoomed} onView={changeView} />
             <p className="mt-1.5 text-[11px] text-muted-foreground" style={{ marginLeft: PLOT_LEFT }}>
               Pinch, or hold ⌘ or Ctrl and scroll, to zoom. Drag the chart or scroll sideways to move along it. Drag across the
               strip to pick a range. Double-click to zoom in.

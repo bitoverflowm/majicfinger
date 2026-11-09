@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Crosshair, ExternalLink, Loader2, Plus, RotateCcw, X } from "lucide-react";
 import { gapLabel, headlineHits, marketNewsTerms, newsAround } from "@/lib/newsQuery";
 import { cn } from "@/lib/utils";
-import { CLOCK, DAY_CLOCK, DAY_MS, DAY_YEAR, HOUR, MINUTE, timeTicks } from "./chartTime";
-import { useMarketNews } from "./useMarketNews";
+import { CLOCK, DAY_CLOCK, DAY_MS, DAY_YEAR, MINUTE } from "./chartTime";
 
 export const NEWS_COLOR = "#f59e0b";
 const TERMS_KEY = "lychee:news-terms:";
@@ -16,9 +15,6 @@ const TIP_ROWS = 6;
 const LIST_ROWS = 150;
 const NEW_FOR_MS = 5 * MINUTE;
 const NEARBY_MS = DAY_MS;
-const FALLBACK_SPAN_MS = 30 * DAY_MS;
-/** The market view's timeline starts this long before the market opened, to catch the news that led up to it. */
-const LEAD_IN_MS = DAY_MS;
 const PROVIDER_LABEL = { google: "Google News", gdelt: "GDELT" };
 
 function readTerms(conditionId) {
@@ -492,145 +488,6 @@ export function NewsList({ articles, terms, domain, arrivals, now, onShow, empty
       ) : (
         <p className="px-3 py-6 text-center text-[12px] text-muted-foreground">{empty}</p>
       )}
-    </div>
-  );
-}
-
-function useBox(ref) {
-  const [box, setBox] = useState({ width: 0, height: 0 });
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return undefined;
-    const measure = () => setBox({ width: el.clientWidth, height: el.clientHeight });
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [ref]);
-  return box;
-}
-
-function useMinuteClock(on) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!on) return undefined;
-    const id = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(id);
-  }, [on]);
-  return now;
-}
-
-const TIMELINE_LEFT = 12;
-const TIMELINE_RIGHT = 12;
-const TIMELINE_BARS = 120;
-
-/**
- * A market's news on its own: matching headlines and how many came out when, from the day it opened
- * to now (or to its close). Click a bar to drill into that stretch; it keeps checking for news live.
- */
-export function MarketNewsSection({ meta }) {
-  const live = !meta.closed;
-  const now = useMinuteClock(live);
-  const closeAt = meta.closed ? Math.min(meta.closeMs || now, now) : now;
-  const listedAt = meta.openMs || closeAt - FALLBACK_SPAN_MS;
-  const openAt = listedAt - Math.max(LEAD_IN_MS, (closeAt - listedAt) * 0.1);
-  const [focus, setFocus] = useState(null);
-  useEffect(() => setFocus(null), [meta.conditionId]);
-  const termState = useNewsTerms(meta);
-  const win = focus ? { start: focus.start, end: focus.end, live: false } : { start: openAt, end: closeAt, live };
-  const news = useMarketNews(termState.terms, win);
-  const [pinned, setPinned] = useState(null);
-  const wrapRef = useRef(null);
-  const box = useBox(wrapRef);
-  const domain = [win.start, Math.max(win.end, win.start + HOUR)];
-  const bars = newsVolume(news, domain);
-  const axis = timeTicks(domain[0], domain[1]);
-  const plotWidth = Math.max(1, box.width - TIMELINE_LEFT - TIMELINE_RIGHT);
-
-  return (
-    <div className="space-y-3">
-      <NewsTermsBar
-        news={news}
-        terms={termState.terms}
-        suggestions={termState.suggestions}
-        edited={termState.edited}
-        onChange={termState.setTerms}
-        onReset={termState.reset}
-      />
-      <section aria-label="News timeline" className="rounded-xl border border-border/70 bg-background p-3 shadow-sm">
-        <div className="flex items-center justify-between gap-2 px-1 pb-1">
-          <span className="text-[12px] text-muted-foreground">
-            {focus ? `${DAY_CLOCK.format(focus.start)} to ${DAY_CLOCK.format(focus.end)}` : "Whole market"}
-          </span>
-          <span className="flex items-center gap-3">
-            {bars.counted ? (
-              <span className="text-[11.5px] text-muted-foreground" title="GDELT's full article counts aren't available right now">
-                Bars count the headlines found
-              </span>
-            ) : null}
-            {focus ? (
-              <button
-                type="button"
-                onClick={() => setFocus(null)}
-                className="rounded-md px-2 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                Back to the whole market
-              </button>
-            ) : (
-              <span className="text-[11.5px] text-muted-foreground">Click a bar to look closer</span>
-            )}
-          </span>
-        </div>
-        <div ref={wrapRef} className="relative" onClick={() => setPinned(null)}>
-          <div className="h-5" />
-          <NewsVolumeBars
-            volume={bars.volume}
-            domain={domain}
-            left={TIMELINE_LEFT}
-            right={TIMELINE_RIGHT}
-            height={TIMELINE_BARS}
-            label=""
-            onPick={(start, end) => {
-              const span = Math.max(end - start, 2 * HOUR);
-              const middle = (start + end) / 2;
-              setPinned(null);
-              setFocus({ start: middle - span / 2, end: Math.min(middle + span / 2, now) });
-            }}
-          />
-          <NewsMarkers
-            articles={news.articles}
-            domain={domain}
-            box={box}
-            left={TIMELINE_LEFT}
-            right={TIMELINE_RIGHT}
-            guideBottom={box.height}
-            arrivals={news.arrivals}
-            now={now}
-            pinned={pinned}
-            onPin={setPinned}
-          />
-          {!bars.volume.length && !news.articles.length ? (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[12px] text-muted-foreground">
-              {news.loading ? "Searching the news" : termState.terms.length ? "No matching news in this stretch yet" : "Add a word to search the news"}
-            </div>
-          ) : null}
-        </div>
-        <div className="relative h-5 text-[11px] text-muted-foreground">
-          {axis.ticks.map((tick) => (
-            <span key={tick} className="absolute top-1 -translate-x-1/2 whitespace-nowrap" style={{ left: TIMELINE_LEFT + ((tick - domain[0]) / (domain[1] - domain[0])) * plotWidth }}>
-              {axis.format(tick)}
-            </span>
-          ))}
-        </div>
-      </section>
-      <NewsList
-        articles={news.articles}
-        terms={termState.terms}
-        domain={focus ? domain : null}
-        arrivals={news.arrivals}
-        now={now}
-        empty={news.loading ? "Searching the news" : "No matching headlines here. Try fewer or different words."}
-      />
     </div>
   );
 }
