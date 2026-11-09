@@ -252,6 +252,10 @@ module.exports = {
   				'60%': { backgroundColor: 'rgb(13 153 255 / 0.08)', boxShadow: 'inset 2px 0 0 0 rgb(13 153 255 / 0.6)' },
   				'100%': { backgroundColor: 'transparent', boxShadow: 'inset 2px 0 0 0 transparent' }
   			},
+  			'row-flow': {
+  				'0%': { opacity: '0', transform: 'translateY(-6px)' },
+  				'100%': { opacity: '1', transform: 'translateY(0)' }
+  			},
   			'tick-up': {
   				'0%': { backgroundColor: 'rgb(16 185 129 / 0.22)' },
   				'100%': { backgroundColor: 'transparent' }
@@ -280,6 +284,7 @@ module.exports = {
   			ripple: 'ripple var(--duration,2s) ease calc(var(--i, 0)*.2s) infinite',
   			'api-tab-pulse': 'api-tab-pulse 0.6s ease-out forwards',
   			'row-arrive': 'row-arrive 3s ease-out',
+  			'row-flow': 'row-flow 420ms cubic-bezier(0.22, 1, 0.36, 1) both',
   			'tick-up': 'tick-up 1.2s ease-out',
   			'tick-down': 'tick-down 1.2s ease-out'
   		},

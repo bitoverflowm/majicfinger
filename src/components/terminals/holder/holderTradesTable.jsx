@@ -13,6 +13,10 @@ const OVERSCAN = 12;
 const ARRIVE_MS = 3000;
 /** New trades land at the top; a catch-up page can slot a few in below the newest. */
 const ARRIVAL_SCAN = 2000;
+/** Matches the `row-flow` animation in tailwind.config.js. History rows on screen fade in a few at a time. */
+const FLOW_MS = 420;
+const FLOW_STAGGER_MS = 18;
+const FLOW_MAX_DELAY_MS = 360;
 
 const OUTCOME_TONE = [
   { dot: "bg-emerald-500", chip: "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200" },
@@ -162,12 +166,14 @@ function TraderCell({ row, onPickTrader }) {
   );
 }
 
-function TradeRow({ row, top, merged, meta, outcomes, maxValue, arrivedAt, onPickTrader }) {
+function TradeRow({ row, top, merged, meta, outcomes, maxValue, arrivedAt, flowAt, onPickTrader }) {
   const value = tradeValue(row);
   const side = String(row.side || "").toUpperCase();
   const index = outcomeIndex(meta, row);
   const elapsed = arrivedAt ? Date.now() - arrivedAt : Infinity;
   const arriving = elapsed < ARRIVE_MS;
+  const flowElapsed = flowAt ? Date.now() - flowAt : Infinity;
+  const flowing = !arriving && flowElapsed < FLOW_MS;
   const share = maxValue > 0 && Number.isFinite(value) ? Math.sqrt(value / maxValue) : 0;
   return (
     <div
@@ -175,12 +181,13 @@ function TradeRow({ row, top, merged, meta, outcomes, maxValue, arrivedAt, onPic
       className={cn(
         "group/row absolute inset-x-0 grid items-center border-b border-border/50 text-[12.5px] hover:bg-muted/40",
         arriving && "animate-row-arrive",
+        flowing && "animate-row-flow motion-reduce:animate-none",
       )}
       style={{
         top,
         height: ROW_HEIGHT,
         gridTemplateColumns: gridTemplate(merged),
-        ...(arriving ? { animationDelay: `-${elapsed}ms` } : null),
+        ...(arriving ? { animationDelay: `-${elapsed}ms` } : flowing ? { animationDelay: `${-flowElapsed}ms` } : null),
       }}
     >
       <div role="cell" className="truncate whitespace-nowrap pl-3 pr-1 text-[12px] tabular-nums text-muted-foreground">{tradeTime(row)}</div>
@@ -215,11 +222,15 @@ function TradeRow({ row, top, merged, meta, outcomes, maxValue, arrivedAt, onPic
   );
 }
 
-/** Rows newest first, drawn only where the list is scrolled to. New rows at the top don't move what the reader is looking at. */
-function TradeList({ rows, merged, meta, outcomes, arrivals, empty, onPickTrader }) {
+/**
+ * Rows newest first, drawn only where the list is scrolled to. New rows at the top don't move what the reader is looking at.
+ * While the history is `flowing` in, each page extends the list and the rows it puts on screen fade in.
+ */
+function TradeList({ rows, merged, meta, outcomes, arrivals, empty, flowing = false, onPickTrader }) {
   const scrollRef = useRef(null);
   const [view, setView] = useState({ top: 0, height: 480 });
   const firstKeyRef = useRef("");
+  const flowRef = useRef({ count: 0, at: new Map() });
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -259,6 +270,22 @@ function TradeList({ rows, merged, meta, outcomes, arrivals, empty, onPickTrader
   const visible = rows.slice(start, end);
   const usedKeys = new Set();
 
+  const flow = flowRef.current;
+  if (flowing) {
+    const now = Date.now();
+    let order = 0;
+    for (let offset = Math.max(0, flow.count - start); offset < visible.length; offset += 1) {
+      const key = tradeKey(visible[offset]);
+      if (!flow.at.has(key)) flow.at.set(key, now + Math.min(order++ * FLOW_STAGGER_MS, FLOW_MAX_DELAY_MS));
+    }
+  }
+  useLayoutEffect(() => {
+    const state = flowRef.current;
+    state.count = rows.length;
+    const stale = Date.now() - FLOW_MAX_DELAY_MS - FLOW_MS;
+    for (const [key, at] of state.at) if (at < stale) state.at.delete(key);
+  }, [rows]);
+
   return (
     <div
       ref={scrollRef}
@@ -296,6 +323,7 @@ function TradeList({ rows, merged, meta, outcomes, arrivals, empty, onPickTrader
                   outcomes={outcomes}
                   maxValue={maxValue}
                   arrivedAt={arrivals.get(key)}
+                  flowAt={flowing ? flow.at.get(tradeKey(row)) : undefined}
                   onPickTrader={onPickTrader}
                 />
               );
@@ -357,7 +385,8 @@ export function MergeOutcomesButton({ merged, outcomes, onChange }) {
 
 /**
  * The market's trades as a rich table. Split puts the first outcome (Yes, Up) on the left and the
- * second on the right; merged is one list with an outcome column.
+ * second on the right; merged is one list with an outcome column. While `loading`, `rows` are the
+ * history pages read so far and they flow in.
  */
 export function HolderTradesTable({ meta, rows, merged, loading, ready, onPickTrader }) {
   const outcomes = [meta.outcomes?.[0] || "Yes", meta.outcomes?.[1] || "No"];
@@ -388,7 +417,7 @@ export function HolderTradesTable({ meta, rows, merged, loading, ready, onPickTr
   if (merged) {
     return (
       <section aria-label="Trades" className="flex h-[560px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
-        <TradeList rows={rows} merged meta={meta} outcomes={outcomes} arrivals={arrivals} empty={empty("")} onPickTrader={onPickTrader} />
+        <TradeList rows={rows} merged meta={meta} outcomes={outcomes} arrivals={arrivals} empty={empty("")} flowing={loading} onPickTrader={onPickTrader} />
       </section>
     );
   }
@@ -409,6 +438,7 @@ export function HolderTradesTable({ meta, rows, merged, loading, ready, onPickTr
             outcomes={outcomes}
             arrivals={arrivals}
             empty={empty(label)}
+            flowing={loading}
             onPickTrader={onPickTrader}
           />
         </section>

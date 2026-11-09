@@ -11,7 +11,9 @@ import {
   marketVarsClassName,
   useMorph,
   usePrefersReducedMotion,
+  useTween,
 } from "@/components/spectrumui/charts/chart-engine";
+import { FlowEdge, FlowLabel } from "@/components/spectrumui/charts/flow-edge";
 
 /**
  * Spectrum indicator chart.
@@ -193,6 +195,8 @@ function sliceToRange(points, range, end) {
  * @param {{ t: number, price: number }[]} points
  * @param {{ id: string, label: string, values?: (number|null)[], color?: string, min?: number, max?: number, format?: (value: number) => string }[]} [indicators]
  * @param {{ id: string, label: string, points: { t: number, price: number }[], color: string }[]} [overlays] More price lines on the price pane, each with its own color.
+ * @param {{ filling?: boolean, from?: number, label?: string } | null} [flow] A trade history: the line
+ * flows in from the right. While `filling`, the time axis starts at `from` and the line grows back to it.
  */
 export function IndicatorChart({
   className,
@@ -213,8 +217,11 @@ export function IndicatorChart({
   emptyLabel = "This price history has no points to chart yet.",
   units = "number",
   curve = "monotone",
+  flow = null,
 }) {
   const reduce = usePrefersReducedMotion();
+  const filling = Boolean(flow?.filling);
+  const flowOn = Boolean(flow) && !reduce;
   const [plotRef, box] = useBox();
   const svgRef = React.useRef(null);
   const [ownRangeLabel, setOwnRangeLabel] = React.useState(defaultRange);
@@ -264,6 +271,7 @@ export function IndicatorChart({
     tStart = Math.min(tStart, overlay.view[0].t);
     tEnd = Math.max(tEnd, overlay.view[overlay.view.length - 1].t);
   }
+  if (filling && flow.from > 0 && first) tStart = Math.min(tStart, flow.from);
   const span = first && last ? Math.max(1, tEnd - tStart) : 1;
   const xAt = React.useCallback(
     (time) => x0 + ((time - tStart) / span) * plotW,
@@ -287,28 +295,30 @@ export function IndicatorChart({
     const pad = (hi - lo) * 0.12;
     return [lo - pad, hi + pad];
   }, [n, overlayViews, view]);
+  const shownDomain = useTween(domain, { enabled: flowOn && filling });
 
   const priceY = React.useCallback(
-    (value) => priceBottom - ((value - domain[0]) / (domain[1] - domain[0] || 1)) * (priceBottom - priceTop),
-    [domain, priceBottom, priceTop],
+    (value) => priceBottom - ((value - shownDomain[0]) / (shownDomain[1] - shownDomain[0] || 1)) * (priceBottom - priceTop),
+    [shownDomain, priceBottom, priceTop],
   );
   const plotted = React.useMemo(
     () => [view, ...overlayViews.map((overlay) => overlay.view)].map((list) => list.map((point) => ({ x: xAt(point.t), y: priceY(point.price) }))),
     [overlayViews, priceY, view, xAt],
   );
-  const morphKey = `${range?.label || ""}|${symbol}|${lineLabel}|${overlayViews.map((overlay) => overlay.id).join(",")}`;
+  const morphKey = `${range?.label || ""}|${symbol}|${lineLabel}|${overlayViews.map((overlay) => overlay.id).join(",")}|${filling ? "filling" : ""}`;
   const drawn = useMorph(plotted, morphKey, { enabled: !reduce });
   const pathOf = (list) => (curve === "linear" ? linearPath(list) : monotonePath(list));
   const drawnMain = drawn[0] || [];
   const closeLine = pathOf(drawnMain);
   const overlayLines = overlayViews.map((overlay, index) => ({ ...overlay, path: pathOf(drawn[index + 1] || []) }));
+  const oldest = plotted.reduce((best, list) => (list?.length && (!best || list[0].x < best.x) ? list[0] : best), null);
   const priceTicks = React.useMemo(() => niceTicks(domain[0], domain[1], 4), [domain]);
   const timeTicks = React.useMemo(() => {
     if (n < 2 && !overlayViews.length) return view.map((point) => point.t);
     const want = Math.max(2, Math.min(5, Math.floor(plotW / 90)));
     const out = [];
     for (let i = 0; i < want; i += 1) {
-      if (overlayViews.length) {
+      if (overlayViews.length || filling) {
         out.push(Math.round(tStart + (i / (want - 1)) * (tEnd - tStart)));
         continue;
       }
@@ -390,6 +400,7 @@ export function IndicatorChart({
               </span>
             ) : null}
             <span className="truncate text-[12px] text-neutral-500">{name}</span>
+            {filling && flow.label ? <FlowLabel label={flow.label} reduce={reduce} /> : null}
           </div>
           <div className="mt-1 flex flex-wrap items-end gap-x-2 gap-y-1">
             {readouts.length ? (
@@ -470,41 +481,64 @@ export function IndicatorChart({
                   </g>
                 );
               })}
-              {overlayLines.length || !drawnMain.length ? null : (
+              <g clipPath={flowOn ? `url(#${uid}-flow)` : undefined}>
+                {overlayLines.length || !drawnMain.length ? null : (
+                  <path
+                    d={`${closeLine} L${drawnMain[drawnMain.length - 1].x},${priceBottom} L${drawnMain[0].x},${priceBottom} Z`}
+                    fill={`url(#${uid}-price)`}
+                  />
+                )}
                 <path
-                  d={`${closeLine} L${drawnMain[drawnMain.length - 1].x},${priceBottom} L${drawnMain[0].x},${priceBottom} Z`}
-                  fill={`url(#${uid}-price)`}
-                />
-              )}
-              <path
-                d={closeLine}
-                fill="none"
-                stroke={lineColor}
-                strokeWidth="2"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                pathLength="1"
-                style={reduce ? undefined : { strokeDasharray: 1, animation: `spectrum-mc-draw 880ms ${EASE} both`, transition: `stroke 320ms ${EASE}` }}
-              />
-              {overlayLines.map((overlay) => (
-                <path
-                  key={overlay.id}
-                  d={overlay.path}
+                  d={closeLine}
                   fill="none"
-                  stroke={overlay.color}
+                  stroke={lineColor}
                   strokeWidth="2"
                   strokeLinejoin="round"
                   strokeLinecap="round"
                   pathLength="1"
-                  style={reduce ? undefined : { strokeDasharray: 1, animation: `spectrum-mc-draw 880ms ${EASE} both` }}
+                  style={
+                    reduce
+                      ? undefined
+                      : flowOn
+                        ? { transition: `stroke 320ms ${EASE}` }
+                        : { strokeDasharray: 1, animation: `spectrum-mc-draw 880ms ${EASE} both`, transition: `stroke 320ms ${EASE}` }
+                  }
                 />
-              ))}
+                {overlayLines.map((overlay) => (
+                  <path
+                    key={overlay.id}
+                    d={overlay.path}
+                    fill="none"
+                    stroke={overlay.color}
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    pathLength="1"
+                    style={reduce || flowOn ? undefined : { strokeDasharray: 1, animation: `spectrum-mc-draw 880ms ${EASE} both` }}
+                  />
+                ))}
+              </g>
+              {flowOn ? (
+                <FlowEdge
+                  id={`${uid}-flow`}
+                  point={oldest}
+                  left={x0}
+                  right={x1}
+                  filling={filling}
+                  ready={n > 0 && box.width > 0}
+                  top={priceTop}
+                  bottom={priceBottom}
+                  width={w}
+                  height={h}
+                  color={lineColor}
+                />
+              ) : null}
               {paneFrames.map((pane) => (
                 <g key={pane.indicator.id}>
                   <text x={x0 + 2} y={pane.top - 2} fontSize="9.5" fontWeight="600" fill="currentColor" opacity="0.55" className="font-mono uppercase tracking-wider">
                     {pane.indicator.label}
                   </text>
-                  <path d={pane.line} fill="none" stroke={pane.color} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+                  <path d={pane.line} fill="none" stroke={pane.color} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" clipPath={flowOn ? `url(#${uid}-flow)` : undefined} />
                 </g>
               ))}
               {timeTicks.map((time, index) => {

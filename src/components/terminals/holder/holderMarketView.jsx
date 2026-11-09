@@ -87,7 +87,7 @@ export function MarketStatsPanel() {
 }
 
 export function MarketLastPricePanel() {
-  const { rows, status, sheet, chart, live } = useHolderSession();
+  const { tradeRows, status, sheet, chart, live } = useHolderSession();
   const waiting = useMarketWaiting();
   const fill = usePanelFill("h-[440px]");
   return (
@@ -98,7 +98,7 @@ export function MarketLastPricePanel() {
       className={cn("flex min-w-0 flex-col p-3 pr-8", fill)}
     >
       {waiting ||
-        (rows.length ? (
+        (tradeRows.length ? (
           <SheetBlockChart sheet={sheet} live={live} view={chart.chartView} />
         ) : (
           <PanelLoading label={status.phase === "history" ? "Waiting for trades" : "No trades yet"} />
@@ -108,7 +108,7 @@ export function MarketLastPricePanel() {
 }
 
 export function MarketTradesPanel() {
-  const { meta, rows, status, live, merged, setMerged, outcomes, historyLoaded, sheet, actions } = useHolderSession();
+  const { meta, tradeRows, status, live, merged, setMerged, outcomes, historyLoaded, sheet, actions } = useHolderSession();
   const waiting = useMarketWaiting();
   return (
     <TerminalPanelFrame
@@ -122,7 +122,7 @@ export function MarketTradesPanel() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <MergeOutcomesButton merged={merged} outcomes={outcomes} onChange={setMerged} />
             <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
-              <HistoryStatus status={status} count={rows.length} />
+              <HistoryStatus status={status} count={tradeRows.length} />
               <LiveDot on={live} label={live ? "Streaming" : "Offline"} />
             </div>
           </div>
@@ -130,7 +130,7 @@ export function MarketTradesPanel() {
           <div data-block-type={sheet.type}>
             <HolderTradesTable
               meta={meta}
-              rows={rows}
+              rows={tradeRows}
               merged={merged}
               loading={status.phase === "history"}
               ready={historyLoaded}

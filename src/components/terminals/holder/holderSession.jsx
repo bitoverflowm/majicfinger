@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { fillingFor } from "@/components/dashboardComposer/recipes/tradeSheetStream";
 import { TRADER_PNL_ENDPOINT_ID } from "@/lib/polymarketLive/traderPnlCompose";
 import { marketTradeSheet, sheetChartBlock, traderSheet } from "./holderTerminalSheets";
 import { useHolderFlags } from "./holderHoldersTable";
@@ -52,7 +53,9 @@ export function revealHolderPanel(panel) {
 
 function MarketSession({ subject, actions, children }) {
   const { meta, error, quotes } = useLiveMarketMeta(subject.conditionId);
-  const { rows, status } = useFusedMarketTrades(meta);
+  const { rows, streamRows, status } = useFusedMarketTrades(meta);
+  const filling = status.phase === "history";
+  const tradeRows = filling ? streamRows : rows;
   const stats = useLiveMarketStats(meta, quotes, rows);
   const priceHistory = useMarketPriceHistory(meta, stats?.prices);
   const priceChart = useMemo(() => (priceHistory.sheet ? sheetChartBlock(priceHistory.sheet) : null), [priceHistory.sheet]);
@@ -62,8 +65,15 @@ function MarketSession({ subject, actions, children }) {
   const supply = useHolderSupply(meta, rows, stats?.prices, holders.sides);
   const [merged, setMerged] = useState(false);
   const sheet = useMemo(
-    () => (meta ? marketTradeSheet(meta, rows, { truncated: status.truncated, label: status.label }) : null),
-    [meta, rows, status.label, status.truncated],
+    () =>
+      meta
+        ? marketTradeSheet(meta, tradeRows, {
+            truncated: status.truncated,
+            label: status.label,
+            filling: filling ? fillingFor(meta, tradeRows.length) : null,
+          })
+        : null,
+    [filling, meta, status.label, status.truncated, tradeRows],
   );
   const chart = useMemo(() => (sheet ? sheetChartBlock(sheet) : null), [sheet]);
   const live = status.socket === "open";
@@ -75,6 +85,7 @@ function MarketSession({ subject, actions, children }) {
     error,
     stats,
     rows,
+    tradeRows,
     status,
     sheet,
     chart,

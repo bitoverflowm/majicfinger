@@ -150,7 +150,15 @@ function candlesFromPreset(preset) {
   return null;
 }
 
-function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "trades" }) {
+const ALL_RANGE = [{ label: "All", ms: null }];
+
+/** Every trade chart flows in. While the pull is still paging, `sheet.filling` holds `{ from, label }`. */
+function tradeFlow(sheet) {
+  const filling = sheet?.filling;
+  return filling ? { filling: true, from: Number(filling.from) || 0, label: filling.label || "" } : { filling: false };
+}
+
+function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "trades", flow = null }) {
   const built = useMemo(
     () => (mode === "ohlc" ? ohlcRowsToCandles(sheet?.columns, rows) : tradesToCandles(sheet?.columns, rows)),
     [mode, rows, sheet?.columns],
@@ -166,7 +174,7 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
     : "";
   const sentKey = useRef("");
   useEffect(() => {
-    if (live || !candleKey || !built.candles.length || sentKey.current === candleKey) return;
+    if (live || flow?.filling || !candleKey || !built.candles.length || sentKey.current === candleKey) return;
     sentKey.current = candleKey;
     onSnapshot?.({
       kind: "trade-market",
@@ -175,7 +183,7 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
       symbol,
       mode,
     });
-  }, [built.candles, candleKey, live, mode, onSnapshot, symbol, volumeLabel]);
+  }, [built.candles, candleKey, flow?.filling, live, mode, onSnapshot, symbol, volumeLabel]);
 
   const outcomes = useMemo(() => (mode === "trades" ? tradeOutcomes(sheet?.columns, rows) : []), [mode, rows, sheet?.columns]);
   const split = outcomes.length > 1;
@@ -186,10 +194,15 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
     () => (mode === "trades" ? tradeTimes(sheet?.columns, rows, split && !both ? choice : "") : []),
     [both, choice, mode, rows, sheet?.columns, split],
   );
-  const shownRanges = useMemo(() => (times.length ? rangesForCandles(times) : ranges), [ranges, times]);
+  const fillFrom = flow?.filling && times.length ? Math.min(flow.from > 0 ? flow.from : times[0], times[0]) : null;
+  const shownRanges = useMemo(
+    () => (fillFrom != null ? ALL_RANGE : times.length ? rangesForCandles(times) : ranges),
+    [fillFrom, ranges, times],
+  );
   const [rangeLabel, setRangeLabel] = useState("All");
   const range = shownRanges.find((item) => item.label === rangeLabel) || shownRanges[shownRanges.length - 1];
-  const since = times.length && range?.ms != null ? times[times.length - 1] - range.ms : null;
+  const since = fillFrom ?? (times.length && range?.ms != null ? times[times.length - 1] - range.ms : null);
+  const chartFlow = flow ? { ...flow, from: fillFrom ?? flow.from } : null;
   const lines = useMemo(
     () =>
       both
@@ -218,6 +231,7 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
         ranges={shownRanges}
         rangeValue={range?.label}
         onRangeChange={setRangeLabel}
+        flow={chartFlow}
       />
     );
   }
@@ -238,6 +252,7 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
       status={shownCandles.length ? "ready" : "empty"}
       emptyLabel={mode === "ohlc" ? "This candlestick sheet has no price bars yet." : "This trades sheet has no yes price to chart yet."}
       toolbar={split ? <OutcomeToggle outcomes={outcomes} value={choice} onChange={setPicked} /> : null}
+      flow={chartFlow}
     />
   );
 }
@@ -383,7 +398,7 @@ function OutcomeToggle({ outcomes, value, onChange }) {
  * One line per outcome. With more than one outcome the toggle picks Yes, No, or both,
  * and both draws each outcome as its own line.
  */
-function OutcomeLinesChart({ lines, picked, onPick, name, fallbackSymbol = "", live, emptyLabel, ranges: fixedRanges, rangeValue, onRangeChange }) {
+function OutcomeLinesChart({ lines, picked, onPick, name, fallbackSymbol = "", live, emptyLabel, ranges: fixedRanges, rangeValue, onRangeChange, flow = null }) {
   const split = lines.length > 1;
   const choice = picked === BOTH_OUTCOMES || lines.some((line) => line.outcome === picked) ? picked : BOTH_OUTCOMES;
   const shown = useMemo(
@@ -424,6 +439,7 @@ function OutcomeLinesChart({ lines, picked, onPick, name, fallbackSymbol = "", l
         emptyLabel={emptyLabel}
         units="probability"
         curve="linear"
+        flow={flow}
       />
     </div>
   );
@@ -539,7 +555,7 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
 
   if (resolved?.view === "trade-price" || trade) {
     const liveRows = matrixFromCells(sheet);
-    const rows = live && liveRows.length ? liveRows : fullSheet?.rows?.length ? fullSheet.rows : liveRows;
+    const rows = (live || sheet?.filling) && liveRows.length ? liveRows : fullSheet?.rows?.length ? fullSheet.rows : liveRows;
     return (
       <TradeMarketChart
         sheet={sheet}
@@ -548,6 +564,7 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
         snapshot={snapshot}
         onSnapshot={onSnapshot}
         mode="trades"
+        flow={tradeFlow(sheet)}
       />
     );
   }
@@ -575,7 +592,7 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
 
   if (trade || candle) {
     const liveRows = matrixFromCells(sheet);
-    const rows = live && liveRows.length ? liveRows : !candle && fullSheet?.rows?.length ? fullSheet.rows : liveRows;
+    const rows = (live || sheet?.filling) && liveRows.length ? liveRows : !candle && fullSheet?.rows?.length ? fullSheet.rows : liveRows;
     return (
       <TradeMarketChart
         sheet={sheet}
@@ -584,6 +601,7 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
         snapshot={snapshot}
         onSnapshot={onSnapshot}
         mode={candle ? "ohlc" : "trades"}
+        flow={tradeFlow(sheet)}
       />
     );
   }

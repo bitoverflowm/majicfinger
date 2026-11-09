@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { tradeSheetRow } from "@/components/dashboardComposer/polymarketLiveBuild";
 import {
   freshTradesEnd,
@@ -60,11 +60,15 @@ function confirms(row, print) {
  * closes the gap the history pull left. Socket prints show at once and are swapped for
  * REST's copy (with wallet and hash) when it arrives.
  *
+ * While history loads, `streamRows` holds the pages read so far (plus socket prints), so the chart
+ * and trade list can fill in; `rows` stays on the prints alone until the whole history is in.
+ *
  * @param {object | null} meta from `resolvePolymarketMarket`
- * @returns {{ rows: object[], status: typeof IDLE }} rows newest first
+ * @returns {{ rows: object[], streamRows: object[], status: typeof IDLE }} rows newest first
  */
 export function useFusedMarketTrades(meta) {
   const [rows, setRows] = useState([]);
+  const [historyPages, setHistoryPages] = useState([]);
   const [status, setStatus] = useState(IDLE);
   const metaRef = useRef(meta);
   metaRef.current = meta;
@@ -92,6 +96,7 @@ export function useFusedMarketTrades(meta) {
     let catchAgain = false;
 
     setRows([]);
+    setHistoryPages([]);
     setStatus({ ...IDLE, phase: "history", progress: "Reading the trade history" });
 
     const flushRows = () => {
@@ -212,6 +217,18 @@ export function useFusedMarketTrades(meta) {
       },
     });
 
+    // One synchronous step, so no frame shows the streamed pages gone before the full history is in.
+    const finishHistory = (patch) => {
+      if (signal.aborted || historyDone) return;
+      historyDone = true;
+      setHistoryPages([]);
+      setStatus((prev) => ({ ...prev, phase: "live", progress: "", ...patch }));
+      settlePending();
+      publishRows(true);
+      void catchUp();
+      pollTimer = window.setInterval(() => void catchUp(), SAFETY_POLL_MS);
+    };
+
     const plan = planTradeSources(market);
     // Live + Historical hands back Live-shaped rows for every market, so prints and history share columns.
     const fusedPlan = plan.kind === "historical" ? { ...plan, kind: "live+historical" } : plan;
@@ -219,6 +236,9 @@ export function useFusedMarketTrades(meta) {
       signal,
       onProgress: (progress) => {
         if (!signal.aborted) setStatus((prev) => ({ ...prev, progress }));
+      },
+      onRows: (partial) => {
+        if (!signal.aborted && !historyDone) setHistoryPages(partial.rows);
       },
     })
       .then((pulled) => {
@@ -232,31 +252,11 @@ export function useFusedMarketTrades(meta) {
         }
         confirmed = unique.sort(byNewest);
         newestSec = Number(confirmed[0]?.timestamp) || 0;
-        setStatus((prev) => ({
-          ...prev,
-          phase: "live",
-          progress: "",
-          truncated: !!pulled.truncated,
-          label: pulled.label || "",
-          historyCount: confirmed.length,
-        }));
+        finishHistory({ truncated: !!pulled.truncated, label: pulled.label || "", historyCount: confirmed.length });
       })
       .catch((err) => {
         if (signal.aborted || err?.name === "AbortError") return;
-        setStatus((prev) => ({
-          ...prev,
-          phase: "live",
-          progress: "",
-          error: `The full history didn't load (${err?.message || "pull failed"}). New trades still stream in.`,
-        }));
-      })
-      .finally(() => {
-        if (signal.aborted) return;
-        historyDone = true;
-        settlePending();
-        publishRows(true);
-        void catchUp();
-        pollTimer = window.setInterval(() => void catchUp(), SAFETY_POLL_MS);
+        finishHistory({ error: `The full history didn't load (${err?.message || "pull failed"}). New trades still stream in.` });
       });
 
     return () => {
@@ -268,5 +268,10 @@ export function useFusedMarketTrades(meta) {
     };
   }, [conditionId, tokensKey]);
 
-  return { rows, status };
+  const filling = status.phase === "history";
+  const streamRows = useMemo(
+    () => (filling && historyPages.length ? rows.concat(historyPages) : rows),
+    [filling, historyPages, rows],
+  );
+  return { rows, streamRows, status };
 }

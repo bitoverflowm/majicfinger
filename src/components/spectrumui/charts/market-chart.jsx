@@ -8,7 +8,9 @@ import {
   marketVarsClassName,
   useMorph,
   usePrefersReducedMotion,
+  useTween,
 } from "@/components/spectrumui/charts/chart-engine";
+import { FlowEdge, FlowLabel } from "@/components/spectrumui/charts/flow-edge";
 
 const PAD = { top: 12, right: 64, bottom: 22, left: 8 };
 const VOLUME_SHARE = 0.22;
@@ -183,6 +185,8 @@ function RangeSelector({ ranges, value, onChange, reduce }) {
  * Spectrum market chart. `variant="area"` is the line with a fill split around the
  * first price. `variant="candles"` draws OHLC bars. Volume stays in the pane either way.
  * `live` marks a feed that is already updating `data`. It does not invent prices.
+ * `flow` marks a trade history: it flows in from the right. While `flow.filling`, candles sit on a
+ * time axis that starts at `flow.from` and the history grows back toward it.
  */
 export function MarketChart({
   className,
@@ -201,9 +205,12 @@ export function MarketChart({
   status = "ready",
   emptyLabel = "This sheet has no price to chart yet.",
   toolbar = null,
+  flow = null,
 }) {
   const uid = React.useId().replace(/:/g, "");
   const reduce = usePrefersReducedMotion();
+  const filling = Boolean(flow?.filling);
+  const flowOn = Boolean(flow) && !reduce;
   const [plotRef, box] = useBox();
   const [ownRangeLabel, setOwnRangeLabel] = React.useState(defaultRange);
   const rangeLabel = rangeValue ?? ownRangeLabel;
@@ -251,9 +258,18 @@ export function MarketChart({
   const priceY1 = innerBottom - (showVolume ? volH + VOLUME_GAP : 0);
   const volY1 = innerBottom;
   const priceH = Math.max(1, priceY1 - priceY0);
-  const step = plotW / Math.max(n, 1);
+  const timeAxis = React.useMemo(() => {
+    if (!filling || !n) return null;
+    let bucket = Infinity;
+    for (let i = 1; i < n; i += 1) bucket = Math.min(bucket, view[i].t - view[i - 1].t);
+    if (!Number.isFinite(bucket) || bucket <= 0) bucket = 60_000;
+    const start = Math.min(view[0].t, flow.from > 0 ? flow.from : view[0].t) - bucket / 2;
+    const span = Math.max(1, view[n - 1].t + bucket / 2 - start);
+    return { start, span, bucket };
+  }, [filling, flow?.from, n, view]);
+  const step = timeAxis ? (timeAxis.bucket / timeAxis.span) * plotW : plotW / Math.max(n, 1);
   const bodyW = Math.max(2, Math.min(step * 0.62, 14));
-  const cx = (i) => plotX0 + step * (i + 0.5);
+  const cx = (i) => (timeAxis ? plotX0 + ((view[i].t - timeAxis.start) / timeAxis.span) * plotW : plotX0 + step * (i + 0.5));
 
   const domain = React.useMemo(() => {
     if (!n) return [0, 1];
@@ -268,7 +284,7 @@ export function MarketChart({
     const pad = (hi - lo) * 0.16 || Math.abs(hi) * 0.04 || 0.02;
     return [lo - pad, hi + pad];
   }, [n, variant, view]);
-  const [domLo, domHi] = domain;
+  const [domLo, domHi] = useTween(domain, { enabled: flowOn && filling });
   const priceY = (v) => priceY1 - ((v - domLo) / (domHi - domLo || 1)) * priceH;
   const first = view[0];
   const active = hoverIndex != null ? view[hoverIndex] : null;
@@ -292,9 +308,10 @@ export function MarketChart({
     : [];
   const [drawnShapes, [drawnBase], drawnBars] = useMorph(
     [shapes, [{ y: priceY(baseline) }], bars],
-    `${range?.label || ""}|${symbol}|${variant}`,
+    `${range?.label || ""}|${symbol}|${variant}|${timeAxis ? "filling" : ""}`,
     { enabled: !reduce },
   );
+  const oldest = shapes[0] ? { x: shapes[0].x, y: variant === "area" ? shapes[0].y : shapes[0].top } : null;
   const areaPoints = variant === "area" ? drawnShapes : [];
   const linePath = variant === "area" ? monotonePath(areaPoints) : "";
   const baselineY = drawnBase?.y ?? priceY(baseline);
@@ -314,15 +331,21 @@ export function MarketChart({
   const dirColor = up ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)";
   const lastUp = last ? last.close >= last.open : true;
   const lastColor = lastUp ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)";
-  const span = n ? view[n - 1].t - view[0].t : 0;
+  const span = timeAxis ? timeAxis.span : n ? view[n - 1].t - view[0].t : 0;
   const priceTicks = niceTicks(domLo, domHi, 4);
   const ready = box.width > 40 && box.height > 80;
 
   const timeTicks = React.useMemo(() => {
     if (!n) return [];
+    const want = Math.max(2, Math.min(4, Math.floor(plotW / 88)));
+    if (timeAxis) {
+      return Array.from({ length: want }, (_, i) => {
+        const share = i / (want - 1);
+        return { key: `t-${i}`, t: timeAxis.start + share * timeAxis.span, x: plotX0 + share * plotW };
+      });
+    }
     const xOf = (i) => plotX0 + (plotW / Math.max(n, 1)) * (i + 0.5);
     const minGap = 58;
-    const want = Math.max(2, Math.min(4, Math.floor(plotW / 88)));
     const gap = Math.max(1, Math.floor((n - 1) / (want - 1 || 1)));
     const out = [];
     for (let i = 0; i < n; i += gap) {
@@ -332,14 +355,20 @@ export function MarketChart({
       while (out.length && xOf(n - 1) - xOf(out[out.length - 1]) < minGap) out.pop();
       out.push(n - 1);
     }
-    return out;
-  }, [n, plotW, plotX0]);
+    return out.map((i) => ({ key: `t-${i}`, t: view[i].t, x: xOf(i) }));
+  }, [n, plotW, plotX0, timeAxis, view]);
 
   const pointerToIndex = (clientX) => {
     const svg = svgRef.current;
     if (!svg || !n) return;
     const rect = svg.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * w;
+    if (timeAxis) {
+      let best = 0;
+      for (let i = 1; i < n; i += 1) if (Math.abs(cx(i) - x) < Math.abs(cx(best) - x)) best = i;
+      setHoverIndex(best);
+      return;
+    }
     const i = Math.floor((x - plotX0) / step);
     setHoverIndex(Math.max(0, Math.min(n - 1, i)));
   };
@@ -368,6 +397,7 @@ export function MarketChart({
                 Live
               </span>
             ) : null}
+            {filling && flow.label ? <FlowLabel label={flow.label} reduce={reduce} /> : null}
           </div>
           <div className="mt-1 flex items-end gap-2">
             <p className="font-mono text-[22px] font-medium leading-none tabular-nums text-neutral-950 dark:text-white">
@@ -453,6 +483,7 @@ export function MarketChart({
               );
             })}
 
+            <g clipPath={flowOn ? `url(#${uid}-flow)` : undefined}>
             {variant === "area" ? (
               <g>
                 <defs>
@@ -492,7 +523,7 @@ export function MarketChart({
                   clipPath={`url(#${uid}-above)`}
                   pathLength={1}
                   style={
-                    reduce
+                    reduce || flowOn
                       ? undefined
                       : { strokeDasharray: 1, animation: "spectrum-mc-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) both" }
                   }
@@ -507,7 +538,7 @@ export function MarketChart({
                   clipPath={`url(#${uid}-below)`}
                   pathLength={1}
                   style={
-                    reduce
+                    reduce || flowOn
                       ? undefined
                       : { strokeDasharray: 1, animation: "spectrum-mc-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) both" }
                   }
@@ -543,6 +574,22 @@ export function MarketChart({
                   );
                 })
               : null}
+            </g>
+            {flowOn ? (
+              <FlowEdge
+                id={`${uid}-flow`}
+                point={oldest}
+                left={plotX0}
+                right={plotX1}
+                filling={filling}
+                ready={n > 0}
+                top={priceY0}
+                bottom={innerBottom}
+                width={w}
+                height={h}
+                color={variant === "area" ? "var(--spectrum-chart-up)" : "currentColor"}
+              />
+            ) : null}
             {showVolume ? (
               <text x={plotX0} y={priceY1 + 12} fontSize={10} fill="currentColor">
                 {volumeLabel}
@@ -598,14 +645,12 @@ export function MarketChart({
               </g>
             ) : null}
 
-            {timeTicks.map((i) => {
-              const candle = view[i];
-              if (!candle) return null;
-              const first = i === timeTicks[0];
-              const x = first ? Math.max(plotX0, cx(i)) : Math.max(plotX0 + 18, Math.min(plotX1 - 18, cx(i)));
+            {timeTicks.map((tick, index) => {
+              const first = index === 0;
+              const x = first ? Math.max(plotX0, tick.x) : Math.max(plotX0 + 18, Math.min(plotX1 - 18, tick.x));
               return (
-                <text key={`t-${i}`} x={x} y={h - 6} textAnchor={first ? "start" : "middle"} fontSize={10} fill="currentColor" className="tabular-nums">
-                  {formatChartTick(candle.t, span, { dated: first })}
+                <text key={tick.key} x={x} y={h - 6} textAnchor={first ? "start" : "middle"} fontSize={10} fill="currentColor" className="tabular-nums">
+                  {formatChartTick(tick.t, span, { dated: first })}
                 </text>
               );
             })}

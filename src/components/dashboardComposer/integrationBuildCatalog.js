@@ -619,6 +619,36 @@ function rowsFromAthenaCells(result, limit) {
 }
 
 /**
+ * An `onPhase` handler that hands `onRows` every row downloaded so far, as each page lands.
+ * Only the new page is converted, so a long pull stays linear. Rows come newest first.
+ */
+function streamAthenaRows(onRows, convert = (row) => row) {
+  if (typeof onRows !== "function") return null;
+  const rows = [];
+  return (info) => {
+    if (info?.phase !== "downloading_page" || !Array.isArray(info.accumulatedRows)) return;
+    const names = info.columns || [];
+    for (let index = rows.length; index < info.accumulatedRows.length; index += 1) {
+      const cells = info.accumulatedRows[index];
+      const row = {};
+      names.forEach((name, at) => {
+        row[name] = cells[at];
+      });
+      rows.push(convert(row));
+    }
+    onRows(rows);
+  };
+}
+
+function withRowStream(onPhase, stream) {
+  if (!stream) return onPhase;
+  return (info) => {
+    onPhase?.(info);
+    stream(info);
+  };
+}
+
+/**
  * Trades for one market ticker. Preview calls omit `limit` and stay at PREVIEW_ROW_CAP.
  * Save and run passes the plan row cap so Elite gets the full pull and other tiers
  * stop at their sheet cap.
@@ -647,7 +677,7 @@ export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_
     maxWaitMs,
     pollIntervalMs: 800,
     pageTimeoutMs: options.pageTimeoutMs,
-    onPhase: options.onPhase,
+    onPhase: withRowStream(options.onPhase, streamAthenaRows(options.onRows && ((rows) => options.onRows(rows, columns)))),
   }).then((result) => ({
     columns,
     rows: rowsFromAthenaCells(result, rowLimit),
@@ -834,11 +864,15 @@ export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_
   };
   const outcomes = marketOutcomes(options.outcomes);
   const maxWaitMs = rowLimit > PREVIEW_ROW_CAP ? 600000 : 180000;
+  const stream = streamAthenaRows(
+    options.onRows && ((rows) => options.onRows(rows, columns)),
+    (row) => priceFill(row, unique, outcomes),
+  );
   return fetchAthenaLakeSample(request, {
     maxWaitMs,
     pollIntervalMs: 800,
     pageTimeoutMs: options.pageTimeoutMs,
-    onPhase: options.onPhase,
+    onPhase: withRowStream(options.onPhase, stream),
   }).then((result) => ({
     columns,
     rows: rowsFromAthenaCells(result, rowLimit).map((row) => priceFill(row, unique, outcomes)),

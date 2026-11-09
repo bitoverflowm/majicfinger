@@ -46,8 +46,11 @@ export function outcomeTokens(meta, outcome) {
   return tokens.slice(0, 2);
 }
 
-/** One market's fused trade history. `rows` are trade sheet rows, newest first. */
-export function marketTradeSheet(meta, rows, { outcome = "both", truncated = false, label = "" } = {}) {
+/**
+ * One market's fused trade history. `rows` are trade sheet rows, newest first.
+ * `filling` (`{ from, label }`) marks a history still paging in, so its chart flows in back to `from`.
+ */
+export function marketTradeSheet(meta, rows, { outcome = "both", truncated = false, label = "", filling = null } = {}) {
   const handle = meta.slug || meta.conditionId;
   return {
     id: `terminal-${HOLDER_TERMINAL}-trades-${slugId(handle)}`,
@@ -57,6 +60,7 @@ export function marketTradeSheet(meta, rows, { outcome = "both", truncated = fal
     records: rows,
     rowCount: rows.length,
     keepAllRows: true,
+    ...(filling ? { filling } : {}),
     span: "full",
     integrationId: "polymarket",
     table: "getTradesByMarket",

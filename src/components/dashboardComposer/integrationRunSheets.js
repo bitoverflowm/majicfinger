@@ -175,6 +175,7 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       ...(sheet.pull ? { pull: sheet.pull } : {}),
       ...(sheet.query ? { query: sheet.query } : {}),
       ...(sheet.provenance ? { provenance: sheet.provenance } : {}),
+      ...(sheet.filling ? { filling: sheet.filling } : {}),
       pulledAt: Number(sheet.pulledAt) || Date.now(),
     };
     blocks.push(block);

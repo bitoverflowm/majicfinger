@@ -13,6 +13,7 @@ import { clampCandlestickWindowToKalshiCap, KALSHI_CANDLESTICK_MAX_CANDLES } fro
 import { normalizeKalshiLiveMarketRow } from "@/lib/kalshiLive/normalizeMarketRow";
 import { normalizeKalshiLiveTradeRow } from "@/lib/kalshiLive/normalizeTradeRow";
 import { RECIPE_TRADE_HISTORY, RECIPE_TRADE_ROW_LIMIT } from "@/lib/dataLake/recipeLakeAccess";
+import { pacedRows } from "@/lib/tradeHistoryStream";
 
 /** Kalshi Historical v1 is the lake: Kalshi launch through Dec 2025. */
 export const KALSHI_V1_END_MS = Date.UTC(2026, 0, 1);
@@ -342,7 +343,7 @@ export function describePlan(plan) {
   };
 }
 
-async function liveTrades(ticker, limit, onProgress) {
+async function liveTrades(ticker, limit, onProgress, onPage) {
   const rows = [];
   let cursor = "";
   while (rows.length < limit) {
@@ -356,17 +357,24 @@ async function liveTrades(ticker, limit, onProgress) {
     const page = Array.isArray(body?.trades) ? body.trades : [];
     rows.push(...page.map((trade) => normalizeKalshiLiveTradeRow(trade)));
     onProgress?.(`Read ${rows.length.toLocaleString()} trades from Kalshi Live`);
+    onPage?.(rows);
     cursor = String(body?.cursor || "").trim();
     if (!cursor || !page.length) break;
   }
   return { rows: rows.slice(0, limit), truncated: rows.length >= limit && Boolean(cursor) };
 }
 
-async function v2Trades(ticker, limit, onProgress) {
+async function v2Trades(ticker, limit, onProgress, onPage) {
+  const read = [];
   const result = await fetchKalshiHistoricalV2TradesPull({
     marketTickers: ticker,
     limit,
-    onPage: (info) => onProgress?.(`Read ${Number(info?.totalLoaded || 0).toLocaleString()} trades from Kalshi Historical v2`),
+    onPage: (info) => {
+      onProgress?.(`Read ${Number(info?.totalLoaded || 0).toLocaleString()} trades from Kalshi Historical v2`);
+      if (!onPage) return;
+      if (Array.isArray(info?.rows)) read.push(...info.rows);
+      onPage(read);
+    },
   });
   const rows = Array.isArray(result?.raw) ? result.raw : [];
   return { rows, truncated: rows.length >= limit };
@@ -406,8 +414,11 @@ function dedupeTrades(rows) {
  * Every trade for one market, yes and no prices on each row, from the source the plan picked.
  * Falls through v1 → v2 trades → v2 candlesticks when a source comes back empty. Recipes skip
  * the plan's row cap and stop only at `RECIPE_TRADE_ROW_LIMIT`.
+ *
+ * `onRows` gets the trades read so far while the pull runs, newest first and in the same shape as
+ * the result, so a chart or sheet can fill in page by page. Partial rows are not deduped yet.
  */
-export async function pullKalshiTradeHistory(meta, plan, { onProgress } = {}) {
+export async function pullKalshiTradeHistory(meta, plan, { onProgress, onRows } = {}) {
   const cap = RECIPE_TRADE_ROW_LIMIT;
   const ticker = meta.ticker;
   const { columns: tradeColumns } = await loadKalshiLiveTradesForTicker(ticker, 1, { empty: true });
@@ -419,13 +430,17 @@ export async function pullKalshiTradeHistory(meta, plan, { onProgress } = {}) {
     truncated: pulled.truncated,
     label,
   });
+  const send = pacedRows(onRows);
+  const soFar = (integrationId, label, before = []) => (rows) =>
+    send(() => asTrades(integrationId, { rows: before.concat(rows), truncated: false }, label));
 
   if (plan.kind === "live" || plan.kind === "live+v2") {
-    const live = await liveTrades(ticker, cap, onProgress);
+    const label = plan.kind === "live" ? SOURCE_LABELS.kalshiLive : describePlan(plan).label;
+    const live = await liveTrades(ticker, cap, onProgress, soFar("kalshiLive", label));
     if (plan.kind === "live" || live.rows.length >= cap) return asTrades("kalshiLive", live);
-    const older = await v2Trades(ticker, cap - live.rows.length, onProgress);
+    const older = await v2Trades(ticker, cap - live.rows.length, onProgress, soFar("kalshiLive", label, live.rows));
     const rows = dedupeTrades([...live.rows, ...older.rows]).slice(0, cap);
-    return asTrades("kalshiLive", { rows, truncated: older.truncated }, describePlan(plan).label);
+    return asTrades("kalshiLive", { rows, truncated: older.truncated }, label);
   }
 
   if (plan.kind === "v1") {
@@ -434,6 +449,15 @@ export async function pullKalshiTradeHistory(meta, plan, { onProgress } = {}) {
       // A full history downloads 1,000 rows per page, and a slow link can take over 20s for one.
       pageTimeoutMs: 90000,
       onPhase: (info) => onProgress?.(describeComposePhase(info, { table: "kalshi.trades", limit: cap })),
+      onRows: (rows, columns) =>
+        send(() => ({
+          integrationId: "kalshiHistorical",
+          table: "trades",
+          columns,
+          rows: rows.slice(),
+          truncated: false,
+          label: SOURCE_LABELS.kalshiHistorical,
+        })),
     });
     if (lake.rows.length) {
       return {
@@ -449,7 +473,7 @@ export async function pullKalshiTradeHistory(meta, plan, { onProgress } = {}) {
     onProgress?.("No trades in the v1 lake. Trying Kalshi Historical v2");
   }
 
-  const tape = await v2Trades(ticker, cap, onProgress);
+  const tape = await v2Trades(ticker, cap, onProgress, soFar("kalshiHistoricalV2"));
   if (tape.rows.length) return asTrades("kalshiHistoricalV2", tape);
   const candles = await v2Candles(meta, onProgress);
   const { columns: candleColumns } = await loadKalshiLiveCandlesticksForTicker(ticker, 1, { empty: true });

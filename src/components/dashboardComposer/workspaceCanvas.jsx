@@ -338,7 +338,7 @@ function metaFromLive(live) {
 
 /** The whole dashboard, for a first create and the local backup. Tabs still loading keep their last local copy. */
 function draftFromLive(live) {
-  const saved = savedBlocksByPage(live.blocksByPage);
+  const saved = savedBlocksByPage(settledBlocksByPage(live.blocksByPage));
   const blocks = blocksForDocument(saved.blocksByPage);
   if (live.pendingTabs?.length) {
     const previous = readLocalDashboard(live.store);
@@ -369,6 +369,22 @@ function whenIdle(work, timeout = 1500) {
   }
   const timer = window.setTimeout(work, 200);
   return () => window.clearTimeout(timer);
+}
+
+/** A sheet still paging in is saved as a plain sheet, so a reload never shows a pull that already stopped. */
+function settledBlocksByPage(blocksByPage) {
+  if (!Object.values(blocksByPage || {}).some((list) => Array.isArray(list) && list.some((block) => block?.filling))) return blocksByPage;
+  const out = {};
+  for (const [page, list] of Object.entries(blocksByPage)) {
+    out[page] = Array.isArray(list) && list.some((block) => block?.filling)
+      ? list.map((block) => {
+          if (!block?.filling) return block;
+          const { filling: _filling, ...rest } = block;
+          return rest;
+        })
+      : list;
+  }
+  return out;
 }
 
 function blocksForDocument(blocksByPage) {
@@ -759,13 +775,14 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
       savingRef.current = run;
       return run;
     }
-    const saved = savedBlocksByPage(live.blocksByPage);
+    const settled = settledBlocksByPage(live.blocksByPage);
+    const saved = savedBlocksByPage(settled);
     rememberSheetRecords(live.owner, saved.trimmed);
     const base = saveBaseRef.current;
     const result = buildSavePatch(base, {
       meta: metaFromLive(live),
       tabIds: live.tabs.map((tab) => tab.id),
-      blocksByPage: live.blocksByPage,
+      blocksByPage: settled,
       savedBlocks: saved.blocksByPage,
       tables: live.tables,
       savedTableList: savedTables(live.tables, live.blocksByPage),
@@ -1058,8 +1075,9 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
         if (!prior) return { ...block, arrive: true };
         const sameData = columnKey(prior.columns) === columnKey(block.columns) && (prior.rowCount || 0) === (block.rowCount || 0);
         const filled = sameData && (block.records?.length || 0) > (prior.records?.length || 0);
+        const { filling: _priorFilling, ...settledPrior } = prior;
         return {
-          ...(sameData ? prior : block),
+          ...(sameData ? settledPrior : block),
           ...(filled ? { records: block.records, cells: block.cells } : {}),
           x: block.x,
           y: block.y,
@@ -1074,6 +1092,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
           ...(block.integrationId ? { integrationId: block.integrationId } : {}),
           ...(block.table ? { table: block.table } : {}),
           ...(block.title ? { title: block.title } : {}),
+          ...(block.filling ? { filling: block.filling } : {}),
         };
       });
       if (spotlightChartsFor) {
