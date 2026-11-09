@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { marketPriceSheet } from "./holderTerminalSheets";
 
 const REFRESH_MS = 5 * 60_000;
+/** After a failed load, try again this soon before falling back to the regular refresh. */
+const RETRY_MS = [3000, 10_000];
 /** Bucket sizes Polymarket accepts, in minutes. The finest that keeps a line near 1,500 points wins. */
 const FIDELITIES = [1, 5, 15, 60, 360, 1440];
 const TARGET_POINTS = 1500;
@@ -14,6 +16,14 @@ const FALLBACK_SPAN_MS = 30 * 24 * 60 * 60_000;
 function fidelityFor(spanSec) {
   const minutes = spanSec / 60;
   return FIDELITIES.find((fidelity) => minutes / fidelity <= TARGET_POINTS) ?? FIDELITIES[FIDELITIES.length - 1];
+}
+
+/** What the panel says when a load fails. Server and browser errors are not worded for readers. */
+function failureMessage(err) {
+  const text = String(err?.message || "");
+  if (err?.name === "TimeoutError" || /time(d)? ?out|aborted/i.test(text)) return "Polymarket took too long to send the price history.";
+  if (err instanceof TypeError) return "Couldn't reach Polymarket for the price history.";
+  return "Couldn't load the price history from Polymarket.";
 }
 
 /** Each outcome's history as `{ t, p }` points (t in seconds), from its first day to now or its close. */
@@ -50,11 +60,15 @@ export async function fetchPriceHistory(tokenIds, startSec, endSec, signal) {
 /**
  * Polymarket's price line for both outcomes as a canvas sheet: the stored history, refreshed every
  * few minutes, with each live price (`livePrices`, one per outcome) appended as it changes.
+ * A failed load tries again after a few seconds; `retrying` is true while that's pending and
+ * `retry()` loads again now.
  */
 export function useMarketPriceHistory(meta, livePrices) {
   const [history, setHistory] = useState(null);
   const [live, setLive] = useState([[], []]);
   const [error, setError] = useState("");
+  const [retrying, setRetrying] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const conditionId = meta?.conditionId || "";
   const closed = !!meta?.closed;
 
@@ -65,30 +79,38 @@ export function useMarketPriceHistory(meta, livePrices) {
     if (!conditionId || !metaRef.current?.tokenIds?.length) return undefined;
     const abort = new AbortController();
     let timer = 0;
+    let failures = 0;
     setHistory(null);
     setLive([[], []]);
     setError("");
+    setRetrying(false);
     const load = () =>
       fetchHistory(metaRef.current, abort.signal)
         .then((next) => {
           if (abort.signal.aborted) return;
+          failures = 0;
           setHistory(next);
           setError("");
           setLive((prev) => prev.map((points, index) => points.filter((point) => point.t > (next[index]?.at(-1)?.t ?? 0))));
         })
         .catch((err) => {
           if (abort.signal.aborted || err?.name === "AbortError") return;
-          setError(err?.message || "Couldn't load the price history.");
+          failures += 1;
+          setError(failureMessage(err));
         })
         .finally(() => {
-          if (!abort.signal.aborted && !closed) timer = window.setTimeout(load, REFRESH_MS);
+          if (abort.signal.aborted) return;
+          const soon = failures ? RETRY_MS[failures - 1] : undefined;
+          setRetrying(soon != null);
+          // A closed market's history doesn't change, so it only loads again after a failure.
+          if (soon != null || failures || !closed) timer = window.setTimeout(load, soon ?? REFRESH_MS);
         });
     void load();
     return () => {
       abort.abort();
       window.clearTimeout(timer);
     };
-  }, [conditionId, closed]);
+  }, [attempt, conditionId, closed]);
 
   const priceKey = (livePrices || []).slice(0, 2).join(",");
   useEffect(() => {
@@ -131,5 +153,6 @@ export function useMarketPriceHistory(meta, livePrices) {
     return marketPriceSheet(meta, records);
   }, [history, live, meta]);
 
-  return { sheet, loading: !history && !error, error };
+  const retry = useCallback(() => setAttempt((count) => count + 1), []);
+  return { sheet, loading: !history && !error, error, retrying, retry };
 }

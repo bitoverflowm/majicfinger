@@ -163,7 +163,23 @@ export function MarketPricePanel() {
           {priceHistory.sheet ? (
             <SheetBlockChart sheet={priceHistory.sheet} live={live && !meta.closed} view={priceChart.chartView} />
           ) : priceHistory.error ? (
-            <p className="flex h-full items-center justify-center text-[12px] text-muted-foreground">{priceHistory.error}</p>
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[12px] text-muted-foreground">
+              <p>{priceHistory.error}</p>
+              {priceHistory.retrying ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                  Trying again
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={priceHistory.retry}
+                  className="rounded-lg border border-border/70 px-2.5 py-1 font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+                >
+                  Try again
+                </button>
+              )}
+            </div>
           ) : (
             <PanelLoading label="Loading the price history" />
           )}
