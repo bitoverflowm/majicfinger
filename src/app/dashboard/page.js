@@ -19,6 +19,7 @@ import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state"
 import { WORKSPACE_PROJECT_PARAM, WorkspaceProjectProvider } from "@/components/projects/workspaceProjectContext"
 
 import { userSwrFetcher } from "@/lib/hooks"
+import { rememberTerminalRequest } from "@/lib/terminalRequest"
 import { AuthenticatedJourneyInit } from "@/components/analytics/AuthenticatedJourneyInit"
 
 if (typeof window !== "undefined") preloadDashboardViews()
@@ -39,6 +40,7 @@ function DashboardInner() {
     useEffect(() => {
         if (isLoading) return
         if (!user) {
+            rememberTerminalRequest()
             router.replace("/login")
         }
     }, [isLoading, user, router])

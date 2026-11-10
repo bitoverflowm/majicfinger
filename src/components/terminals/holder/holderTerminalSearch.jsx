@@ -204,10 +204,19 @@ function EventMarketsDialog({ event, onClose, onConfirm }) {
  * The integrations' Polymarket search with a market / trader toggle. A market opens straight
  * away. An event or series asks which of its markets to open. A trader is a username or wallet.
  * `onExplore`, when given, adds an Explore button that goes back to browsing markets.
- * @param {{ onPick: (subjects: object[]) => void, onExplore?: () => void, className?: string }} props
+ * `scopes` limits the toggle (one scope hides it); `labels` and `placeholders` reword it by scope id.
+ * @param {{
+ *   onPick: (subjects: object[]) => void,
+ *   onExplore?: () => void,
+ *   className?: string,
+ *   scopes?: string[],
+ *   labels?: Record<string, string>,
+ *   placeholders?: Record<string, string>,
+ * }} props
  */
-export function HolderTerminalSearch({ onPick, onExplore, className }) {
-  const [scope, setScope] = useState("markets");
+export function HolderTerminalSearch({ onPick, onExplore, className, scopes, labels, placeholders }) {
+  const options = scopes?.length ? SCOPES.filter((option) => scopes.includes(option.id)) : SCOPES;
+  const [scope, setScope] = useState(options[0]?.id || "markets");
   const [event, setEvent] = useState(null);
 
   const select = (suggestion) => {
@@ -244,9 +253,9 @@ export function HolderTerminalSearch({ onPick, onExplore, className }) {
   const traders = scope === "traders";
   return (
     <div className={className}>
-      <div className="mb-2 flex items-center gap-2">
-        <div role="tablist" aria-label="Search for" className="inline-flex rounded-lg bg-muted p-0.5 text-[12px]">
-          {SCOPES.map((option) => (
+      <div className={cn("mb-2 flex items-center gap-2", options.length < 2 && !onExplore && "hidden")}>
+        <div role="tablist" aria-label="Search for" className={cn("inline-flex rounded-lg bg-muted p-0.5 text-[12px]", options.length < 2 && "hidden")}>
+          {options.map((option) => (
             <button
               key={option.id}
               type="button"
@@ -258,7 +267,7 @@ export function HolderTerminalSearch({ onPick, onExplore, className }) {
                 scope === option.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {option.label}
+              {labels?.[option.id] || option.label}
             </button>
           ))}
         </div>
@@ -283,7 +292,8 @@ export function HolderTerminalSearch({ onPick, onExplore, className }) {
         searchTags={false}
         acceptAddress={traders}
         placeholder={
-          traders ? "Search a username or paste a wallet address" : "Search markets, events or series in plain English, or paste a link"
+          placeholders?.[scope] ||
+          (traders ? "Search a username or paste a wallet address" : "Search markets, events or series in plain English, or paste a link")
         }
       />
       {event ? (

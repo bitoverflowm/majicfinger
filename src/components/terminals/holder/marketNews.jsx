@@ -88,7 +88,7 @@ export function NewsTermsBar({ news, terms, suggestions, edited, onChange, onRes
   };
   const summary = sourceSummary(news.sources, news.articles.length);
   return (
-    <div className="space-y-1.5">
+    <div data-tour="news-terms" className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mr-0.5 text-[12px] font-medium text-muted-foreground">News that mentions</span>
         {terms.map((term) => (
@@ -422,7 +422,7 @@ export function NewsList({ articles, terms, domain, arrivals, now, onShow, empty
     });
   }, [articles, domain, headlineOnly, terms]);
   return (
-    <div className="rounded-xl border border-border/70 bg-background shadow-sm">
+    <div data-tour="news-list" className="rounded-xl border border-border/70 bg-background shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
         <span className="text-[12px] font-medium text-foreground">
           {rows.length.toLocaleString()} headline{rows.length === 1 ? "" : "s"}

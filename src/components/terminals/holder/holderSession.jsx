@@ -122,7 +122,7 @@ function useSkillScore(address) {
   return state.wallet === wallet ? state : { wallet, status: "loading", score: null };
 }
 
-function TraderSession({ subject, actions, children }) {
+function TraderSession({ subject, actions, alertsOn = true, children }) {
   const { profile, activity, pnl } = useLiveTrader(subject.address);
   const skill = useSkillScore(subject.address);
   const lastTradeKey = activity.rows[0] ? arrivalKey(activity.rows[0]) : "";
@@ -170,13 +170,14 @@ function TraderSession({ subject, actions, children }) {
   };
   return (
     <HolderSessionContext.Provider value={value}>
-      <span ref={onScreenRef} className="sr-only" aria-hidden />
+      <span ref={onScreenRef} className="sr-only" hidden={!alertsOn} aria-hidden />
       {children}
     </HolderSessionContext.Provider>
   );
 }
 
-export function HolderSessionProvider({ subject, actions, children }) {
+/** `alertsOn` (traders only) holds back new-trade alerts while false, e.g. off the step that shows trades. */
+export function HolderSessionProvider({ subject, actions, alertsOn, children }) {
   const browse = useMemo(() => ({ view: "browse", subject: null, actions }), [actions]);
   if (subject?.kind === "market") {
     return (
@@ -187,7 +188,7 @@ export function HolderSessionProvider({ subject, actions, children }) {
   }
   if (subject?.kind === "trader") {
     return (
-      <TraderSession key={subject.address} subject={subject} actions={actions}>
+      <TraderSession key={subject.address} subject={subject} actions={actions} alertsOn={alertsOn}>
         {children}
       </TraderSession>
     );

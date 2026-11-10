@@ -10,6 +10,7 @@ import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanv
 import { useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
 import { openTerminalTab, terminalProjectDraft } from "@/components/terminals/openTerminalTab";
 import { createWorkspaceProject, updateWorkspaceProject } from "@/lib/workspaceDashboardClient";
+import { takeTerminalRequest } from "@/lib/terminalRequest";
 import { findTerminal } from "@/lib/workspaceTerminals";
 
 const listeners = new Set();
@@ -90,6 +91,14 @@ export function TerminalPlacementHost() {
       listeners.delete(listener);
     };
   }, [handleRef]);
+
+  // A terminal asked for from outside the app (a landing page's "Open the free terminal").
+  const canvasReady = !!canvas?.ready && !canvas?.readOnly && !ctx?.landingDemo;
+  useEffect(() => {
+    if (!canvasReady) return;
+    const request = takeTerminalRequest();
+    if (request && findTerminal(request.terminalId)) handleRef.current(request);
+  }, [canvasReady]);
 
   const chooseHere = () => {
     if (!pending) return;

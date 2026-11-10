@@ -31,8 +31,12 @@ function noop() {}
 /**
  * A market's price over its whole life with matching headlines on it and how many came out when
  * underneath, so moves can be read against the news. Zoom in to look closer; it follows live while open.
+ *
+ * `part` shows just the "chart" or just the "headlines" (both keep the keyword bar). `onShowArticle`
+ * replaces the list's own "Show on the chart", and `focusArticle` zooms the chart to that headline.
+ * `onNews` hears the matching headlines (newest first) whenever they change.
  */
-export function MarketPriceNews({ meta, livePrices }) {
+export function MarketPriceNews({ meta, livePrices, part = "all", onShowArticle, focusArticle, onNews }) {
   const live = !meta.closed;
   const now = useNow(live ? 5000 : 0);
   const closeMs = meta.closed ? Math.min(meta.closeMs || now, now) : 0;
@@ -51,6 +55,11 @@ export function MarketPriceNews({ meta, livePrices }) {
   const newsTerms = useNewsTerms(meta);
   const news = useMarketNews(newsTerms.terms, newsWindow(full, zoom.detail));
   const bars = newsVolume(news, domain);
+  const onNewsRef = useRef(onNews);
+  onNewsRef.current = onNews;
+  useEffect(() => {
+    onNewsRef.current?.(news.articles);
+  }, [news.articles]);
   const [pinnedNews, setPinnedNews] = useState(null);
   useEffect(() => setPinnedNews(null), [meta.conditionId]);
   const chartRef = useRef(null);
@@ -68,6 +77,17 @@ export function MarketPriceNews({ meta, livePrices }) {
 
   const outcomes = [meta.outcomes?.[0] || "Yes", meta.outcomes?.[1] || "No"];
   const hasTerms = newsTerms.terms.length > 0;
+  const showChart = part !== "headlines";
+  const showList = part !== "chart" && hasTerms;
+
+  const pricesReady = !!prices.lines;
+  const focusT = focusArticle?.t;
+  useEffect(() => {
+    if (!showChart || !pricesReady || !Number.isFinite(focusT)) return;
+    zoomTo(focusT, focusT, NEWS_SPAN_MS);
+    // Zoom once per requested headline, after the prices it zooms over have loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusT, pricesReady, showChart]);
 
   return (
     <div className="space-y-3">
@@ -80,6 +100,7 @@ export function MarketPriceNews({ meta, livePrices }) {
         onReset={newsTerms.reset}
       />
 
+      {showChart ? (
       <section ref={chartRef} aria-label="Market price with the news" className="rounded-xl border border-border/70 bg-background p-3 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
           {prices.lines ? <ZoomControls zoomed={zoomed} onZoom={zoomBy} onReset={reset} /> : <span />}
@@ -134,15 +155,16 @@ export function MarketPriceNews({ meta, livePrices }) {
         ) : null}
         <ChartLegend outcomes={outcomes} livePrices={livePrices} news={hasTerms} moves={false} />
       </section>
+      ) : null}
 
-      {hasTerms ? (
+      {showList ? (
         <NewsList
           articles={news.articles}
           terms={newsTerms.terms}
-          domain={zoomed ? domain : null}
+          domain={zoomed && showChart ? domain : null}
           arrivals={news.arrivals}
           now={now}
-          onShow={showNews}
+          onShow={onShowArticle || showNews}
           empty={
             news.loading
               ? "Searching the news"
