@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -9,6 +10,10 @@ import { HolderSessionProvider, chosenName, shortWallet, useHolderSession } from
 import { HOLDER_LANDING_PAGES, HOLDER_PATHS, holderTerminalHref } from "@/lib/holderLanding/pages";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
+import { useUser } from "@/lib/hooks";
+import { userHasDashboardAccess } from "@/lib/membershipAccess";
+import { FEATURED_MARKET } from "./demo/demoScript";
+import { DemoHero } from "./holderLandingDemoHero";
 import { HeroTools } from "./holderLandingHero";
 import { HeroPreview } from "./holderLandingPreview";
 import { FinalCta, MobileCtaBar, PageRail } from "./holderLandingRail";
@@ -17,6 +22,21 @@ import { useStepToasts } from "./landingToasts";
 import { useTraderHolders } from "./traderHolders";
 
 const CONTAINER = "w-full px-6 sm:px-8 lg:px-10";
+
+const HolderTryDemo = dynamic(() => import("./holderTryDemo"), { ssr: false });
+const DemoRecorder = process.env.NODE_ENV === "development" ? dynamic(() => import("./demo/demoRecorder"), { ssr: false }) : null;
+
+function useDemoRecording() {
+  const [recording, setRecording] = useState(null);
+  useEffect(() => {
+    if (!DemoRecorder) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("recordDemo") && MARKET_ID.test(params.get("recordMarket") || "")) {
+      setRecording({ conditionId: params.get("recordMarket"), trader: params.get("recordTrader") || "" });
+    }
+  }, []);
+  return recording;
+}
 
 const MARKET_ID = /^0x[a-fA-F0-9]{64}$/;
 const WALLET_ID = /^0x[a-fA-F0-9]{40}$/;
@@ -717,30 +737,63 @@ export function HolderLandingExperience({ pageKey, initial }) {
   const finalInView = useInView(finalRef);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  const recording = useDemoRecording();
+
+  const user = useUser();
+  const isMember = userHasDashboardAccess(user);
+  const [trying, setTrying] = useState(false);
+  const tryIt = () => {
+    if (isMember) router.push(holderTerminalHref(FEATURED_MARKET));
+    else setTrying(true);
+  };
+  const closeTry = useCallback(() => setTrying(false), []);
+  const learnMore = (event) => {
+    event.preventDefault();
+    setAutoplay(!reducedMotion);
+    scrollTo("market-path");
+  };
 
   return (
     <HolderSessionProvider subject={heroSubject} actions={actions} alertsOn={leadAlerts}>
       <style dangerouslySetInnerHTML={{ __html: FEATURE_KEYFRAMES + STAGE_CSS }} />
-      <section id="hero" className="relative w-full scroll-mt-0">
-        <div className={cn(CONTAINER, "grid items-center gap-x-12 gap-y-12 pb-16 pt-24 md:pt-32 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]")}>
-          <div className="flex min-w-0 flex-col items-start gap-6">
-            <Breadcrumb page={page} />
-            <HeroCopy hero={page.hero} />
-            <HeroTools
-              page={page}
-              suggestions={initial.suggestions}
-              market={market}
-              subject={heroSubject}
-              onPick={pick}
-              onExample={() => setAutoplay(!reducedMotion)}
-              ctaRef={heroCtaRef}
-            />
+      {page.key === "flagship" ? (
+        <>
+          <DemoHero hero={page.hero} ctaRef={heroCtaRef} onTry={tryIt} onLearn={learnMore} covered={trying} />
+          <section id="start" className="relative w-full scroll-mt-24">
+            <div className={cn(CONTAINER, "pb-6 pt-10 md:pt-14")}>
+              <div className="mx-auto flex max-w-2xl flex-col gap-5">
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <h2 className="text-balance text-[1.75rem] font-normal leading-tight tracking-[-0.02em] text-primary sm:text-[2rem]">Start with any market or trader</h2>
+                  <p className="text-[15px] text-muted-foreground">Search Polymarket, pick from what's trading now, or browse everything. The walkthrough below follows your pick.</p>
+                </div>
+                <HeroTools page={page} suggestions={initial.suggestions} market={market} subject={heroSubject} onPick={pick} ctas={false} />
+              </div>
+            </div>
+          </section>
+          {trying ? <HolderTryDemo subject={FEATURED_MARKET} onClose={closeTry} /> : null}
+        </>
+      ) : (
+        <section id="hero" className="relative w-full scroll-mt-0">
+          <div className={cn(CONTAINER, "grid items-center gap-x-12 gap-y-12 pb-16 pt-24 md:pt-32 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]")}>
+            <div className="flex min-w-0 flex-col items-start gap-6">
+              <Breadcrumb page={page} />
+              <HeroCopy hero={page.hero} />
+              <HeroTools
+                page={page}
+                suggestions={initial.suggestions}
+                market={market}
+                subject={heroSubject}
+                onPick={pick}
+                onExample={() => setAutoplay(!reducedMotion)}
+                ctaRef={heroCtaRef}
+              />
+            </div>
+            <div className="min-w-0">
+              <HeroPreview kind={lead.kind} holdersFirst={page.key === "market"} />
+            </div>
           </div>
-          <div className="min-w-0">
-            <HeroPreview kind={lead.kind} holdersFirst={page.key === "market"} />
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
       <div className={cn(CONTAINER, "xl:grid xl:grid-cols-[12rem_minmax(0,1fr)] xl:gap-10")}>
         <aside className="hidden min-w-0 xl:block">
           <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pb-6 pt-14 md:pt-20">
@@ -777,6 +830,7 @@ export function HolderLandingExperience({ pageKey, initial }) {
         label={subjectName(focusChapter.kind, focusSubject) || page.navLabel}
         terminalHref={terminalHref}
       />
+      {recording ? <DemoRecorder {...recording} /> : null}
     </HolderSessionProvider>
   );
 }

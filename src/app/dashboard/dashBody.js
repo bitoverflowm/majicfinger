@@ -194,7 +194,10 @@ const DashBody = ({ user }) => {
         if (startTabsUserRef.current === userId) return;
         // A user refetch blanks the user for a moment; the signed-out tab list would replace theirs.
         if (userId === "local" && startTabsUserRef.current) return;
+        const first = startTabsUserRef.current === null;
         startTabsUserRef.current = userId;
+        // A landing demo that opened on its own tabs (a terminal page's "Try it now") keeps them.
+        if (first && contextStateV2?.landingDemo && contextStateV2?.workspaceStartTabs?.length) return;
         const stored = loadWorkspaceStartTabs(user?.userId);
         contextStateV2?.setWorkspaceStartTabs?.(stored.tabs);
         contextStateV2?.setWelcomeTabRemoved?.(stored.welcomeRemoved);

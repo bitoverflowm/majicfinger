@@ -6,6 +6,7 @@ import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveCont
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { LiveDot } from "./liveDot";
+import { useHolderDemoFeed } from "./holderDemoFeed";
 import { DAY_MS, DAY_YEAR, FULL_TIME, HOUR, MINUTE, timeTicks } from "./chartTime";
 import { NEWS_COLOR, NewsList, NewsMarkers, NewsNearMove, NewsTermsBar, NewsVolumeBars, newsVolume, useNewsTerms } from "./marketNews";
 import { useMarketNews } from "./useMarketNews";
@@ -204,7 +205,7 @@ function activityType(row) {
   return String(row.type || "TRADE").toUpperCase();
 }
 
-async function fillsPage(wallet, conditionId, limit, cursor, signal) {
+export async function fillsPage(wallet, conditionId, limit, cursor, signal) {
   const params = new URLSearchParams({
     query: "getTraderActivity",
     user: wallet,
@@ -241,6 +242,8 @@ function useMarketFills(wallet, conditionId, lastTrade) {
   const [part, setPart] = useState(NO_FILLS);
   const arrivals = useRef(new Map());
   const kick = useRef(null);
+  const feed = useHolderDemoFeed();
+  const loadPage = feed?.fills || fillsPage;
 
   useEffect(() => {
     if (!key) return undefined;
@@ -254,7 +257,7 @@ function useMarketFills(wallet, conditionId, lastTrade) {
       if (!abort.signal.aborted) timer = window.setTimeout(poll, POLL_MS);
     };
     const poll = () =>
-      fillsPage(wallet, conditionId, POLL_ROWS, "", abort.signal)
+      loadPage(wallet, conditionId, POLL_ROWS, "", abort.signal)
         .then(({ rows }) => {
           if (abort.signal.aborted) return;
           setPart((prev) => {
@@ -285,7 +288,7 @@ function useMarketFills(wallet, conditionId, lastTrade) {
       let cursor = "";
       let pages = 0;
       do {
-        const page = await fillsPage(wallet, conditionId, PAGE, cursor, abort.signal);
+        const page = await loadPage(wallet, conditionId, PAGE, cursor, abort.signal);
         rows = rows.concat(page.rows);
         cursor = page.next;
         pages += 1;
@@ -309,7 +312,7 @@ function useMarketFills(wallet, conditionId, lastTrade) {
       window.clearTimeout(timer);
       kick.current = null;
     };
-  }, [key, wallet, conditionId]);
+  }, [key, wallet, conditionId, loadPage]);
 
   const lastCondition = String(lastTrade?.condition_id || "");
   useEffect(() => {
@@ -807,6 +810,8 @@ export function usePriceWindow(meta, win, livePrices, detail) {
   const key = tokens && win ? `${tokens}|${startSec}|${endSec}` : "";
   const [state, setState] = useState({ key: "", history: null, error: "" });
   const [live, setLive] = useState([[], []]);
+  const feed = useHolderDemoFeed();
+  const loadHistory = feed?.priceHistory || fetchPriceHistory;
 
   useEffect(() => {
     if (!key) return undefined;
@@ -814,7 +819,7 @@ export function usePriceWindow(meta, win, livePrices, detail) {
     let timer = 0;
     setLive([[], []]);
     const load = () =>
-      fetchPriceHistory(tokens.split(","), startSec, endSec || Date.now() / 1000, abort.signal)
+      loadHistory(tokens.split(","), startSec, endSec || Date.now() / 1000, abort.signal)
         .then((history) => {
           if (abort.signal.aborted) return;
           setState({ key, history, error: "" });
@@ -832,7 +837,7 @@ export function usePriceWindow(meta, win, livePrices, detail) {
       abort.abort();
       window.clearTimeout(timer);
     };
-  }, [key, tokens, startSec, endSec]);
+  }, [key, tokens, startSec, endSec, loadHistory]);
 
   const history = state.key === key ? state.history : null;
   const priceKey = win?.follow ? livePriceList(livePrices).join(",") : "";
@@ -862,7 +867,7 @@ export function usePriceWindow(meta, win, livePrices, detail) {
     if (!detailKey) return undefined;
     const abort = new AbortController();
     const end = detail.anchored ? Date.now() : detail.end;
-    fetchPriceHistory(tokens.split(","), detail.start / 1000, end / 1000, abort.signal)
+    loadHistory(tokens.split(","), detail.start / 1000, end / 1000, abort.signal)
       .then((history) => {
         if (!abort.signal.aborted) setFine({ key: detailKey, start: detail.start, end, history });
       })

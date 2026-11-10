@@ -63,7 +63,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     /** Guide and hub demos open straight into this source's build step instead of the picker. */
     const [landingDemoIntegration] = useState(initialSettings?.landingDemoIntegration || null)
     const [landingDemoActive, setLandingDemoActive] = useState(
-      () => !!initialSettings?.landingDemo && isLandingDemoActivateRequested(),
+      () => !!initialSettings?.landingDemo && (!!initialSettings?.landingDemoActive || isLandingDemoActivateRequested()),
     )
     const activateLandingDemo = useCallback((intent) => {
       if (
@@ -100,12 +100,13 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     )
     /** Figma-style app nav: collapsed pills by default, both side panels open together. */
     const [navChromeExpanded, setNavChromeExpanded] = useState(false)
+    /** A landing demo can open on tabs it brings along (a terminal page's "Try it now"). */
     const [workspaceStartTabs, setWorkspaceStartTabs] = useState(() =>
-      initialSettings?.landingDemo ? [] : [{ id: "welcome", name: "Untitled 1", blank: true }],
+      initialSettings?.landingDemo ? initialSettings?.workspaceStartTabs || [] : [{ id: "welcome", name: "Untitled 1", blank: true }],
     )
     const [welcomeTabRemoved, setWelcomeTabRemoved] = useState(!!initialSettings?.landingDemo)
     const [activeWorkspaceStartTabId, setActiveWorkspaceStartTabId] = useState(
-      initialSettings?.landingDemo ? null : "welcome",
+      initialSettings?.landingDemo ? initialSettings?.activeWorkspaceStartTabId || null : "welcome",
     )
     const [integrationSidebar, setIntegrationSidebar] = useState(initialSettings?.integrationSidebar ?? null) // 'polymarket' | 'polymarketHistorical' | 'kalshiHistorical' | 'coinGecko' | etc.
     const [rightPanelOpen, setRightPanelOpen] = useState(!!initialSettings?.rightPanelOpen) // unified right-side panel (integrations/charts)

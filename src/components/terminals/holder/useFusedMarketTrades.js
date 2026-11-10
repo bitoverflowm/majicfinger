@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { tradeSheetRow } from "@/components/dashboardComposer/polymarketLiveBuild";
 import {
   freshTradesEnd,
@@ -19,7 +19,16 @@ const SOCKET_SETTLE_MS = 2500;
 const SAFETY_POLL_MS = 20_000;
 const PENDING_CAP = 2000;
 
-const IDLE = { phase: "idle", progress: "", error: "", truncated: false, label: "", socket: "connecting", historyCount: 0 };
+const RECENT_PAGES = 2;
+
+/**
+ * `{ open }` from a host that wants markets to start light (the landing page's "Try it now"):
+ * while `open` is false, only the newest trades load; the full history follows once it opens.
+ * Without a provider every market reads its whole history straight away.
+ */
+export const TradeHistoryGateContext = createContext(null);
+
+const IDLE = { phase: "idle", progress: "", error: "", truncated: false, label: "", socket: "connecting", historyCount: 0, recent: false };
 
 function lower(value) {
   return String(value || "").toLowerCase();
@@ -67,6 +76,14 @@ function confirms(row, print) {
  * @returns {{ rows: object[], streamRows: object[], status: typeof IDLE }} rows newest first
  */
 export function useFusedMarketTrades(meta) {
+  const gate = useContext(TradeHistoryGateContext);
+  const held = !!gate && !gate.open;
+  const heldRef = useRef(held);
+  heldRef.current = held;
+  const wakeRef = useRef(null);
+  useEffect(() => {
+    if (!held) wakeRef.current?.();
+  }, [held]);
   const [rows, setRows] = useState([]);
   const [historyPages, setHistoryPages] = useState([]);
   const [status, setStatus] = useState(IDLE);
@@ -232,34 +249,102 @@ export function useFusedMarketTrades(meta) {
     const plan = planTradeSources(market);
     // Live + Historical hands back Live-shaped rows for every market, so prints and history share columns.
     const fusedPlan = plan.kind === "historical" ? { ...plan, kind: "live+historical" } : plan;
-    pullPolymarketTradeHistory(market, fusedPlan, {
-      signal,
-      onProgress: (progress) => {
-        if (!signal.aborted) setStatus((prev) => ({ ...prev, progress }));
-      },
-      onRows: (partial) => {
-        if (!signal.aborted && !historyDone) setHistoryPages(partial.rows);
-      },
-    })
-      .then((pulled) => {
-        if (signal.aborted) return;
-        const unique = [];
-        for (const row of pulled.rows) {
-          const key = tradeKey(row);
-          if (known.has(key)) continue;
-          known.add(key);
-          unique.push(row);
-        }
-        confirmed = unique.sort(byNewest);
-        newestSec = Number(confirmed[0]?.timestamp) || 0;
-        finishHistory({ truncated: !!pulled.truncated, label: pulled.label || "", historyCount: confirmed.length });
-      })
-      .catch((err) => {
-        if (signal.aborted || err?.name === "AbortError") return;
-        finishHistory({ error: `The full history didn't load (${err?.message || "pull failed"}). New trades still stream in.` });
+    const pullHistory = () =>
+      pullPolymarketTradeHistory(market, fusedPlan, {
+        signal,
+        onProgress: (progress) => {
+          if (!signal.aborted) setStatus((prev) => ({ ...prev, progress }));
+        },
+        onRows: (partial) => {
+          if (!signal.aborted && !historyDone) setHistoryPages(partial.rows);
+        },
       });
+    const keepNew = (list) => {
+      const unique = [];
+      for (const row of list) {
+        const key = tradeKey(row);
+        if (known.has(key)) continue;
+        known.add(key);
+        unique.push(row);
+      }
+      return unique;
+    };
+
+    const loadFullHistory = () =>
+      pullHistory()
+        .then((pulled) => {
+          if (signal.aborted) return;
+          confirmed = keepNew(pulled.rows).sort(byNewest);
+          newestSec = Number(confirmed[0]?.timestamp) || 0;
+          finishHistory({ truncated: !!pulled.truncated, label: pulled.label || "", historyCount: confirmed.length });
+        })
+        .catch((err) => {
+          if (signal.aborted || err?.name === "AbortError") return;
+          finishHistory({ error: `The full history didn't load (${err?.message || "pull failed"}). New trades still stream in.` });
+        });
+
+    // Behind a closed gate: the newest trades now, the rest of the history once the gate opens.
+    const loadRecentFirst = async () => {
+      const recent = [];
+      let cursor = "";
+      const end = freshTradesEnd();
+      try {
+        for (let page = 0; page < RECENT_PAGES; page += 1) {
+          const body = await polymarketGet(
+            "getTradesByMarket",
+            { condition: conditionId, limit: String(CATCH_UP_PAGE), end, ...(cursor ? { cursor } : {}) },
+            signal,
+            { retries: 2 },
+          );
+          const root = Array.isArray(body) ? body[0] : body;
+          const list = Array.isArray(root?.data) ? root.data.filter((item) => item && typeof item === "object") : [];
+          recent.push(...list.map((raw) => tradeSheetRow(raw, ref)));
+          cursor = String(root?.pagination?.next_cursor || "").trim();
+          if (!cursor || !list.length) break;
+        }
+      } catch (err) {
+        if (signal.aborted || err?.name === "AbortError") return;
+      }
+      if (signal.aborted) return;
+      confirmed = keepNew(recent).sort(byNewest);
+      newestSec = Number(confirmed[0]?.timestamp) || 0;
+      finishHistory({ recent: true, historyCount: confirmed.length });
+      const fillIn = () => {
+        wakeRef.current = null;
+        setStatus((prev) => ({ ...prev, progress: "Reading the full history" }));
+        pullHistory()
+          .then((pulled) => {
+            if (signal.aborted) return;
+            confirmed = confirmed.concat(keepNew(pulled.rows)).sort(byNewest);
+            newestSec = Math.max(newestSec, Number(confirmed[0]?.timestamp) || 0);
+            setStatus((prev) => ({
+              ...prev,
+              recent: false,
+              progress: "",
+              truncated: !!pulled.truncated,
+              label: pulled.label || "",
+              historyCount: confirmed.length,
+            }));
+            publishRows(true);
+          })
+          .catch((err) => {
+            if (signal.aborted || err?.name === "AbortError") return;
+            setStatus((prev) => ({
+              ...prev,
+              progress: "",
+              error: `The full history didn't load (${err?.message || "pull failed"}). New trades still stream in.`,
+            }));
+          });
+      };
+      if (heldRef.current) wakeRef.current = fillIn;
+      else fillIn();
+    };
+
+    if (heldRef.current) void loadRecentFirst();
+    else void loadFullHistory();
 
     return () => {
+      wakeRef.current = null;
       abort.abort();
       closeSocket();
       window.clearTimeout(rowsTimer);

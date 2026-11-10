@@ -23,7 +23,7 @@ function TradeLine({ trade }) {
   );
 }
 
-function TraderTradeToast({ name, trades, onPause, onView }) {
+export function TraderTradeToast({ name, trades, onPause, onView }) {
   const [first, ...rest] = trades;
   const more = rest.length;
   return (

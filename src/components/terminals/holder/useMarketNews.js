@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cleanTerms, mergeArticles } from "@/lib/newsQuery";
+import { useHolderDemoFeed } from "./holderDemoFeed";
 
 const SOURCES = ["google", "gdelt", "volume"];
 const POLL_MS = 60_000;
@@ -17,6 +18,10 @@ const EMPTY = [];
 
 const store = new Map();
 
+function fetchNews(source, params, signal) {
+  return fetch(`/api/news?${params}`, { signal }).then((res) => res.json());
+}
+
 /**
  * Headlines and article counts mentioning every one of `terms` over `win` (`{ start, end, live }`),
  * from Google News and GDELT merged. A live window runs to now and re-checks every minute;
@@ -30,6 +35,8 @@ export function useMarketNews(terms, win) {
   const [results, setResults] = useState({});
   const [arrivals, setArrivals] = useState(() => new Map());
   const watch = useRef({ termsKey: "", since: 0, ids: new Set() });
+  const feed = useHolderDemoFeed();
+  const request = feed?.news || fetchNews;
 
   useEffect(() => {
     setResults({});
@@ -56,19 +63,18 @@ export function useMarketNews(terms, win) {
       const params = new URLSearchParams({ source, start: String(start), end: String(stop) });
       for (const term of termsKey.split("\u0001")) params.append("terms", term);
       const key = params.toString();
-      const hit = store.get(key);
+      const hit = feed ? null : store.get(key);
       if (hit && Date.now() - hit.at < (live ? FRESH_MS.live : FRESH_MS.past)) {
         put(source, { ...hit.result, loading: false });
         return;
       }
       put(source, { loading: true });
-      fetch(`/api/news?${key}`, { signal: controller.signal })
-        .then((res) => res.json())
+      request(source, key, controller.signal)
         .then((result) => {
           if (cancelled) return;
           const usable = result.status === "ok" || result.status === "out_of_range";
           if (usable) {
-            store.set(key, { result, at: Date.now() });
+            if (!feed) store.set(key, { result, at: Date.now() });
             setResults((prev) => ({ ...prev, [source]: { ...result, loading: false } }));
             return;
           }
@@ -94,7 +100,7 @@ export function useMarketNews(terms, win) {
       if (poll) window.clearInterval(poll);
       for (const id of timers) window.clearTimeout(id);
     };
-  }, [termsKey, start, end, live]);
+  }, [termsKey, start, end, live, feed, request]);
 
   const google = results.google?.articles;
   const gdelt = results.gdelt?.articles;

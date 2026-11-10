@@ -70,7 +70,7 @@ function Suggestions({ markets, current, onPick, frozen }) {
  * Search, live suggestions, the browsers and the two ways in. Typing, focusing or picking freezes
  * the suggestions so they never move under the visitor.
  */
-export function HeroTools({ page, suggestions, market, subject, onPick, onExample, ctaRef }) {
+export function HeroTools({ page, suggestions, market, subject, onPick, onExample, ctaRef, ctas = true }) {
   const hero = page.hero;
   const [frozen, setFrozen] = useState(false);
   const [browse, setBrowse] = useState(null);
@@ -135,23 +135,25 @@ export function HeroTools({ page, suggestions, market, subject, onPick, onExampl
           </div>
         </div>
       ) : null}
-      <div ref={ctaRef} className="flex flex-col gap-2.5 pt-1">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link href={holderTerminalHref(subject)} prefetch={false} className={cn(PRIMARY_CTA, "h-12 px-6 text-base font-normal")}>
-            Open the free terminal
-            <span aria-hidden>→</span>
-          </Link>
-          <a
-            href={`#${hero.exampleTarget}`}
-            onClick={onExample}
-            className="flex h-12 items-center justify-center gap-1.5 rounded-full border border-border bg-muted px-6 text-base font-normal text-primary transition-all ease-out hover:bg-muted/70 active:scale-95"
-          >
-            {hero.exampleAction}
-            <span aria-hidden>↓</span>
-          </a>
+      {ctas ? (
+        <div ref={ctaRef} className="flex flex-col gap-2.5 pt-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href={holderTerminalHref(subject)} prefetch={false} className={cn(PRIMARY_CTA, "h-12 px-6 text-base font-normal")}>
+              Open the free terminal
+              <span aria-hidden>→</span>
+            </Link>
+            <a
+              href={`#${hero.exampleTarget}`}
+              onClick={onExample}
+              className="flex h-12 items-center justify-center gap-1.5 rounded-full border border-border bg-muted px-6 text-base font-normal text-primary transition-all ease-out hover:bg-muted/70 active:scale-95"
+            >
+              {hero.exampleAction}
+              <span aria-hidden>↓</span>
+            </a>
+          </div>
+          <p className="text-[12.5px] text-muted-foreground">{FREE_NOTE}</p>
         </div>
-        <p className="text-[12.5px] text-muted-foreground">{FREE_NOTE}</p>
-      </div>
+      ) : null}
     </div>
   );
 }

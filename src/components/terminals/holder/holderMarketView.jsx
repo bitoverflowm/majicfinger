@@ -48,6 +48,16 @@ function HistoryStatus({ status, count }) {
       </span>
     );
   }
+  if (status.recent) {
+    return (
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] text-muted-foreground">
+        {status.progress ? <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden /> : null}
+        <span className="truncate">
+          Newest {count.toLocaleString()} trades · {status.progress || "the full history loads once you start exploring"}
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="min-w-0 truncate text-[12px] text-muted-foreground">
       {count.toLocaleString()} trades, first to latest

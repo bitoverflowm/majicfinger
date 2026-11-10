@@ -540,7 +540,7 @@ export const HOLDER_LANDING_PAGES = {
     },
     hero: {
       label: "Lychee Holder Terminal",
-      title: "Who's trading on Polymarket?",
+      title: "The Ultimate Trader Intelligence Terminal for Polymarket",
       description:
         "Pick a market to see its trades, headlines, and largest holders. Or start with a trader to see which positions made or lost them money.",
       scopes: ["markets", "traders"],

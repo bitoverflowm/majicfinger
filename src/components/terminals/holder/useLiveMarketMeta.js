@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { resolvePolymarketMarket } from "@/components/dashboardComposer/recipes/polymarketTradeHistorySource";
 import { openPolymarketQuoteSocket } from "@/lib/polymarketLive/openPolymarketMarketSocket";
+import { useHolderDemoFeed } from "./holderDemoFeed";
 
 const META_REFRESH_MS = 30_000;
 const QUOTE_FLUSH_MS = 400;
@@ -15,6 +16,8 @@ export function useLiveMarketMeta(conditionId) {
   const [error, setError] = useState("");
   const [quotes, setQuotes] = useState({});
   const [refreshedAt, setRefreshedAt] = useState(0);
+  const feed = useHolderDemoFeed();
+  const resolve = feed?.market || resolvePolymarketMarket;
 
   useEffect(() => {
     if (!conditionId) return undefined;
@@ -24,7 +27,7 @@ export function useLiveMarketMeta(conditionId) {
     setError("");
     setQuotes({});
     const load = (first) =>
-      resolvePolymarketMarket(conditionId, abort.signal)
+      resolve(conditionId, abort.signal)
         .then((next) => {
           if (abort.signal.aborted) return;
           setMeta(next);
@@ -43,12 +46,13 @@ export function useLiveMarketMeta(conditionId) {
       abort.abort();
       window.clearTimeout(timer);
     };
-  }, [conditionId]);
+  }, [conditionId, resolve]);
 
   const tokensKey = (meta?.tokenIds || []).join(",");
   const pendingQuotes = useRef({});
+  const quiet = !!feed?.quiet;
   useEffect(() => {
-    if (!tokensKey || meta?.closed) return undefined;
+    if (!tokensKey || meta?.closed || quiet) return undefined;
     let timer = 0;
     pendingQuotes.current = {};
     const flush = () => {
@@ -68,7 +72,7 @@ export function useLiveMarketMeta(conditionId) {
       close();
       window.clearTimeout(timer);
     };
-  }, [tokensKey, meta?.closed]);
+  }, [tokensKey, meta?.closed, quiet]);
 
   return { meta, error, quotes, refreshedAt };
 }
