@@ -5,16 +5,26 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import * as SliderPrimitive from "@radix-ui/react-slider";
+import { toast } from "sonner";
 import { ArrowLeft, BarChart3, Check, ChevronDown, ChevronRight, Database, Eye, Loader2, Play, Radio, RotateCcw, RotateCw, Save, SlidersHorizontal, Square, Table2, Type } from "lucide-react";
 import { ProvenanceMapButton } from "@/components/dashboardComposer/provenanceMap";
 import { PROJECTS_PATH, previewUrlForProject, useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
 import { captureProjectThumbnail } from "@/lib/projectThumbnail";
+import { retryImport } from "@/lib/retryImport";
 
 const DashboardShareDialog = dynamic(() =>
-  import("@/components/dashboardComposer/DashboardShareDialog").then((m) => m.DashboardShareDialog),
+  retryImport(() => import("@/components/dashboardComposer/DashboardShareDialog")).then((m) => m.DashboardShareDialog),
 );
 
+function ShareFailed() {
+  useEffect(() => {
+    toast.error("Sharing couldn't open. Reload the page and try again.");
+  }, []);
+  return null;
+}
+
 import { Button } from "@/components/ui/button";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
@@ -747,10 +757,12 @@ function RightChromeControls({ onLogout, expanded }) {
   const landingDemo = !!useMyStateV2()?.landingDemo;
   const [shareOpen, setShareOpen] = useState(false);
   const [shareMounted, setShareMounted] = useState(false);
+  const [shareTries, setShareTries] = useState(0);
   const [membersOnly, setMembersOnly] = useState("");
   const [saveTipForced, setSaveTipForced] = useState(false);
   const openShare = () => {
     setShareMounted(true);
+    setShareTries((count) => count + 1);
     setShareOpen(true);
   };
   const lockedAs = (feature) => (landingDemo ? () => setMembersOnly(feature) : undefined);
@@ -812,7 +824,11 @@ function RightChromeControls({ onLogout, expanded }) {
         Share
       </button>
       </ChromeTip>
-      {shareMounted && <DashboardShareDialog open={shareOpen} onOpenChange={setShareOpen} />}
+      {shareMounted && (
+        <ErrorBoundary name="DashboardShareDialog" resetKey={shareTries} fallback={ShareFailed}>
+          <DashboardShareDialog open={shareOpen} onOpenChange={setShareOpen} />
+        </ErrorBoundary>
+      )}
       <LandingDemoMembersOnlyPortal open={!!membersOnly} feature={membersOnly} onClose={() => setMembersOnly("")} />
     </div>
     </TooltipProvider>

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useUser } from "@/lib/hooks";
 import { useRouter } from "next/navigation";
 import Login from "@/components/login";
+import { WORKSPACE_ENTRY_PATH } from "@/lib/workspaceEntry";
 
 const LoginPage = () => {
   const user = useUser();
@@ -11,7 +12,7 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (user) {
-      router.push("/dashboard");
+      router.replace(WORKSPACE_ENTRY_PATH);
     }
   }, [user]);
 

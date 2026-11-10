@@ -107,6 +107,8 @@ const USD_COMPACT = new Intl.NumberFormat("en-US", { style: "currency", currency
 const SHARES = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const SHARES_COMPACT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 const RANK_COMPACT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+/** Fits the 48px rank cell: −$940, −$1.2K, −$190K, −$2M. */
+const LOSS_SHORT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumSignificantDigits: 2 });
 
 function usd(value) {
   if (!Number.isFinite(value)) return "—";
@@ -150,7 +152,7 @@ function Pending() {
 const GRID = "280px 96px 84px 88px 72px 64px 92px 92px 92px 92px";
 
 const COLUMNS = [
-  { key: "trader", label: "Leaderboard · Holder", className: "pl-3", title: "All-time PnL rank on the Polymarket leaderboard, then the holder" },
+  { key: "trader", label: "Leaderboard · Holder", className: "pl-3", title: "All-time PnL rank on the Polymarket leaderboard (wallets that lost money show the loss in red instead), then the holder" },
   {
     key: "score",
     label: (
@@ -173,8 +175,23 @@ const COLUMNS = [
   { key: "bought", label: "Bought", right: true, className: "pr-3", title: "Total shares of this outcome ever bought" },
 ];
 
+/**
+ * Polymarket ranks every wallet by all-time PnL, so anyone who has lost money sits near the bottom
+ * at about #3M. That number says nothing, so a losing wallet shows its loss instead.
+ */
 function LeaderboardRank({ detail }) {
   if (detail === undefined) return <Pending />;
+  const volume = detail?.volumeRank ? ` · #${detail.volumeRank.toLocaleString()} by volume` : "";
+  if (Number.isFinite(detail?.pnl) && detail.pnl < -0.5) {
+    return (
+      <span
+        className="font-mono tabular-nums text-rose-600 dark:text-rose-400"
+        title={`Down ${USD.format(Math.abs(detail.pnl))} all time, so Polymarket ranks this wallet near the bottom${detail.pnlRank ? ` (#${detail.pnlRank.toLocaleString()} by PnL)` : ""}${volume}`}
+      >
+        −{LOSS_SHORT.format(Math.abs(detail.pnl))}
+      </span>
+    );
+  }
   if (!detail?.pnlRank) {
     return (
       <span className="text-muted-foreground opacity-60" title="Not ranked on the all-time leaderboard">
@@ -185,7 +202,7 @@ function LeaderboardRank({ detail }) {
   return (
     <span
       className={cn("font-mono tabular-nums", detail.pnlRank <= 100 ? "font-semibold text-amber-600 dark:text-amber-300" : "text-foreground")}
-      title={`#${detail.pnlRank.toLocaleString()} by all-time PnL${detail.volumeRank ? ` · #${detail.volumeRank.toLocaleString()} by volume` : ""}`}
+      title={`#${detail.pnlRank.toLocaleString()} by all-time PnL${Number.isFinite(detail.pnl) ? `, up ${USD.format(detail.pnl)}` : ""}${volume}`}
     >
       #{detail.pnlRank >= 100_000 ? RANK_COMPACT.format(detail.pnlRank) : detail.pnlRank.toLocaleString()}
     </span>

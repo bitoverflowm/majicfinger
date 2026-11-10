@@ -2,9 +2,14 @@
 
 import { forwardRef, useState } from "react";
 import { GripVertical, Maximize2, Minimize2, X } from "lucide-react";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { cn } from "@/lib/utils";
 import { PIECE_KIND_LABEL } from "./shareLibrary";
 import { SharePiece } from "./SharePiece";
+
+function PieceFailed() {
+  return <p className="flex flex-1 items-center justify-center px-4 text-center text-[12px] text-muted-foreground">This piece couldn&apos;t be drawn. Remove it or pick another.</p>;
+}
 
 /** Card sizes in layout pixels; `scale` takes them to the exported image. */
 export const SHARE_FORMATS = {
@@ -77,7 +82,13 @@ function Slot({ item, piece, headline, editable, dragging, onDragStart, onDragEn
         </p>
         {tag ? <p className="min-w-0 flex-1 truncate text-right text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">{tag}</p> : null}
       </div>
-      <div className="pointer-events-none flex min-h-0 flex-1 flex-col">{piece ? <SharePiece piece={piece} /> : null}</div>
+      <div className="pointer-events-none flex min-h-0 flex-1 flex-col">
+        {piece ? (
+          <ErrorBoundary name="SharePiece" resetKey={piece} fallback={<PieceFailed />}>
+            <SharePiece piece={piece} />
+          </ErrorBoundary>
+        ) : null}
+      </div>
       {editable ? (
         <div
           {...{ [SHARE_CHROME]: "" }}

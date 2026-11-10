@@ -574,6 +574,30 @@ function columnIds(sheet) {
   return new Set((sheet?.columns || []).map((column) => columnKey(column)).filter(Boolean));
 }
 
+/**
+ * Whole-sheet scans, kept per rows object. Sheets are replaced rather than edited,
+ * so an unchanged sheet re-renders without walking its rows again.
+ */
+const scans = new WeakMap();
+
+function rowsSource(sheet) {
+  if (Array.isArray(sheet?.records) && sheet.records.length) return sheet.records;
+  return sheet?.cells && typeof sheet.cells === "object" ? sheet.cells : null;
+}
+
+function cachedScan(sheet, key, compute) {
+  const source = rowsSource(sheet);
+  if (!source) return compute();
+  const fullKey = source === sheet.records ? key : `${key}\u0002${(sheet.columns || []).map(columnKey).join("\u0001")}`;
+  let entry = scans.get(source);
+  if (!entry) {
+    entry = new Map();
+    scans.set(source, entry);
+  }
+  if (!entry.has(fullKey)) entry.set(fullKey, compute());
+  return entry.get(fullKey);
+}
+
 /** A saved descriptor still fits when its label, value, price, and series keys are columns on the sheet. */
 function descriptorFitsSheet(sheet, dataset) {
   const ids = columnIds(sheet);
@@ -601,13 +625,15 @@ export function countSeries(sheet, keys) {
   const ids = columnIds(sheet);
   const present = wanted.filter((key) => ids.has(key));
   if (!present.length) return 1;
-  const seen = new Set();
-  for (const row of sheetRecords(sheet)) {
-    const parts = present.map((key) => String(row?.[key] ?? "").trim());
-    if (parts.every((part) => !part)) continue;
-    seen.add(parts.join("\u0001"));
-  }
-  return seen.size || 1;
+  return cachedScan(sheet, `series\u0000${present.join("\u0001")}`, () => {
+    const seen = new Set();
+    for (const row of sheetRecords(sheet)) {
+      const parts = present.map((key) => String(row?.[key] ?? "").trim());
+      if (parts.every((part) => !part)) continue;
+      seen.add(parts.join("\u0001"));
+    }
+    return seen.size || 1;
+  });
 }
 
 /**
@@ -648,6 +674,10 @@ export function describeSheet(sheet) {
 /** Rows keyed by the sheet's own column ids. Stored records win over the formatted grid. */
 export function sheetRecords(sheet) {
   if (Array.isArray(sheet?.records) && sheet.records.length) return sheet.records;
+  return cachedScan(sheet, "records", () => recordsFromCells(sheet));
+}
+
+function recordsFromCells(sheet) {
   const columns = Array.isArray(sheet?.columns) ? sheet.columns : [];
   const cells = sheet?.cells && typeof sheet.cells === "object" ? sheet.cells : {};
   const rowIndexes = new Set();
@@ -665,14 +695,22 @@ export function sheetRecords(sheet) {
   });
 }
 
-/** Filled observations of the descriptor's price, close, or value field. */
-export function countObservations(sheet, dataset) {
+/** Filled observations of the descriptor's price, close, or value field. Counting stops at `atMost`. */
+export function countObservations(sheet, dataset, atMost = Infinity) {
   const field = dataset?.fields?.price || dataset?.fields?.close || dataset?.fields?.value;
   const records = sheetRecords(sheet);
-  if (!field) return records.length;
+  if (!field) return Math.min(records.length, atMost);
   const fallback = dataset?.fields?.close ? dataset.fields.previous : "";
-  const filled = (row, key) => Boolean(key) && String(row?.[key] ?? "").trim() !== "";
-  return records.filter((row) => filled(row, field) || filled(row, fallback)).length;
+  return cachedScan(sheet, `observations\u0000${field}\u0000${fallback || ""}\u0000${atMost}`, () => {
+    const filled = (row, key) => Boolean(key) && String(row?.[key] ?? "").trim() !== "";
+    let count = 0;
+    for (const row of records) {
+      if (!filled(row, field) && !filled(row, fallback)) continue;
+      count += 1;
+      if (count >= atMost) break;
+    }
+    return count;
+  });
 }
 
 /** Attach the endpoint descriptor onto a sheet that is about to be saved. */

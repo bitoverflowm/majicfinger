@@ -139,6 +139,48 @@ async function get(key) {
   }
 }
 
+/**
+ * IndexedDB copies values on the main thread, about 3 seconds for 500k rows in one go.
+ * Rows go in chunks with a pause between, so the page keeps responding.
+ */
+const CHUNK_ROWS = 10000;
+
+const pause = () => new Promise((resolve) => window.setTimeout(resolve, 0));
+
+const chunkKey = (key, index) => `${key}#${index}`;
+
+async function writeRecords(key, block) {
+  const records = block.records;
+  const chunks = Math.ceil(records.length / CHUNK_ROWS);
+  // No entry while chunks are mid-write, so a reload never reads half old, half new rows.
+  await put(key, null);
+  for (let index = 0; index < chunks; index += 1) {
+    if (written.get(key) !== records) return;
+    await put(chunkKey(key, index), records.slice(index * CHUNK_ROWS, (index + 1) * CHUNK_ROWS));
+    await pause();
+  }
+  if (written.get(key) !== records) return;
+  await put(key, {
+    pulledAt: Number(block.pulledAt) || 0,
+    columns: columnsKey(block.columns),
+    rows: records.length,
+    bytes: records.length * bytesPerRow(records),
+    chunks,
+  });
+}
+
+async function readRecords(entry, key) {
+  if (Array.isArray(entry.records)) return entry.records;
+  const out = [];
+  for (let index = 0; index < (entry.chunks || 0); index += 1) {
+    const part = await get(chunkKey(key, index));
+    if (!Array.isArray(part)) return null;
+    for (const row of part) out.push(row);
+    await pause();
+  }
+  return out.length === entry.rows ? out : null;
+}
+
 const written = new Map();
 const timers = new Map();
 
@@ -154,11 +196,7 @@ export function rememberSheetRecords(owner, trimmed) {
       key,
       window.setTimeout(() => {
         timers.delete(key);
-        void put(key, {
-          pulledAt: Number(block.pulledAt) || 0,
-          columns: columnsKey(block.columns),
-          records: block.records,
-        });
+        void writeRecords(key, block);
       }, 1500),
     );
   }
@@ -169,9 +207,65 @@ export async function restoreSheetRecords(owner, pageId, block) {
   if (!owner || !Array.isArray(block?.records)) return null;
   const key = cacheKey(owner, pageId, block.id);
   const entry = await get(key);
-  if (!entry || !Array.isArray(entry.records)) return null;
+  if (!entry) return null;
   if (entry.pulledAt !== (Number(block.pulledAt) || 0) || entry.columns !== columnsKey(block.columns)) return null;
-  if (entry.records.length <= block.records.length) return null;
-  written.set(key, entry.records);
-  return entry.records;
+  const rows = Array.isArray(entry.records) ? entry.records.length : entry.rows || 0;
+  if (rows <= block.records.length) return null;
+  const records = await readRecords(entry, key);
+  if (!records) return null;
+  written.set(key, records);
+  return records;
+}
+
+/** Drops every sheet this browser kept for a tab. Resolves to the bytes freed. */
+export async function forgetSheetRecords(owner, pageId) {
+  if (!owner || !pageId) return 0;
+  const prefix = cacheKey(owner, pageId, "");
+  for (const key of [...written.keys()]) {
+    if (!key.startsWith(prefix)) continue;
+    written.delete(key);
+    window.clearTimeout(timers.get(key));
+    timers.delete(key);
+  }
+  try {
+    const db = await openDb();
+    return await new Promise((resolve, reject) => {
+      let bytes = 0;
+      const tx = db.transaction("sheets", "readwrite");
+      const store = tx.objectStore("sheets");
+      const request = store.openCursor(IDBKeyRange.bound(prefix, `${prefix}\uffff`));
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const value = cursor.value;
+        if (value && !Array.isArray(value)) {
+          bytes += Number(value.bytes) || (Array.isArray(value.records) ? value.records.length * bytesPerRow(value.records) : 0);
+        }
+        cursor.delete();
+        cursor.continue();
+      };
+      tx.oncomplete = () => resolve(bytes);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    return 0;
+  }
+}
+
+/** Roughly what a tab's blocks take up, without serializing big sheets. */
+export function estimateBlocksBytes(blocks) {
+  let bytes = 0;
+  for (const block of Array.isArray(blocks) ? blocks : []) {
+    if (!block || typeof block !== "object") continue;
+    const records = sheetRecords(block);
+    const { records: _records, cells, ...rest } = block;
+    try {
+      bytes += JSON.stringify(rest).length;
+    } catch {
+      // A block that cannot serialize adds nothing.
+    }
+    if (records) bytes += records.length * bytesPerRow(records);
+    else if (cells && typeof cells === "object") bytes += JSON.stringify(cells).length;
+  }
+  return bytes;
 }

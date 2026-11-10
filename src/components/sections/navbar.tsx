@@ -15,6 +15,7 @@ import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefIsInPageScrollSp
 import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/lib/hooks";
+import { WORKSPACE_ENTRY_PATH } from "@/lib/workspaceEntry";
 import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient";
 import { interceptOnCompactScreen } from "@/lib/desktopOnly";
 import { requestLandingDemoActivateAfterScroll } from "@/lib/landingDemoSession";
@@ -253,12 +254,12 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                   <>
                     <Link
                       className="h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-fit px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"
-                      href="/dashboard"
+                      href={WORKSPACE_ENTRY_PATH}
                     >
                       Dashboard
                     </Link>
                     <Link
-                      href="/dashboard"
+                      href={WORKSPACE_ENTRY_PATH}
                       className="hidden md:flex items-center justify-center h-8 w-8 rounded-full border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95 overflow-hidden"
                       aria-label="Open dashboard"
                     >
@@ -408,7 +409,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                   ) : (
                     <>
                       <Link
-                        href="/dashboard"
+                        href={WORKSPACE_ENTRY_PATH}
                         className="h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-full px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"
                       >
                         Dashboard

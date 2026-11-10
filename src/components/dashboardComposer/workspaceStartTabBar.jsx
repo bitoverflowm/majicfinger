@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { Copy, MoreVertical, Pencil } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,6 +28,22 @@ import { terminalTabField } from "@/lib/workspaceTerminals";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { useUser } from "@/lib/hooks";
+import { toast } from "sonner";
+
+/** Matches the `lychee-tab-burn` animation in globals.css. */
+const TAB_BURN_MS = 460;
+
+function formatBytes(bytes) {
+  const units = ["bytes", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  if (!unit) return `${Math.round(value)} bytes`;
+  return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+}
 
 function StartTabChip({ tab, selected, userId, onSelect }) {
   const context = useMyStateV2();
@@ -91,7 +107,7 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
     });
   };
 
-  const remove = () => {
+  const removeNow = () => {
     const state = current();
     const index = state.tabs.findIndex((item) => item.id === tab.id);
     const tabs = state.tabs.filter((item) => item.id !== tab.id);
@@ -100,16 +116,40 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
     const activeId =
       state.activeId === tab.id ? neighbor?.id || null : state.activeId;
     persist({ welcomeRemoved, tabs, activeId });
-    canvas?.deleteTab?.(tab.id);
-    setMenuOpen(false);
+    const name = tab.name || "tab";
+    void Promise.resolve(canvas?.deleteTab?.(tab.id))
+      .catch(() => 0)
+      .then((bytes) => {
+        toast.success(bytes > 0 ? `Successfully deleted ${name}, cleared up ${formatBytes(bytes)}` : `Successfully deleted ${name}`);
+      });
     if (state.activeId === tab.id) {
       if (neighbor) onSelect?.(neighbor.id);
       else context?.setViewing?.("connectDataHome");
     }
   };
 
+  const rootRef = useRef(null);
+  const [burn, setBurn] = useState(null);
+  const remove = () => {
+    setMenuOpen(false);
+    if (burn) return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    setBurn({ width: rootRef.current?.offsetWidth || 0, collapsed: false });
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => setBurn((prev) => prev && { ...prev, collapsed: true })));
+    window.setTimeout(removeNow, reduced ? 180 : TAB_BURN_MS);
+  };
+
   return (
-    <div className="group/tab relative inline-flex shrink-0">
+    <div
+      ref={rootRef}
+      className={cn(
+        "group/tab relative inline-flex shrink-0",
+        burn && "pointer-events-none overflow-hidden transition-[max-width,margin-right] duration-200 ease-in [transition-delay:260ms]",
+      )}
+      style={burn ? { maxWidth: burn.collapsed ? 0 : burn.width, marginRight: burn.collapsed ? -6 : 0 } : undefined}
+      aria-hidden={burn ? true : undefined}
+    >
+      {burn ? <span aria-hidden className="lychee-tab-ember pointer-events-none absolute inset-0 z-10 rounded-md" /> : null}
       {renaming ? (
         <input
           ref={inputRef}
@@ -143,6 +183,7 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
               : "bg-background text-muted-foreground transition-[padding-right,color,background-color] duration-200 hover:bg-muted hover:text-foreground",
             menuOpen && "pr-6",
             "group-hover/tab:pr-6 group-focus-within/tab:pr-6",
+            burn && "lychee-tab-burn",
           )}
         >
           {tab.name}
@@ -161,7 +202,8 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
-                onSelect?.(tab.id);
+                // Opening a tab mounts its blocks; the menu shows first and the switch follows.
+                startTransition(() => onSelect?.(tab.id));
               }}
             >
               <MoreVertical className="size-3.5" />

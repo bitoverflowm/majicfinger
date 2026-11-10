@@ -48,7 +48,8 @@ import {
   workspaceProjectThumbnailUrl,
 } from "@/lib/workspaceDashboardClient";
 import { forgetWorkspaceProject, rememberWorkspaceProject } from "@/lib/workspaceProjectScope";
-import { dashboardUrlForProject } from "@/components/projects/workspaceProjectContext";
+import { dashboardUrlForProject, PROJECTS_PATH } from "@/components/projects/workspaceProjectContext";
+import { ENTRY_PARAM } from "@/lib/workspaceEntry";
 import { cn } from "@/lib/utils";
 
 const VIEW_KEY = "lycheeProjectsView";
@@ -328,6 +329,15 @@ export default function ProjectsView({ user }) {
     if (result.unauthorized) {
       router.replace("/login");
       return;
+    }
+    const entry = typeof window !== "undefined" && new URLSearchParams(window.location.search).has(ENTRY_PARAM);
+    if (entry) {
+      // Arriving from sign-in or a Dashboard link: someone with nothing saved yet starts on the dashboard and its walkthrough.
+      if (result.ok && !result.hasWork) {
+        router.replace("/dashboard");
+        return;
+      }
+      router.replace(PROJECTS_PATH);
     }
     if (!result.ok) {
       setLoadError(result.message);

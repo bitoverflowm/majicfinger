@@ -106,7 +106,7 @@ export async function listWorkspaceProjects() {
   if (!res.ok || !json?.success) {
     return { ok: false, message: json?.message || "Could not load your projects." };
   }
-  return { ok: true, data: Array.isArray(json.data) ? json.data : [] };
+  return { ok: true, data: Array.isArray(json.data) ? json.data : [], hasWork: json.has_work !== false };
 }
 
 /** One project's summary: `id`, or the one opened last. `data` is null when there is none. */

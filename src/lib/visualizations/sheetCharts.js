@@ -19,7 +19,7 @@ export function chartSpecsForSheet(sheet, forcedView) {
   const dataset = describeSheet(sheet);
   const resolved = resolveVisualization(dataset, {
     columnIds: (sheet?.columns || []).map((column) => columnKey(column)).filter(Boolean),
-    observations: dataset ? countObservations(sheet, dataset) : undefined,
+    observations: dataset ? countObservations(sheet, dataset, 2) : undefined,
   });
   const base = String(sheet?.title || "Sheet").replace(/\s+chart$/, "").trim() || "Sheet";
   const requested = String(forcedView || sheet?.pull?.chartView || "").trim();

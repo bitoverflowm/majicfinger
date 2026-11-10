@@ -10,6 +10,7 @@ const CONCURRENCY = 4;
 /**
  * wallet|conditionId → {
  *   pnlRank, volumeRank: all-time leaderboard ranks, null when unranked;
+ *   pnl: all-time PnL in USDC, null when unknown;
  *   firstTradeHere: whether the wallet's first trade ever was in this market, null when unknown;
  *   bought: total shares ever bought of each outcome;
  *   score: the Lychee trader score outside this market, null with no finished positions, undefined when it failed;
@@ -42,9 +43,11 @@ async function lookUp(wallet, conditionId, tokenIds) {
     const size = Number(position?.total_size);
     return Number.isFinite(size) ? size : 0;
   });
+  const pnl = entry?.pnl == null || entry.pnl === "" ? NaN : Number(entry.pnl);
   return {
     pnlRank: rank(entry?.rank_pnl),
     volumeRank: rank(entry?.rank_volume),
+    pnl: Number.isFinite(pnl) ? pnl : null,
     firstTradeHere:
       first.status !== "fulfilled" ? null : firstTrade ? String(firstTrade.condition_id || "").toLowerCase() === conditionId.toLowerCase() : null,
     bought,

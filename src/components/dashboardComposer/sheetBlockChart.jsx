@@ -104,7 +104,20 @@ function isTradeSheet(sheet) {
   return titles.includes("yes price") && titles.some((entry) => entry.includes("created"));
 }
 
+/** Kept per rows object and column list, so chart memos see the same rows until the sheet changes. */
+const matrices = new WeakMap();
+
 function matrixFromCells(sheet) {
+  const source = Array.isArray(sheet?.records) && sheet.records.length ? sheet.records : sheet?.cells;
+  if (!source || typeof source !== "object") return buildMatrix(sheet);
+  const known = matrices.get(source);
+  if (known && known.columns === sheet.columns) return known.rows;
+  const rows = buildMatrix(sheet);
+  matrices.set(source, { columns: sheet.columns, rows });
+  return rows;
+}
+
+function buildMatrix(sheet) {
   const columns = sheet?.columns || [];
   if (Array.isArray(sheet?.records) && sheet.records.length) {
     return sheet.records.map((row) =>
@@ -497,7 +510,8 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
         userView: view,
         custom: Boolean(view) && !(usesStatCards(dataset) && !vizCustom),
         columnIds,
-        observations: countObservations(sheet, dataset),
+        // The view only asks whether there are none, one, or several.
+        observations: countObservations(sheet, dataset, 2),
       })
     : null;
   if (resolved?.view === "stat-cards") {

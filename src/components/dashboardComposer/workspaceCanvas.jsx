@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, memo, startTransition, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { BarChart3, Copy, Database, Download, Lock, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
@@ -98,6 +98,8 @@ import {
 } from "@/components/dashboardComposer/dashboardSaveDiff";
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
 import {
+  estimateBlocksBytes,
+  forgetSheetRecords,
   rememberSheetRecords,
   restoreSheetRecords,
   savedBlocksByPage,
@@ -359,6 +361,18 @@ function mergeLoadedTabs(prev, loaded) {
     next[page] = added.length ? [...list, ...added] : list;
   }
   return next;
+}
+
+/** Runs work once the next frame has painted, so each step shows before the next starts. */
+function afterPaint(work, delay = 0) {
+  let timer = 0;
+  const frame = window.requestAnimationFrame(() => {
+    timer = window.setTimeout(work, delay);
+  });
+  return () => {
+    window.cancelAnimationFrame(frame);
+    window.clearTimeout(timer);
+  };
 }
 
 /** Runs work when the browser is idle, so background tab loads never compete with the tab on screen. */
@@ -828,45 +842,74 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
     return () => window.clearTimeout(timer);
   }, [activeTabId, blocksByPage, dashboardName, flushSave, owner, readOnly, ready, saveNonce, tables, tabs, welcomeRemoved]);
 
+  // Live sheets change every tick, so the tab's local copy is written when the browser is idle.
+  // A write still waiting when the tab changes or the page closes goes out first.
+  const localWriteRef = useRef(null);
   useEffect(() => {
-    if (readOnly || !ready || !storageKey) return;
-    const saved = savedBlocksByPage({ [pageId]: blocks });
-    rememberSheetRecords(owner, saved.trimmed);
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(saved.blocksByPage[pageId] || []));
-    } catch {
-      // The full dashboard document is the copy that survives a reload.
-    }
+    if (readOnly || !ready || !storageKey) return undefined;
+    const previous = localWriteRef.current;
+    if (previous && previous.key !== storageKey) previous.run();
+    const write = {
+      key: storageKey,
+      run: () => {
+        if (localWriteRef.current === write) localWriteRef.current = null;
+        const saved = savedBlocksByPage({ [pageId]: blocks });
+        rememberSheetRecords(owner, saved.trimmed);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(saved.blocksByPage[pageId] || []));
+        } catch {
+          // The full dashboard document is the copy that survives a reload.
+        }
+      },
+    };
+    localWriteRef.current = write;
+    let cancelIdle;
+    const timer = window.setTimeout(() => {
+      cancelIdle = whenIdle(write.run, 3000);
+    }, 600);
+    return () => {
+      window.clearTimeout(timer);
+      cancelIdle?.();
+    };
   }, [blocks, owner, pageId, readOnly, ready, storageKey]);
+  useEffect(() => {
+    const flush = () => localWriteRef.current?.run();
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
 
+  // Full rows come back only for the tab on screen; a tab loaded in the background keeps its saved rows until opened.
   const restoredRef = useRef(new Set());
   useEffect(() => {
     if (!ready || !owner) return;
-    for (const [page, list] of Object.entries(blocksByPage)) {
-      for (const block of Array.isArray(list) ? list : []) {
-        if (block?.type !== "sheet" || !Array.isArray(block.records)) continue;
-        if (!(Number(block.rowCount) > block.records.length)) continue;
-        const mark = `${page}:${block.id}:${block.pulledAt || 0}`;
-        if (restoredRef.current.has(mark)) continue;
-        restoredRef.current.add(mark);
-        void restoreSheetRecords(owner, page, block).then((records) => {
-          if (!records) return;
-          setBlocksByPage((prev) => {
-            const current = prev[page];
-            if (!Array.isArray(current)) return prev;
-            let hit = false;
-            const next = current.map((item) => {
-              if (item.id !== block.id || (item.pulledAt || 0) !== (block.pulledAt || 0)) return item;
-              if (!Array.isArray(item.records) || item.records.length >= records.length) return item;
-              hit = true;
-              return { ...item, records };
-            });
-            return hit ? { ...prev, [page]: next } : prev;
+    const page = pageId;
+    const list = blocksByPage[page];
+    for (const block of Array.isArray(list) ? list : []) {
+      if (block?.type !== "sheet" || !Array.isArray(block.records)) continue;
+      if (!(Number(block.rowCount) > block.records.length)) continue;
+      const mark = `${page}:${block.id}:${block.pulledAt || 0}`;
+      if (restoredRef.current.has(mark)) continue;
+      restoredRef.current.add(mark);
+      void restoreSheetRecords(owner, page, block).then((records) => {
+        if (!records) return;
+        startTransition(() => setBlocksByPage((prev) => {
+          const current = prev[page];
+          if (!Array.isArray(current)) return prev;
+          let hit = false;
+          const next = current.map((item) => {
+            if (item.id !== block.id || (item.pulledAt || 0) !== (block.pulledAt || 0)) return item;
+            if (!Array.isArray(item.records) || item.records.length >= records.length) return item;
+            hit = true;
+            return { ...item, records };
           });
-        });
-      }
+          return hit ? { ...prev, [page]: next } : prev;
+        }));
+      });
     }
-  }, [blocksByPage, owner, ready]);
+  }, [blocksByPage, owner, pageId, ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -1420,8 +1463,9 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
   }, [stopPageRealtime]);
 
   /** Drops a tab's blocks and tables here, and from the saved dashboard on the next save. */
+  /** Resolves to roughly how many bytes the tab took: its saved copy plus the full rows this browser kept. */
   const deleteTab = useCallback((tabId) => {
-    if (!tabId || readOnly) return;
+    if (!tabId || readOnly) return Promise.resolve(0);
     const page = pageIdForTab(tabId);
     removedTabsRef.current.add(tabId);
     tabFetchRef.current.delete(tabId);
@@ -1434,6 +1478,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
       return next;
     });
     const current = blocksByPageRef.current;
+    const loadedBlocks = Array.isArray(current[page]) ? current[page] : [];
+    let savedBytes = loadedBlocks.length ? estimateBlocksBytes(savedBlocksByPage({ [page]: loadedBlocks }).blocksByPage[page]) : 0;
     const goneIds = new Set((current[page] || []).map((block) => block?.id).filter(Boolean));
     for (const [otherPage, list] of Object.entries(current)) {
       if (otherPage === page) continue;
@@ -1449,12 +1495,16 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
     setPendingTabs((prev) => (prev.includes(tabId) ? prev.filter((id) => id !== tabId) : prev));
     const localStore = liveRef.current?.store;
     if (localStore) {
+      const key = canvasStorageKey(localStore, page);
+      if (localWriteRef.current?.key === key) localWriteRef.current = null;
       try {
-        window.localStorage.removeItem(canvasStorageKey(localStore, page));
+        if (!savedBytes) savedBytes = (window.localStorage.getItem(key) || "").length;
+        window.localStorage.removeItem(key);
       } catch {
         /* storage unavailable */
       }
     }
+    return forgetSheetRecords(liveRef.current?.owner, page).then((cached) => savedBytes + cached);
   }, [readOnly, stopPageRealtime]);
 
   const resolveLeave = useCallback((choice) => {
@@ -1776,12 +1826,18 @@ function shownRowCount(block) {
   return Math.max(stored, filledRowCount(block?.cells), Number(block?.rowCount) || 0);
 }
 
+const filledRowCounts = new WeakMap();
+
 function filledRowCount(cells) {
+  if (!cells || typeof cells !== "object") return 0;
+  const known = filledRowCounts.get(cells);
+  if (known != null) return known;
   const rows = new Set();
-  for (const key of Object.keys(cells || {})) {
+  for (const key of Object.keys(cells)) {
     const row = Number(String(key).split(",")[1]);
     if (Number.isFinite(row)) rows.add(row);
   }
+  filledRowCounts.set(cells, rows.size);
   return rows.size;
 }
 
@@ -1918,7 +1974,7 @@ function SheetBlockBody({ block, onChange, booting }) {
   const pulled = formatPulledAt(block.pulledAt);
   const shownCount = shownRowCount(view);
   const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
-  const dataset = describeSheet(view);
+  const dataset = booting ? null : describeSheet(view);
   const visual = block.presentation === "visual" && hasVisualTable(dataset);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -2047,6 +2103,13 @@ function BlockBody({ block, onChange, booting }) {
 
   return <ChartBlockBody block={block} onChange={onChange} booting={booting} />;
 }
+
+/**
+ * A block's content renders again only when its own props change, so opening the block's menu
+ * or other state on the frame does not redraw its sheet or chart.
+ */
+const BlockContent = memo(BlockBody);
+const PanelContent = memo(TerminalPanelBody);
 
 function chartViewForBlock(block, canvas) {
   const source = block.sourceSheetId ? (canvas?.blocks || []).find((item) => item.id === block.sourceSheetId) : null;
@@ -2338,6 +2401,10 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const onChangeRef = useRef(onChange);
   blockRef.current = block;
   onChangeRef.current = onChange;
+  const canvasRef = useRef(canvas);
+  canvasRef.current = canvas;
+  const changeContent = useCallback((patch) => onChangeRef.current(patch), []);
+  const fitContent = useCallback((h) => canvasRef.current?.fitBlock?.(blockRef.current.id, h), []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [resizing, setResizing] = useState(false);
@@ -2348,7 +2415,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     const timer = window.setTimeout(() => setDataReady(true), 280);
     return () => window.clearTimeout(timer);
   }, [dataReady]);
-  const sheetDataset = block.type === "sheet" ? describeSheet(block) : null;
+  // A block still booting skips reading its rows; the tab's other blocks open first.
+  const sheetDataset = block.type === "sheet" && !booting ? describeSheet(block) : null;
   const terminalPanel = isTerminalBlock(block);
   const panelTable = useTerminalPanelTable(block);
   const ctxState = useMyStateV2();
@@ -2673,7 +2741,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              onSelect(block.id);
+              // Selecting redraws every block on the tab; the menu opens first and that catches up after.
+              startTransition(() => onSelect(block.id));
             }}
           >
             <MoreVertical className="size-3.5" />
@@ -2848,9 +2917,9 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       ) : (
         <div ref={bodyRef} className={cn("flex min-h-0 min-w-0 flex-1 flex-col", arriveRef.current && dataReady && "lychee-sheet-fill")}>
           {terminalPanel ? (
-            <TerminalPanelBody block={block} booting={booting} onFit={(h) => canvas?.fitBlock?.(block.id, h)} />
+            <PanelContent block={block} booting={booting} onFit={fitContent} />
           ) : (
-            <BlockBody block={block} onChange={onChange} booting={booting || !dataReady} />
+            <BlockContent block={block} onChange={changeContent} booting={booting || !dataReady} />
           )}
         </div>
       )}
@@ -3202,29 +3271,44 @@ export function WorkspaceCanvas() {
     const visible = ordered.filter(inView).map((block) => block.id);
     const below = ordered.filter((block) => !inView(block)).map((block) => block.id);
     setBootingIds(new Set([...visible, ...below]));
-    const release = (ids) =>
-      setBootingIds((current) => {
-        if (!ids.some((id) => current.has(id))) return current;
-        const next = new Set(current);
-        for (const id of ids) next.delete(id);
-        return next;
-      });
+    // One block opens per task, as a transition, so a heavy tab never holds the page for all of its blocks at once.
+    // On-screen blocks go top to bottom after each paint; the rest wait for idle time unless scrolled near.
+    const release = (id) =>
+      startTransition(() =>
+        setBootingIds((current) => {
+          if (!current.has(id)) return current;
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        }),
+      );
+    const soon = [...visible];
     let stopped = false;
-    let cancelIdle = null;
-    const timers = visible.map((id, index) => window.setTimeout(() => release([id]), 60 + index * 90));
-    const drainBelow = () => {
-      if (stopped) return;
-      const id = below.shift();
-      if (!id) return;
-      release([id]);
-      cancelIdle = whenIdle(drainBelow, 800);
+    let settled = false;
+    let cancel = null;
+    const schedule = (urgent) => {
+      cancel?.();
+      cancel = urgent ? afterPaint(step, 60) : whenIdle(step, 800);
     };
-    timers.push(
-      window.setTimeout(() => {
+    function step() {
+      cancel = null;
+      if (stopped) return;
+      const id = soon.shift();
+      if (id) {
+        release(id);
+        schedule(true);
+        return;
+      }
+      if (!settled) {
+        settled = true;
         markTabSettled?.(pageId);
-        cancelIdle = whenIdle(drainBelow, 800);
-      }, 60 + visible.length * 90 + 120),
-    );
+      }
+      const next = below.shift();
+      if (!next) return;
+      release(next);
+      schedule(false);
+    }
+    schedule(true);
     const onScroll = () => {
       const view = scrollerRef.current;
       if (!view) return;
@@ -3232,14 +3316,17 @@ export function WorkspaceCanvas() {
       const to = view.scrollTop + view.clientHeight + 320;
       const near = blocksRef.current
         .filter((block) => (block.y || 0) < to && (block.y || 0) + (block.h || 0) > from)
-        .map((block) => block.id);
-      release(near);
+        .map((block) => block.id)
+        .filter((id) => below.includes(id));
+      if (!near.length) return;
+      for (const id of near) below.splice(below.indexOf(id), 1);
+      soon.push(...near);
+      schedule(true);
     };
     scroller?.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       stopped = true;
-      for (const timer of timers) window.clearTimeout(timer);
-      cancelIdle?.();
+      cancel?.();
       scroller?.removeEventListener("scroll", onScroll);
       bootedPageRef.current = "";
       setBootingIds(new Set());

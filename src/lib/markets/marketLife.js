@@ -267,7 +267,9 @@ export function sheetMarketName(block) {
  * @param {object | null | undefined} block
  */
 export function sheetMarketSide(block) {
-  const saved = formatMarketOutcome(block?.pull?.side);
+  // Holder sheets save `side` as the outcome's index (a string once saved) and its name under `outcome`.
+  const side = block?.pull?.side;
+  const saved = formatMarketOutcome(/^\d+$/.test(String(side ?? "")) ? block?.pull?.outcome : side);
   if (saved) return saved;
   return formatMarketOutcome(uniformColumnValue(block, ["outcome", "yes_sub_title"]));
 }

@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react';
 import { useUser  } from '@/lib/hooks';
+import { WORKSPACE_ENTRY_PATH } from '@/lib/workspaceEntry';
 import Link from 'next/link'
 import Image from 'next/image';
 
@@ -85,7 +86,7 @@ const Nav = () => {
                   </>
                   :<>
                     <div>
-                      <Link href="/dashboard">Dashboard</Link>
+                      <Link href={WORKSPACE_ENTRY_PATH}>Dashboard</Link>
                     </div>
                     <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-white/30 bg-transparent hover:bg-white/10 text-lychee_white inline-flex items-center justify-center" />
                     <DropdownMenu>

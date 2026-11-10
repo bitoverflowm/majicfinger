@@ -30,7 +30,7 @@ function toneFor(record, sheet) {
   const outcome = String(record?.outcome || sheet?.pull?.outcome || "").trim().toLowerCase();
   if (outcome === "no") return "second";
   if (outcome === "yes") return "first";
-  return sheet?.pull?.side === 1 ? "second" : "first";
+  return Number(sheet?.pull?.side) === 1 ? "second" : "first";
 }
 
 function holderModel(sheet, dataset) {

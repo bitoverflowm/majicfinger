@@ -10,6 +10,7 @@ import { useWorkspaceProject } from "@/components/projects/workspaceProjectConte
 import { PublishPanel } from "@/components/publish/PublishPanel";
 import { SharePanel } from "@/components/share/SharePanel";
 import { buildShareLibrary } from "@/components/share/shareLibrary";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { useUser } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,20 @@ const TABS = [
   { id: "publish", label: "Publish", icon: Globe, blurb: "Put this dashboard on its own page under your handle." },
   { id: "share", label: "Share", icon: Share2, blurb: "Turn any panel, chart or sheet into an image, GIF or video." },
 ];
+
+function panelFallback(what) {
+  return function PanelFallback({ retry }) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+        <p className="text-[14px] font-medium text-foreground">{what} hit an error on this dashboard.</p>
+        <p className="max-w-sm text-[12.5px] text-muted-foreground">Your dashboard is fine. Try again, or close this and reopen it.</p>
+        <button type="button" onClick={retry} className="h-8 rounded-md border border-border px-3 text-[12.5px] font-medium hover:bg-muted">
+          Try again
+        </button>
+      </div>
+    );
+  };
+}
 
 export function DashboardShareDialog({ open, onOpenChange }) {
   const canvas = useWorkspaceCanvas();
@@ -34,7 +49,12 @@ export function DashboardShareDialog({ open, onOpenChange }) {
   const blocksByPage = canvas?.blocksByPage;
   const groups = useMemo(() => {
     if (!open) return [];
-    const built = buildShareLibrary({ tabs, blocksByPage, previous: lastPieces.current });
+    let built = [];
+    try {
+      built = buildShareLibrary({ tabs, blocksByPage, previous: lastPieces.current });
+    } catch (error) {
+      console.error("[DashboardShareDialog] couldn't list share pieces", error);
+    }
     lastPieces.current = new Map(built.flatMap((group) => group.pieces.map((piece) => [piece.id, piece])));
     return built;
   }, [open, tabs, blocksByPage]);
@@ -90,19 +110,23 @@ export function DashboardShareDialog({ open, onOpenChange }) {
 
         {visited.publish ? (
           <div role="tabpanel" className={cn("min-h-0 flex-1 flex-col", tab === "publish" ? "flex" : "hidden")}>
-            <PublishPanel
-              projectId={project?.id}
-              user={user}
-              tabs={tabs}
-              filledTabIds={groups.map((group) => group.tab.id)}
-              dashboardName={dashboardName}
-              onPublication={setPublication}
-            />
+            <ErrorBoundary name="PublishPanel" fallback={panelFallback("Publishing")}>
+              <PublishPanel
+                projectId={project?.id}
+                user={user}
+                tabs={tabs}
+                filledTabIds={groups.map((group) => group.tab.id)}
+                dashboardName={dashboardName}
+                onPublication={setPublication}
+              />
+            </ErrorBoundary>
           </div>
         ) : null}
         {visited.share ? (
           <div role="tabpanel" className={cn("min-h-0 flex-1 flex-col", tab === "share" ? "flex" : "hidden")}>
-            <SharePanel groups={groups} activeTabId={ctx?.activeWorkspaceStartTabId} handle={handle} shareUrl={shareUrl} defaultHeadline={dashboardName} />
+            <ErrorBoundary name="SharePanel" fallback={panelFallback("Sharing")}>
+              <SharePanel groups={groups} activeTabId={ctx?.activeWorkspaceStartTabId} handle={handle} shareUrl={shareUrl} defaultHeadline={dashboardName} />
+            </ErrorBoundary>
           </div>
         ) : null}
       </DialogContent>

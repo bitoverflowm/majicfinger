@@ -50,12 +50,16 @@ export default async function handler(req, res) {
       const doc = await findProject(WorkspaceDashboard, userId, id).select(PROJECT_LIST_FIELDS).lean();
       return res.status(200).json({ success: true, data: doc ? projectListItem(doc) : null });
     }
-    const docs = await WorkspaceDashboard.find({ user_id: userId })
-      .sort({ updatedAt: -1 })
-      .limit(MAX_PROJECTS_LISTED)
-      .select(PROJECT_LIST_FIELDS)
-      .lean();
-    return res.status(200).json({ success: true, data: docs.map(projectListItem) });
+    // Opening the dashboard creates an empty project, so work saved means a project with blocks on it.
+    const [docs, worked] = await Promise.all([
+      WorkspaceDashboard.find({ user_id: userId })
+        .sort({ updatedAt: -1 })
+        .limit(MAX_PROJECTS_LISTED)
+        .select(PROJECT_LIST_FIELDS)
+        .lean(),
+      WorkspaceDashboard.exists({ user_id: userId, blocks: { $nin: [null, {}] } }),
+    ]);
+    return res.status(200).json({ success: true, data: docs.map(projectListItem), has_work: !!worked });
   }
 
   const body = req.body && typeof req.body === "object" ? req.body : {};

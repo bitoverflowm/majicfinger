@@ -16,6 +16,7 @@ import {
   isDevMagicLinkBypassEmail,
 } from '@/lib/devLoginBypass';
 import { handleLoginJourney } from '@/lib/analytics/journeyClient';
+import { WORKSPACE_ENTRY_PATH } from '@/lib/workspaceEntry';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -106,7 +107,7 @@ const Login = ({ fromHome }) => {
           ) : user ? (
             <div className="space-y-4 rounded-lg border p-4">
               <p className="text-sm">Welcome, {user.email}</p>
-              <Button onClick={() => (fromHome ? router.push('/dashboard') : setViewing?.('dashboard'))} className="w-full">
+              <Button onClick={() => (fromHome ? router.push(WORKSPACE_ENTRY_PATH) : setViewing?.('dashboard'))} className="w-full">
                 Go to dashboard
               </Button>
             </div>

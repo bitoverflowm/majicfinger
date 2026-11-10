@@ -1,4 +1,6 @@
 // Config for landing page v2 (MagicUI template)
+import { WORKSPACE_ENTRY_PATH } from "@/lib/workspaceEntry";
+
 export const landingPageV2Config = {
   name: "Lychee",
   description: "Your Quant in a Box. Built for Polymarket • Powerful for anyone who works with data. No CSVs, No Python, No copy-pasting. Just raw data to analysis and actionable insights. Real quantitative edge. 0 lines of code.",
@@ -344,7 +346,7 @@ export const landingPageV2Config = {
       links: [
         { href: "#features", text: "Features", icon: null },
         { href: "#pricing", text: "Pricing", icon: null },
-        { href: "/dashboard", text: "Dashboard", icon: null },
+        { href: WORKSPACE_ENTRY_PATH, text: "Dashboard", icon: null },
       ],
     },
     {
