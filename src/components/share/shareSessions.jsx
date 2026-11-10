@@ -1,13 +1,15 @@
 "use client";
 
-import { createContext, memo, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { HolderSessionContext, useHolderSession } from "@/components/terminals/holder/holderSession";
 import { TerminalCanvasSession } from "@/components/terminals/terminalCanvas";
+import { useLiveSessions } from "./liveSessions";
 
 /**
- * Share cards show terminal panels from any tab, not just the open one. Each tab a card uses gets
- * one hidden session (its market or trader, loaded and kept live), whose value every piece from
- * that tab reads.
+ * Share cards show terminal panels from any tab, not just the open one. The open tab's session is
+ * already running on the canvas, so its pieces read that one; every other tab a card uses gets one
+ * hidden session (its market or trader, loaded and kept live), whose value every piece from that
+ * tab reads.
  */
 const SessionsContext = createContext({});
 
@@ -28,17 +30,21 @@ const SessionSource = memo(function SessionSource({ tab, onValue }) {
 });
 
 export function ShareSessions({ tabs, children }) {
+  const live = useLiveSessions();
   const [values, setValues] = useState({});
   const onValue = useCallback((tabId, value) => {
     setValues((prev) => (prev[tabId] === value ? prev : { ...prev, [tabId]: value }));
   }, []);
+  const merged = useMemo(() => ({ ...values, ...live }), [live, values]);
   return (
-    <SessionsContext.Provider value={values}>
+    <SessionsContext.Provider value={merged}>
       {/* Off screen, so trade alerts and tips never fire from here. */}
       <div hidden aria-hidden>
-        {tabs.filter((tab) => tab?.terminal).map((tab) => (
-          <SessionSource key={tab.id} tab={tab} onValue={onValue} />
-        ))}
+        {tabs
+          .filter((tab) => tab?.terminal && !live[tab.id])
+          .map((tab) => (
+            <SessionSource key={tab.id} tab={tab} onValue={onValue} />
+          ))}
       </div>
       {children}
     </SessionsContext.Provider>

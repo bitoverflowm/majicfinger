@@ -35,8 +35,10 @@ function draggedPiece(event) {
   return event.dataTransfer?.types?.includes(PIECE_DRAG_TYPE);
 }
 
-function Slot({ item, piece, editable, dragging, onDragStart, onDragEnd, onDropOn, onDropPiece, onToggleSpan, onRemove }) {
+function Slot({ item, piece, headline, editable, dragging, onDragStart, onDragEnd, onDropOn, onDropPiece, onToggleSpan, onRemove }) {
   const [over, setOver] = useState(false);
+  // The headline usually names the market already; don't repeat it over every piece.
+  const tag = piece?.detail && piece.detail !== headline ? piece.detail : "";
   return (
     <div
       draggable={editable}
@@ -69,9 +71,11 @@ function Slot({ item, piece, editable, dragging, onDragStart, onDragEnd, onDropO
       )}
       style={{ gridColumn: item.span === 2 ? "span 2 / span 2" : "span 1 / span 1" }}
     >
-      <div className="flex shrink-0 items-center gap-2 px-3.5 pb-1 pt-2.5">
-        <p className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground">{piece?.title || "Piece"}</p>
-        <p className="shrink-0 truncate text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">{piece?.detail || PIECE_KIND_LABEL[piece?.kind]}</p>
+      <div className="flex shrink-0 items-baseline gap-2 px-3.5 pb-1 pt-2.5">
+        <p className="min-w-0 shrink-0 truncate text-[12px] font-semibold text-foreground" style={{ maxWidth: tag ? "60%" : "100%" }}>
+          {piece?.title || PIECE_KIND_LABEL[piece?.kind] || "Piece"}
+        </p>
+        {tag ? <p className="min-w-0 flex-1 truncate text-right text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">{tag}</p> : null}
       </div>
       <div className="pointer-events-none flex min-h-0 flex-1 flex-col">{piece ? <SharePiece piece={piece} /> : null}</div>
       {editable ? (
@@ -183,6 +187,7 @@ export const ShareCard = forwardRef(function ShareCard(
                 key={item.key}
                 item={cols === 1 ? { ...item, span: 1 } : item}
                 piece={pieces[item.pieceId]}
+                headline={headline}
                 editable={editable}
                 dragging={dragging}
                 onDragStart={setDragging}

@@ -50,6 +50,10 @@ function useLogo() {
 /** The line a piece animates: `{ series, valueKind, label, meta }`, or null while it loads. */
 function useMotionSource(piece) {
   const session = useShareSession(piece?.tabId);
+  // Only what the line is drawn from, so live ticks elsewhere in the session don't restart it.
+  const priceSheet = session?.view === "market" ? session.priceHistory?.sheet || null : null;
+  const meta = session?.view === "market" ? session.meta || null : null;
+  const pnlRows = session?.view === "trader" ? session.pnl?.rows || null : null;
   return useMemo(() => {
     if (!piece?.motion) return null;
     if (piece.motion === "sheet-price") {
@@ -57,8 +61,8 @@ function useMotionSource(piece) {
       const points = (line?.points || []).map((point) => ({ t: point.t > 1e12 ? point.t : point.t * 1000, v: point.price })).filter((point) => Number.isFinite(point.v));
       return points.length >= 2 ? { series: [{ label: piece.asset?.side || "", points: thinPoints(points) }], valueKind: "cents", meta: null } : null;
     }
-    if (piece.motion === "price" && session?.view === "market") {
-      const records = session.priceHistory?.sheet?.records || [];
+    if (piece.motion === "price" && priceSheet) {
+      const records = priceSheet.records || [];
       if (!records.length) return null;
       const byOutcome = new Map();
       for (const row of records) {
@@ -66,17 +70,17 @@ function useMotionSource(piece) {
         byOutcome.get(row.outcome).push({ t: row.t * 1000, v: row.p });
       }
       const series = [...byOutcome.entries()].slice(0, 2).map(([label, points]) => ({ label, points: thinPoints(points.sort((a, b) => a.t - b.t)) }));
-      return series[0]?.points.length >= 2 ? { series, valueKind: "cents", meta: session.meta } : null;
+      return series[0]?.points.length >= 2 ? { series, valueKind: "cents", meta } : null;
     }
-    if (piece.motion === "pnl" && session?.view === "trader") {
-      const points = (session.pnl?.rows || [])
+    if (piece.motion === "pnl" && pnlRows) {
+      const points = pnlRows
         .map((row) => ({ t: Number(row.timestamp) * 1000, v: Number(row.position_pnl ?? row.trade_pnl) }))
         .filter((point) => Number.isFinite(point.t) && Number.isFinite(point.v))
         .sort((a, b) => a.t - b.t);
       return points.length >= 2 ? { series: [{ label: "PnL", points: thinPoints(points) }], valueKind: "usd", meta: null } : null;
     }
     return null;
-  }, [piece, session]);
+  }, [meta, piece, pnlRows, priceSheet]);
 }
 
 /** Headlines for a market over the animated period, the same search its price and news panel uses. */
@@ -174,12 +178,12 @@ export function ShareMotion({ piece, format, theme, accent, handle, url, headlin
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {source?.meta && start && end ? <MarketHeadlines meta={source.meta} start={start} end={end} onArticles={setArticles} /> : null}
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/40 p-4">
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-muted/50 bg-[radial-gradient(theme(colors.neutral.300)_1px,transparent_1px)] bg-[length:18px_18px] p-6 dark:bg-[radial-gradient(theme(colors.neutral.800)_1px,transparent_1px)]">
         {scene ? (
           <canvas
             ref={canvasRef}
             aria-label={`Animation of ${piece.title}`}
-            className="max-h-full max-w-full rounded-lg shadow-xl"
+            className="max-h-full max-w-full rounded-lg shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)]"
             style={{ aspectRatio: `${spec.w} / ${spec.h}`, height: "100%" }}
           />
         ) : (
@@ -190,7 +194,7 @@ export function ShareMotion({ piece, format, theme, accent, handle, url, headlin
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <div role="radiogroup" aria-label="Length" className="flex items-center rounded-lg border border-border p-0.5">
+        <div role="radiogroup" aria-label="Length" className="flex items-center rounded-lg bg-muted p-0.5">
           {DURATIONS.map((item) => (
             <button
               key={item.ms}
@@ -198,7 +202,10 @@ export function ShareMotion({ piece, format, theme, accent, handle, url, headlin
               role="radio"
               aria-checked={drawMs === item.ms}
               onClick={() => setDrawMs(item.ms)}
-              className={cn("h-7 rounded-md px-2.5 text-[12px] font-medium", drawMs === item.ms ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
+              className={cn(
+                "h-7 rounded-md px-2.5 text-[12px] font-medium tabular-nums transition-colors",
+                drawMs === item.ms ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
             >
               {item.label}
             </button>
@@ -226,7 +233,7 @@ export function ShareMotion({ piece, format, theme, accent, handle, url, headlin
         </div>
       </div>
       <p className="text-[11.5px] text-muted-foreground">
-        Video records in real time, so it takes as long as the clip. Instagram, TikTok and X all take the MP4; the GIF loops anywhere.
+        Video records in real time, so it takes as long as the clip. Instagram, TikTok and X take the MP4; the GIF loops anywhere.
       </p>
     </div>
   );

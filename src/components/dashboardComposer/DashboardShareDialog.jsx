@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Globe, Share2 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,7 +11,6 @@ import { PublishPanel } from "@/components/publish/PublishPanel";
 import { SharePanel } from "@/components/share/SharePanel";
 import { buildShareLibrary } from "@/components/share/shareLibrary";
 import { useUser } from "@/lib/hooks";
-import { loadProjectPublish } from "@/lib/workspacePublishClient";
 import { cn } from "@/lib/utils";
 
 const SITE_URL = "https://lycheedata.com";
@@ -25,24 +24,20 @@ export function DashboardShareDialog({ open, onOpenChange }) {
   const canvas = useWorkspaceCanvas();
   const ctx = useMyStateV2();
   const project = useWorkspaceProject();
-  const { user } = useUser();
+  const user = useUser();
   const [tab, setTab] = useState("publish");
   const [visited, setVisited] = useState({ publish: true });
   const [publication, setPublication] = useState(null);
-
-  useEffect(() => {
-    if (!open || !project?.id) return undefined;
-    let alive = true;
-    loadProjectPublish(project.id).then((result) => {
-      if (alive && result.ok) setPublication(result.data?.publication || null);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [open, project?.id]);
+  const lastPieces = useRef(new Map());
 
   const tabs = ctx?.workspaceStartTabs;
-  const groups = useMemo(() => (open ? buildShareLibrary({ tabs, blocksByPage: canvas?.blocksByPage }) : []), [open, tabs, canvas?.blocksByPage]);
+  const blocksByPage = canvas?.blocksByPage;
+  const groups = useMemo(() => {
+    if (!open) return [];
+    const built = buildShareLibrary({ tabs, blocksByPage, previous: lastPieces.current });
+    lastPieces.current = new Map(built.flatMap((group) => group.pieces.map((piece) => [piece.id, piece])));
+    return built;
+  }, [open, tabs, blocksByPage]);
   const handle = String(user?.user_name || "");
   const shareUrl = publication?.published && publication.path ? `${SITE_URL}${publication.path}` : SITE_URL;
   const dashboardName = canvas?.dashboardName || "Untitled";
@@ -101,7 +96,7 @@ export function DashboardShareDialog({ open, onOpenChange }) {
               tabs={tabs}
               filledTabIds={groups.map((group) => group.tab.id)}
               dashboardName={dashboardName}
-              onPublished={setPublication}
+              onPublication={setPublication}
             />
           </div>
         ) : null}

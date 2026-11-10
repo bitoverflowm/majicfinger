@@ -43,11 +43,31 @@ function byPosition(a, b) {
   return (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0);
 }
 
+/** A terminal panel draws from its tab's session, so only which panel it is matters. */
+function sameBlock(a, b) {
+  if (a.block === b.block) return true;
+  return a.kind === "panel" && a.block?.panel === b.block?.panel && a.block?.terminal === b.block?.terminal;
+}
+
+function samePiece(a, b) {
+  return (
+    a.kind === b.kind &&
+    sameBlock(a, b) &&
+    a.source === b.source &&
+    a.title === b.title &&
+    a.detail === b.detail &&
+    a.motion === b.motion
+  );
+}
+
 /**
+ * @param {{ tabs: object[], blocksByPage: object, previous?: Map<string, object> }} input
+ *   `previous`, the last build's pieces by id: a piece whose blocks haven't changed comes back as
+ *   the same object, so the card doesn't redraw it every time another sheet on the dashboard ticks.
  * @returns {{ tab: object, label: string, pieces: object[] }[]} each piece:
  *   `{ id, tabId, kind, title, detail, block?, source?, motion? }`
  */
-export function buildShareLibrary({ tabs, blocksByPage }) {
+export function buildShareLibrary({ tabs, blocksByPage, previous }) {
   const groups = [];
   for (const tab of Array.isArray(tabs) ? tabs : []) {
     if (!tab?.id) continue;
@@ -120,7 +140,12 @@ export function buildShareLibrary({ tabs, blocksByPage }) {
         });
       }
     }
-    if (pieces.length) groups.push({ tab, label: tabName, subject: tabSubjectLabel(tab), pieces });
+    if (!pieces.length) continue;
+    const kept = pieces.map((piece) => {
+      const prior = previous?.get(piece.id);
+      return prior && samePiece(prior, piece) ? prior : piece;
+    });
+    groups.push({ tab, label: tabName, subject: tabSubjectLabel(tab), pieces: kept });
   }
   return groups;
 }

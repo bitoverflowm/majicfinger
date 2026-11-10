@@ -80,15 +80,16 @@ function sameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+const TIME_TODAY = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" });
+const TIME_DAY = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const TIME_CLOCK = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+
 function tradeTime(row) {
   const sec = Number(row.timestamp);
   if (!Number.isFinite(sec) || !sec) return "";
   const date = new Date(sec * 1000);
-  if (sameDay(date, new Date())) {
-    return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" });
-  }
-  const day = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  return `${day} ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+  if (sameDay(date, new Date())) return TIME_TODAY.format(date);
+  return `${TIME_DAY.format(date)} ${TIME_CLOCK.format(date)}`;
 }
 
 function cents(price) {

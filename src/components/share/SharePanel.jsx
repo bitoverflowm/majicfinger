@@ -12,7 +12,6 @@ import {
   LayoutPanelTop,
   Link2,
   Loader2,
-  Mail,
   Plus,
   Search,
   Share2,
@@ -24,7 +23,6 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { captureNodePng } from "@/components/dashboardComposer/blockExport";
 import { cn } from "@/lib/utils";
@@ -42,6 +40,11 @@ const KIND_ICON = {
   text: Type,
   score: Trophy,
 };
+
+const MODES = [
+  { id: "image", label: "Image", icon: ImageIcon },
+  { id: "motion", label: "Video & GIF", icon: Film },
+];
 
 let itemSeq = 0;
 function newItem(pieceId, span = 1) {
@@ -78,18 +81,81 @@ function buildCaption({ headline, pieces, url }) {
   return lines.join("\n");
 }
 
-function OptionGroup({ label, children }) {
+/** Whether this browser can hand an image to another app (the phone share sheet, mostly). */
+function canShareFiles() {
+  if (typeof navigator === "undefined" || !navigator.share || !navigator.canShare) return false;
+  try {
+    return navigator.canShare({ files: [new File([""], "card.png", { type: "image/png" })] });
+  } catch {
+    return false;
+  }
+}
+
+function Section({ title, action, children }) {
   return (
-    <div className="space-y-1.5">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+    <section className="space-y-2">
+      <div className="flex h-5 items-center justify-between gap-2">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{title}</h3>
+        {action}
+      </div>
       {children}
+    </section>
+  );
+}
+
+function Segmented({ label, options, value, onChange, className }) {
+  return (
+    <div role="radiogroup" aria-label={label} className={cn("inline-flex rounded-lg bg-muted p-0.5", className)}>
+      {options.map((option) => {
+        const on = value === option.id;
+        const Icon = option.icon;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(option.id)}
+            className={cn(
+              "inline-flex h-7 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-[12px] font-medium transition-colors",
+              on ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {Icon ? <Icon className="size-3.5" aria-hidden /> : null}
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function Library({ groups, onAdd, onSolo, onMotion, used }) {
+function ResetButton({ onClick }) {
+  return (
+    <button type="button" onClick={onClick} className="text-[11px] font-medium text-muted-foreground hover:text-foreground">
+      Reset
+    </button>
+  );
+}
+
+/** A box drawn at the format's aspect ratio. */
+function RatioGlyph({ spec, on }) {
+  const long = 16;
+  const scale = long / Math.max(spec.w, spec.h);
+  return (
+    <span className="flex size-5 shrink-0 items-center justify-center" aria-hidden>
+      <span
+        className={cn("rounded-[3px] border-[1.5px]", on ? "border-[#0d99ff] bg-[#0d99ff]/15" : "border-muted-foreground/60")}
+        style={{ width: Math.round(spec.w * scale), height: Math.round(spec.h * scale) }}
+      />
+    </span>
+  );
+}
+
+function Library({ groups, onToggle, onMotion, used }) {
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
+  const total = groups.reduce((sum, group) => sum + group.pieces.length, 0);
   const shown = groups
     .map((group) => ({
       ...group,
@@ -99,10 +165,15 @@ function Library({ groups, onAdd, onSolo, onMotion, used }) {
     }))
     .filter((group) => group.pieces.length);
   return (
-    <div className="flex min-h-0 flex-col gap-2">
+    <aside aria-label="Pieces" className="flex min-h-0 flex-col gap-2.5">
+      <div className="flex items-baseline justify-between">
+        <h3 className="text-[13px] font-semibold text-foreground">Pieces</h3>
+        <span className="text-[11.5px] tabular-nums text-muted-foreground">{used.size ? `${used.size} on card` : `${total} available`}</span>
+      </div>
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input
+          type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Find a panel, sheet or chart"
@@ -110,12 +181,11 @@ function Library({ groups, onAdd, onSolo, onMotion, used }) {
           className="h-8 pl-8 text-[13px]"
         />
       </div>
-      <p className="text-[11.5px] text-muted-foreground">Drag onto the card, or use + to add. Every panel, sheet and chart on every tab is here.</p>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="-mr-1 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         {shown.length ? (
           shown.map((group) => (
             <section key={group.tab.id} aria-label={group.label}>
-              <p className="sticky top-0 z-10 truncate bg-background py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="sticky top-0 z-10 truncate bg-background pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 {group.label}
               </p>
               <ul className="space-y-1">
@@ -130,38 +200,47 @@ function Library({ groups, onAdd, onSolo, onMotion, used }) {
                         event.dataTransfer.effectAllowed = "copy";
                         event.dataTransfer.setData(PIECE_DRAG_TYPE, piece.id);
                       }}
-                      className="group/piece flex cursor-grab items-center gap-2 rounded-lg border border-border/70 bg-card px-2 py-1.5 hover:border-foreground/20 active:cursor-grabbing"
+                      className={cn(
+                        "group/piece flex items-center gap-1 rounded-lg border pr-1 transition-colors",
+                        inUse ? "border-[#0d99ff]/40 bg-[#0d99ff]/[0.06]" : "border-border/70 bg-card hover:border-foreground/20 hover:bg-muted/40",
+                      )}
                     >
-                      <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                      <button type="button" onClick={() => onSolo(piece.id)} className="min-w-0 flex-1 text-left" title="Make a card of just this">
-                        <p className="truncate text-[12.5px] font-medium text-foreground">{piece.title}</p>
-                        <p className="truncate text-[11px] text-muted-foreground">
-                          {PIECE_KIND_LABEL[piece.kind]}
-                          {piece.detail ? ` · ${piece.detail}` : ""}
-                        </p>
+                      <button
+                        type="button"
+                        aria-pressed={inUse}
+                        onClick={() => onToggle(piece.id)}
+                        title={inUse ? "Take it off the card" : "Add it to the card, or drag it to a spot"}
+                        className="flex min-w-0 flex-1 cursor-grab items-center gap-2.5 py-1.5 pl-2 text-left active:cursor-grabbing"
+                      >
+                        <span
+                          className={cn(
+                            "flex size-7 shrink-0 items-center justify-center rounded-md",
+                            inUse ? "bg-[#0d99ff] text-white" : "bg-muted text-muted-foreground group-hover/piece:text-foreground",
+                          )}
+                          aria-hidden
+                        >
+                          {inUse ? <Check className="size-3.5" /> : <Icon className="size-3.5" />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[12.5px] font-medium text-foreground">{piece.title}</span>
+                          <span className="block truncate text-[11px] text-muted-foreground">
+                            {PIECE_KIND_LABEL[piece.kind]}
+                            {piece.detail && piece.detail !== group.label && piece.detail !== group.subject ? ` · ${piece.detail}` : ""}
+                          </span>
+                        </span>
+                        {inUse ? null : <Plus className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/piece:opacity-100" aria-hidden />}
                       </button>
                       {piece.motion ? (
                         <button
                           type="button"
                           onClick={() => onMotion(piece.id)}
                           aria-label={`Animate ${piece.title}`}
-                          title="Record it as a video or GIF"
-                          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                          title="Record it drawing itself, as a video or GIF"
+                          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground"
                         >
                           <Film className="size-3.5" />
                         </button>
                       ) : null}
-                      <button
-                        type="button"
-                        onClick={() => onAdd(piece.id)}
-                        aria-label={`Add ${piece.title} to the card`}
-                        className={cn(
-                          "inline-flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-muted",
-                          inUse ? "text-[#0d99ff]" : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        {inUse ? <Check className="size-3.5" /> : <Plus className="size-3.5" />}
-                      </button>
                     </li>
                   );
                 })}
@@ -174,19 +253,19 @@ function Library({ groups, onAdd, onSolo, onMotion, used }) {
           </p>
         )}
       </div>
-    </div>
+    </aside>
   );
 }
 
 function ScaledPreview({ spec, children }) {
   const ref = useRef(null);
-  const [scale, setScale] = useState(0.5);
+  const [scale, setScale] = useState(0);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
     const measure = () => {
-      const w = el.clientWidth - 32;
-      const h = el.clientHeight - 32;
+      const w = el.clientWidth - 48;
+      const h = el.clientHeight - 48;
       if (w > 0 && h > 0) setScale(Math.min(1, w / spec.w, h / spec.h));
     };
     measure();
@@ -195,12 +274,17 @@ function ScaledPreview({ spec, children }) {
     return () => observer.disconnect();
   }, [spec.h, spec.w]);
   return (
-    <div ref={ref} className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-border bg-[repeating-conic-gradient(theme(colors.neutral.100)_0%_25%,transparent_0%_50%)] bg-[length:16px_16px] dark:bg-[repeating-conic-gradient(theme(colors.neutral.900)_0%_25%,transparent_0%_50%)]">
-      <div className="relative shrink-0 overflow-hidden rounded-lg shadow-2xl" style={{ width: spec.w * scale, height: spec.h * scale }}>
-        <div className="absolute left-0 top-0" style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}>
-          {children}
+    <div
+      ref={ref}
+      className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-muted/50 bg-[radial-gradient(theme(colors.neutral.300)_1px,transparent_1px)] bg-[length:18px_18px] dark:bg-[radial-gradient(theme(colors.neutral.800)_1px,transparent_1px)]"
+    >
+      {scale ? (
+        <div className="relative shrink-0 overflow-hidden rounded-lg shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)]" style={{ width: spec.w * scale, height: spec.h * scale }}>
+          <div className="absolute left-0 top-0" style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}>
+            {children}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -223,6 +307,7 @@ export function SharePanel({ groups, activeTabId, handle, shareUrl, defaultHeadl
   const [edited, setEdited] = useState({ headline: false, subhead: false, caption: false });
   const [busy, setBusy] = useState("");
   const [copied, setCopied] = useState("");
+  const [shareable] = useState(canShareFiles);
   const cardRef = useRef(null);
 
   const spec = SHARE_FORMATS[format];
@@ -233,6 +318,7 @@ export function SharePanel({ groups, activeTabId, handle, shareUrl, defaultHeadl
   const firstGroup = groups.find((group) => group.pieces.some((piece) => piece.id === cardPieces[0]?.id));
   const autoHeadline = firstGroup?.subject || cardPieces[0]?.detail || defaultHeadline;
   const autoSubhead = cardPieces.length > 1 ? cardPieces.map((piece) => piece.title).slice(0, 3).join(" · ") : cardPieces[0]?.title || "";
+  const empty = !items.length;
 
   useEffect(() => {
     if (!edited.headline) setHeadline(autoHeadline || "");
@@ -263,15 +349,21 @@ export function SharePanel({ groups, activeTabId, handle, shareUrl, defaultHeadl
     },
     [pieces],
   );
-  const soloPiece = (pieceId) => {
-    setMode("image");
-    setItems([newItem(pieceId, 2)]);
-    setEdited((prev) => ({ ...prev, headline: false, subhead: false }));
+  const togglePiece = (pieceId) => {
+    if (used.has(pieceId)) {
+      setMode("image");
+      setItems((prev) => prev.filter((item) => item.pieceId !== pieceId));
+    } else addPiece(pieceId);
   };
   const animatePiece = (pieceId) => {
     setMotionId(pieceId);
     setMode("motion");
   };
+  const edit = (field, setter) => (event) => {
+    setEdited((prev) => ({ ...prev, [field]: true }));
+    setter(event.target.value);
+  };
+  const reset = (field) => () => setEdited((prev) => ({ ...prev, [field]: false }));
 
   const capture = useCallback(async () => {
     const node = cardRef.current;
@@ -323,13 +415,9 @@ export function SharePanel({ groups, activeTabId, handle, shareUrl, defaultHeadl
   const nativeShare = () =>
     run("native", async () => {
       const file = new File([dataUrlToBlob(await capture())], `${fileName}.png`, { type: "image/png" });
-      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
-        await navigator.share({ files: [file], text: caption, title: headline }).catch((error) => {
-          if (error?.name !== "AbortError") throw error;
-        });
-        return;
-      }
-      throw new Error("Sharing files isn't supported here. Download the image and attach it.");
+      await navigator.share({ files: [file], text: caption, title: headline }).catch((error) => {
+        if (error?.name !== "AbortError") throw error;
+      });
     });
   const copyText = (kind, text) => async () => {
     await navigator.clipboard?.writeText(text).catch(() => undefined);
@@ -337,45 +425,38 @@ export function SharePanel({ groups, activeTabId, handle, shareUrl, defaultHeadl
   };
   const open = (href) => window.open(href, "_blank", "noopener,noreferrer");
   const enc = encodeURIComponent;
+  const title = headline || defaultHeadline;
   const networks = [
     { id: "x", label: "X", href: `https://x.com/intent/post?text=${enc(caption)}` },
     { id: "linkedin", label: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${enc(shareUrl)}` },
-    { id: "reddit", label: "Reddit", href: `https://www.reddit.com/submit?url=${enc(shareUrl)}&title=${enc(headline || defaultHeadline)}` },
-    { id: "telegram", label: "Telegram", href: `https://t.me/share/url?url=${enc(shareUrl)}&text=${enc(headline || defaultHeadline)}` },
+    { id: "reddit", label: "Reddit", href: `https://www.reddit.com/submit?url=${enc(shareUrl)}&title=${enc(title)}` },
+    { id: "telegram", label: "Telegram", href: `https://t.me/share/url?url=${enc(shareUrl)}&text=${enc(title)}` },
     { id: "whatsapp", label: "WhatsApp", href: `https://wa.me/?text=${enc(caption)}` },
+    { id: "email", label: "Email", href: `mailto:?subject=${enc(title)}&body=${enc(caption)}` },
   ];
 
   return (
     <ShareSessions tabs={sessionTabs}>
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)_17rem]">
-        <Library groups={groups} used={used} onAdd={(id) => addPiece(id)} onSolo={soloPiece} onMotion={animatePiece} />
+      <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[15.5rem_minmax(0,1fr)_18rem]">
+        <Library groups={groups} used={used} onToggle={togglePiece} onMotion={animatePiece} />
 
-        <div className="flex min-h-0 flex-col gap-2">
-          <div className="flex items-center justify-between gap-2">
-            <div role="tablist" aria-label="What to make" className="flex items-center rounded-lg border border-border p-0.5">
-              {[
-                { id: "image", label: "Image", icon: ImageIcon },
-                { id: "motion", label: "Video & GIF", icon: Film },
-              ].map((tab) => (
+        <div className="flex min-h-0 flex-col gap-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <Segmented label="What to make" options={MODES} value={mode} onChange={setMode} />
+            {mode === "image" && !empty ? (
+              <div className="flex min-w-0 items-center gap-3">
+                <p className="truncate text-[11.5px] text-muted-foreground">Drag to reorder · hover a piece to resize or remove it</p>
                 <button
-                  key={tab.id}
                   type="button"
-                  role="tab"
-                  aria-selected={mode === tab.id}
-                  onClick={() => setMode(tab.id)}
-                  className={cn(
-                    "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium",
-                    mode === tab.id ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
-                  )}
+                  onClick={() => setItems([])}
+                  className="shrink-0 text-[12px] font-medium text-muted-foreground hover:text-foreground"
                 >
-                  <tab.icon className="size-3.5" aria-hidden />
-                  {tab.label}
+                  Clear
                 </button>
-              ))}
-            </div>
-            <p className="truncate text-[11.5px] text-muted-foreground">
-              {mode === "image" ? "Drag pieces to reorder. Hover one to resize or remove it." : motionPiece ? `Animating ${motionPiece.title}` : ""}
-            </p>
+              </div>
+            ) : mode === "motion" && motionPiece ? (
+              <p className="truncate text-[11.5px] text-muted-foreground">Animating {motionPiece.title}</p>
+            ) : null}
           </div>
           {mode === "image" ? (
             <ScaledPreview spec={spec}>
@@ -415,155 +496,134 @@ export function SharePanel({ groups, activeTabId, handle, shareUrl, defaultHeadl
           )}
         </div>
 
-        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
-          <OptionGroup label="Size">
-            <div className="grid grid-cols-2 gap-1.5">
-              {Object.entries(SHARE_FORMATS).map(([id, item]) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={format === id}
-                  onClick={() => setFormat(id)}
-                  className={cn(
-                    "rounded-lg border px-2 py-1.5 text-left",
-                    format === id ? "border-[#0d99ff] bg-[#0d99ff]/[0.06]" : "border-border hover:border-foreground/20",
-                  )}
-                >
-                  <span className="block text-[12px] font-medium text-foreground">
-                    {item.label} <span className="text-muted-foreground">{item.ratio}</span>
-                  </span>
-                  <span className="block truncate text-[10.5px] text-muted-foreground">{item.hint}</span>
-                </button>
-              ))}
-            </div>
-          </OptionGroup>
-          <OptionGroup label="Style">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center rounded-lg border border-border p-0.5">
-                {["dark", "light"].map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={theme === value}
-                    onClick={() => setTheme(value)}
-                    className={cn("h-7 rounded-md px-2.5 text-[12px] font-medium capitalize", theme === value ? "bg-foreground text-background" : "text-muted-foreground")}
-                  >
-                    {value}
+        <div className="flex min-h-0 flex-col">
+          <div className="-mr-1 min-h-0 flex-1 space-y-5 overflow-y-auto pb-4 pr-1">
+            <Section title="Format">
+              <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Format">
+                {Object.entries(SHARE_FORMATS).map(([id, item]) => {
+                  const on = format === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => setFormat(id)}
+                      title={`Good for ${item.hint}`}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors",
+                        on ? "border-[#0d99ff] bg-[#0d99ff]/[0.06]" : "border-border hover:border-foreground/20",
+                      )}
+                    >
+                      <RatioGlyph spec={item} on={on} />
+                      <span className="min-w-0">
+                        <span className="block text-[12px] font-medium text-foreground">{item.label}</span>
+                        <span className="block text-[10.5px] tabular-nums text-muted-foreground">{item.ratio}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">Good for {spec.hint}.</p>
+            </Section>
+
+            <Section title="Look">
+              <div className="flex items-center gap-3">
+                <Segmented
+                  label="Theme"
+                  options={[
+                    { id: "dark", label: "Dark" },
+                    { id: "light", label: "Light" },
+                  ]}
+                  value={theme}
+                  onChange={setTheme}
+                  className="w-[7.5rem]"
+                />
+                <div className="flex items-center gap-1.5" role="radiogroup" aria-label="Accent">
+                  {Object.entries(SHARE_ACCENTS).map(([id, item]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="radio"
+                      aria-checked={accent === id}
+                      aria-label={item.label}
+                      title={item.label}
+                      onClick={() => setAccent(id)}
+                      className={cn(
+                        "size-6 rounded-full ring-offset-2 ring-offset-background transition-shadow",
+                        accent === id ? "ring-2 ring-foreground" : "hover:ring-2 hover:ring-border",
+                      )}
+                      style={{ background: `linear-gradient(135deg, ${item.colors[0]}, ${item.colors[1]})` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </Section>
+
+            <Section title="Headline" action={edited.headline ? <ResetButton onClick={reset("headline")} /> : null}>
+              <Input id="share-headline" aria-label="Headline" value={headline} maxLength={120} onChange={edit("headline", setHeadline)} className="h-8 text-[13px]" />
+            </Section>
+            {mode === "image" ? (
+              <Section title="Subheading" action={edited.subhead ? <ResetButton onClick={reset("subhead")} /> : null}>
+                <Input id="share-subhead" aria-label="Subheading" value={subhead} maxLength={160} onChange={edit("subhead", setSubhead)} className="h-8 text-[13px]" />
+              </Section>
+            ) : null}
+
+            <Section
+              title="Post"
+              action={
+                <span className="flex items-center gap-3">
+                  {edited.caption ? <ResetButton onClick={reset("caption")} /> : null}
+                  <button type="button" onClick={copyText("caption", caption)} className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground">
+                    {copied === "caption" ? <Check className="size-3" /> : <Copy className="size-3" />}
+                    {copied === "caption" ? "Copied" : "Copy text"}
                   </button>
+                </span>
+              }
+            >
+              <Textarea id="share-caption" aria-label="Post text" value={caption} onChange={edit("caption", setCaption)} className="min-h-[6.5rem] text-[12px] leading-relaxed" />
+              <div className="grid grid-cols-3 gap-1.5">
+                {networks.map((network) => (
+                  <Button key={network.id} type="button" size="sm" variant="outline" className="h-8 px-2 text-[12px]" onClick={() => open(network.href)}>
+                    {network.label}
+                  </Button>
                 ))}
               </div>
-              <div className="flex items-center gap-1" role="radiogroup" aria-label="Accent">
-                {Object.entries(SHARE_ACCENTS).map(([id, item]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="radio"
-                    aria-checked={accent === id}
-                    aria-label={item.label}
-                    onClick={() => setAccent(id)}
-                    className={cn("size-6 rounded-full border-2", accent === id ? "border-foreground" : "border-transparent")}
-                    style={{ background: `linear-gradient(135deg, ${item.colors[0]}, ${item.colors[1]})` }}
-                  />
-                ))}
-              </div>
-            </div>
-          </OptionGroup>
-          <div className="space-y-1.5">
-            <Label htmlFor="share-headline" className="text-[12px]">
-              Headline
-            </Label>
-            <Input
-              id="share-headline"
-              value={headline}
-              maxLength={120}
-              onChange={(event) => {
-                setEdited((prev) => ({ ...prev, headline: true }));
-                setHeadline(event.target.value);
-              }}
-              className="h-8 text-[13px]"
-            />
-          </div>
-          {mode === "image" ? (
-            <div className="space-y-1.5">
-              <Label htmlFor="share-subhead" className="text-[12px]">
-                Subheading
-              </Label>
-              <Input
-                id="share-subhead"
-                value={subhead}
-                maxLength={160}
-                onChange={(event) => {
-                  setEdited((prev) => ({ ...prev, subhead: true }));
-                  setSubhead(event.target.value);
-                }}
-                className="h-8 text-[13px]"
-              />
-            </div>
-          ) : null}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="share-caption" className="text-[12px]">
-                Post text
-              </Label>
-              <button type="button" onClick={copyText("caption", caption)} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground">
-                {copied === "caption" ? <Check className="size-3" /> : <Copy className="size-3" />}
-                {copied === "caption" ? "Copied" : "Copy"}
+              <button
+                type="button"
+                onClick={copyText("link", shareUrl)}
+                className="flex h-8 w-full items-center gap-2 rounded-md border border-dashed border-border px-2.5 text-left text-[12px] text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
+              >
+                {copied === "link" ? <Check className="size-3.5 shrink-0 text-emerald-600" /> : <Link2 className="size-3.5 shrink-0" />}
+                <span className="min-w-0 flex-1 truncate font-mono text-[11.5px]">{displayUrl}</span>
+                <span className="shrink-0 font-medium">{copied === "link" ? "Copied" : "Copy link"}</span>
               </button>
-            </div>
-            <Textarea
-              id="share-caption"
-              value={caption}
-              onChange={(event) => {
-                setEdited((prev) => ({ ...prev, caption: true }));
-                setCaption(event.target.value);
-              }}
-              className="min-h-[7rem] text-[12px]"
-            />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Networks take the text and link. Attach the image or video you download to the post.
+              </p>
+            </Section>
           </div>
+
           {mode === "image" ? (
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-1.5">
-                <Button type="button" size="sm" onClick={download} disabled={!!busy || !items.length}>
-                  {busy === "png" ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-                  Download
-                </Button>
-                <Button type="button" size="sm" variant="outline" onClick={copyImage} disabled={!!busy || !items.length}>
+            <div className="space-y-1.5 border-t border-border/70 pt-3">
+              <Button type="button" className="h-9 w-full" onClick={download} disabled={!!busy || empty}>
+                {busy === "png" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                Download PNG
+              </Button>
+              <div className={cn("grid gap-1.5", shareable ? "grid-cols-2" : "grid-cols-1")}>
+                <Button type="button" size="sm" variant="outline" onClick={copyImage} disabled={!!busy || empty}>
                   {busy === "copy-image" ? <Loader2 className="size-3.5 animate-spin" /> : copied === "image" ? <Check className="size-3.5" /> : <ClipboardCopy className="size-3.5" />}
                   {copied === "image" ? "Copied" : "Copy image"}
                 </Button>
+                {shareable ? (
+                  <Button type="button" size="sm" variant="outline" onClick={nativeShare} disabled={!!busy || empty} title="Send it to Instagram, TikTok or any app">
+                    {busy === "native" ? <Loader2 className="size-3.5 animate-spin" /> : <Share2 className="size-3.5" />}
+                    Share to app
+                  </Button>
+                ) : null}
               </div>
-              <Button type="button" size="sm" variant="outline" className="w-full" onClick={nativeShare} disabled={!!busy || !items.length}>
-                {busy === "native" ? <Loader2 className="size-3.5 animate-spin" /> : <Share2 className="size-3.5" />}
-                Share to an app (Instagram, TikTok…)
-              </Button>
             </div>
           ) : null}
-          <OptionGroup label="Post it">
-            <div className="grid grid-cols-3 gap-1.5">
-              {networks.map((network) => (
-                <Button key={network.id} type="button" size="sm" variant="outline" className="h-8 px-2 text-[12px]" onClick={() => open(network.href)}>
-                  {network.label}
-                </Button>
-              ))}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 px-2 text-[12px]"
-                onClick={() => open(`mailto:?subject=${enc(headline || defaultHeadline)}&body=${enc(caption)}`)}
-              >
-                <Mail className="size-3.5" />
-                Email
-              </Button>
-            </div>
-            <Button type="button" size="sm" variant="ghost" className="w-full justify-start text-[12px]" onClick={copyText("link", shareUrl)}>
-              {copied === "link" ? <Check className="size-3.5" /> : <Link2 className="size-3.5" />}
-              {copied === "link" ? "Link copied" : `Copy link · ${displayUrl}`}
-            </Button>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Networks take text and a link; attach the downloaded image or video to the post. Instagram and TikTok only take posts from their apps, so use Share to an app on your phone.
-            </p>
-          </OptionGroup>
         </div>
       </div>
     </ShareSessions>

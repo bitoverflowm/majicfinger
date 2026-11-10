@@ -114,6 +114,7 @@ import { enqueueMarketLookup, lookupSheetMarket, marketMetaComplete, marketMetaP
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { RunProgressCard } from "@/components/dashboardComposer/integrationRunProgress";
 import { markTerminalTabEdited, updateTerminalTab } from "@/components/terminals/openTerminalTab";
+import { LiveSessionRelay } from "@/components/share/liveSessions";
 import {
   TerminalCanvasSession,
   TerminalPanelBody,
@@ -3428,6 +3429,7 @@ export function WorkspaceCanvas() {
       </div>
       {terminalTab ? (
         <TerminalCanvasSession key={terminalTab.id} tab={terminalTab} customized={terminalCustomized} onTop={terminalToTop} selectTab={selectTab}>
+          <LiveSessionRelay tabId={terminalTab.id} />
           {blockElements}
         </TerminalCanvasSession>
       ) : (

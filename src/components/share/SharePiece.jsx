@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { memo, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import { formatUsd } from "@/components/dashboardComposer/recipes/polymarketMarketSearch";
@@ -190,8 +190,8 @@ function ScoreCard() {
   );
 }
 
-/** One piece's content inside its card slot. */
-export function SharePiece({ piece }) {
+/** One piece's content inside its card slot. Kept out of the card's re-renders: typing a headline doesn't redraw its charts. */
+export const SharePiece = memo(function SharePiece({ piece }) {
   if (piece.kind === "panel") {
     return (
       <PieceSession tabId={piece.tabId} fallback={<PieceLoading />}>
@@ -235,4 +235,4 @@ export function SharePiece({ piece }) {
     return <p className="whitespace-pre-line p-5 text-[18px] leading-relaxed text-foreground">{piece.block.body}</p>;
   }
   return null;
-}
+});

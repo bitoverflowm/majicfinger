@@ -335,7 +335,7 @@ const EMPTY = {
  * The Publish tab: puts this project on its own page at lycheedata.com/<handle>/<slug>, with the
  * tabs, data mode, words and pictures that page should have.
  */
-export function PublishPanel({ projectId, user, tabs, filledTabIds, dashboardName, onPublished }) {
+export function PublishPanel({ projectId, user, tabs, filledTabIds, dashboardName, onPublication }) {
   const [loaded, setLoaded] = useState(null);
   const [handle, setHandle] = useState(String(user?.user_name || ""));
   const [form, setForm] = useState(EMPTY);
@@ -363,6 +363,7 @@ export function PublishPanel({ projectId, user, tabs, filledTabIds, dashboardNam
       const pub = result.data?.publication;
       if (result.data?.handle) setHandle(result.data.handle);
       setLoaded({ canPassword: !!result.data?.canPassword, publication: pub });
+      onPublication?.(pub || null);
       setForm({
         ...EMPTY,
         ...(pub
@@ -471,7 +472,7 @@ export function PublishPanel({ projectId, user, tabs, filledTabIds, dashboardNam
     setOgAuto(undefined);
     setHeaderImage(undefined);
     setPassword("");
-    onPublished?.(result.data.publication);
+    onPublication?.(result.data.publication);
   };
 
   const unpublish = async () => {
@@ -484,7 +485,7 @@ export function PublishPanel({ projectId, user, tabs, filledTabIds, dashboardNam
       return;
     }
     setLoaded((prev) => ({ ...prev, publication: result.data.publication }));
-    onPublished?.(result.data.publication);
+    onPublication?.(result.data.publication);
   };
 
   if (!projectId) return <p className="p-6 text-[13px] text-muted-foreground">Save this dashboard as a project to publish it.</p>;
