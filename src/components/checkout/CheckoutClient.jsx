@@ -22,7 +22,11 @@ import { checkoutEntryPage, msSinceCheckoutClick, trackCheckoutStep } from "@/li
 import { isKnownCheckoutQuery } from "@/lib/stripe/checkoutPlanQuery";
 
 const stripePromises = new Map();
-const ENV_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+/** Match server `stripePublishableKey()`: prefer the dev publishable key outside production builds. */
+const ENV_PUBLISHABLE_KEY =
+  (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_STRIPE_DEV_PUBLISHABLE_KEY) ||
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
+  "";
 
 function stripeFor(publishableKey) {
   if (!publishableKey) return null;
@@ -36,7 +40,7 @@ if (typeof window !== "undefined" && ENV_PUBLISHABLE_KEY) {
 }
 
 /** Past this, the buyer is offered Stripe's hosted checkout page instead. */
-const SLOW_FORM_MS = 8000;
+const SLOW_FORM_MS = 5000;
 
 function postCheckoutSession(body) {
   return fetch("/api/checkout/session", {
@@ -46,7 +50,7 @@ function postCheckoutSession(body) {
   }).then(async (res) => ({ ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) }));
 }
 
-/** One Checkout Session per page load, even when React mounts effects twice. */
+/** One Elements session per plan for the life of the tab (avoids duplicate Stripe sessions on remount). */
 const sessionRequests = new Map();
 
 function requestCheckoutSession(body) {
@@ -58,7 +62,10 @@ function requestCheckoutSession(body) {
       ms: Math.round(performance.now() - started),
     }));
     sessionRequests.set(key, request);
-    request.finally(() => setTimeout(() => sessionRequests.delete(key), 1000));
+    // Hosted fallback should be allowed to retry; Elements stays cached for this tab.
+    if (body.hosted) {
+      request.finally(() => setTimeout(() => sessionRequests.delete(key), 1500));
+    }
   }
   return sessionRequests.get(key);
 }
@@ -204,6 +211,25 @@ function RichText({ text }) {
   );
 }
 
+function CheckoutDeadEnd({ message }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 text-sm">
+      <p className="font-medium text-foreground">{message}</p>
+      <p className="mt-1 text-muted-foreground">
+        Nothing was charged. Go back to{" "}
+        <Link href="/#pricing" prefetch={false} className="underline underline-offset-4 hover:text-foreground">
+          pricing
+        </Link>{" "}
+        or email{" "}
+        <a href="mailto:kash@lycheedata.com" className="underline underline-offset-4 hover:text-foreground">
+          kash@lycheedata.com
+        </a>
+        .
+      </p>
+    </div>
+  );
+}
+
 export default function CheckoutClient({ plan, cycle, referral }) {
   const { resolvedTheme } = useTheme();
   const known = isKnownCheckoutQuery(plan, cycle);
@@ -215,7 +241,8 @@ export default function CheckoutClient({ plan, cycle, referral }) {
     sessionId: "",
     publishableKey: "",
   });
-  const [error, setError] = useState(known ? "" : "That plan isn't available.");
+  /** `plan` = bad URL; `session` = Elements session API failed (hosted fallback still offered). */
+  const [fatal, setFatal] = useState(known ? null : "plan");
   const [formReady, setFormReady] = useState(false);
   const [slow, setSlow] = useState(false);
   const mountedAt = useRef(typeof performance !== "undefined" ? performance.now() : 0);
@@ -240,25 +267,27 @@ export default function CheckoutClient({ plan, cycle, referral }) {
   }, [known, plan, cycle, referral]);
 
   const clientSecret = useMemo(() => {
-    if (!sessionRequest) return null;
+    if (!sessionRequest || fatal === "plan") return null;
     return sessionRequest.then((res) => {
       const data = res.data || {};
       if (data.code === "ALREADY_MEMBER" && data.redirect) {
         window.location.assign(data.redirect);
+        // Hang while navigating — never reject into CheckoutElementsProvider.
         return new Promise(() => {});
       }
       if (!res.ok || !data.clientSecret) {
-        throw new Error(res.status === 400 ? "That plan isn't available." : "We couldn't open checkout. Please try again.");
+        // Hang until `fatal` unmounts the provider; rejecting would flash a Stripe error.
+        return new Promise(() => {});
       }
       return data.clientSecret;
     });
-  }, [sessionRequest]);
+  }, [sessionRequest, fatal]);
 
   useEffect(() => {
-    if (formReady) return undefined;
+    if (formReady || fatal) return undefined;
     const id = window.setTimeout(() => setSlow(true), Math.max(0, SLOW_FORM_MS - msSinceCheckoutClick(mountedAt.current)));
     return () => window.clearTimeout(id);
-  }, [formReady]);
+  }, [formReady, fatal]);
 
   useEffect(() => {
     if (!sessionRequest) return undefined;
@@ -272,7 +301,7 @@ export default function CheckoutClient({ plan, cycle, referral }) {
           return;
         }
         if (!res.ok || !data.clientSecret) {
-          setError(res.status === 400 ? "That plan isn't available." : "We couldn't open checkout. Please try again.");
+          setFatal(res.status === 400 ? "plan" : "session");
           return;
         }
         setMeta({
@@ -285,7 +314,7 @@ export default function CheckoutClient({ plan, cycle, referral }) {
         });
       })
       .catch(() => {
-        if (!cancelled) setError("We couldn't open checkout. Please try again.");
+        if (!cancelled) setFatal("session");
       });
     return () => {
       cancelled = true;
@@ -293,11 +322,12 @@ export default function CheckoutClient({ plan, cycle, referral }) {
   }, [sessionRequest]);
 
   const theme = resolvedTheme === "dark" ? "dark" : "light";
-  const publishableKey = ENV_PUBLISHABLE_KEY || meta.publishableKey;
+  // Prefer the key the server used to create the session once we have it (avoids test/live mismatch).
+  const publishableKey = meta.publishableKey || ENV_PUBLISHABLE_KEY;
   const stripePromise = stripeFor(publishableKey);
   const options = useMemo(
     () =>
-      clientSecret && publishableKey
+      !fatal && clientSecret && publishableKey
         ? {
             clientSecret,
             elementsOptions: {
@@ -311,29 +341,34 @@ export default function CheckoutClient({ plan, cycle, referral }) {
         : null,
     // Stripe reads appearance/email once at mount; theme flips go through changeAppearance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [clientSecret, publishableKey],
+    [clientSecret, publishableKey, fatal],
   );
 
-  const showSlow = slow && !formReady;
+  const showSlow = slow && !formReady && !fatal;
   const hostedFallback = { plan, cycle, referral };
 
-  if (error || (options && !stripePromise)) {
+  if (fatal === "plan" || (options && !stripePromise && !fatal)) {
     return (
       <CheckoutLayout summary={meta.summary}>
-        <div className="rounded-xl border border-border bg-card p-6 text-sm">
-          <p className="font-medium text-foreground">{error || "Checkout is not configured."}</p>
-          <p className="mt-1 text-muted-foreground">
-            Nothing was charged. Go back to{" "}
-            <Link href="/#pricing" prefetch={false} className="underline underline-offset-4 hover:text-foreground">
-              pricing
-            </Link>{" "}
-            or email{" "}
-            <a href="mailto:kash@lycheedata.com" className="underline underline-offset-4 hover:text-foreground">
-              kash@lycheedata.com
-            </a>
-            .
-          </p>
-        </div>
+        <CheckoutDeadEnd message={fatal === "plan" ? "That plan isn't available." : "Checkout is not configured."} />
+      </CheckoutLayout>
+    );
+  }
+
+  if (fatal === "session") {
+    return (
+      <CheckoutLayout summary={meta.summary}>
+        <HostedCheckoutNotice
+          {...hostedFallback}
+          title="We couldn't open the in-app payment form."
+          body="Nothing was charged. Continue on Stripe's secure checkout page, or go back to pricing and try again."
+        />
+        <p className="text-sm text-muted-foreground">
+          Prefer to start over?{" "}
+          <Link href="/#pricing" prefetch={false} className="underline underline-offset-4 hover:text-foreground">
+            Back to pricing
+          </Link>
+        </p>
       </CheckoutLayout>
     );
   }
