@@ -199,7 +199,7 @@ export function NewsDemo() {
       ticker={(e) => e.text}
       renderCard={(e) => (
         <>
-          <p className="text-[9.5px] text-muted-foreground">{e.time} · Newswire</p>
+          <p className="text-[9.5px] text-muted-foreground">{e.time} · Google News</p>
           <p className="mt-0.5 font-medium text-primary">{e.text}</p>
           <p className="mt-1 text-muted-foreground">
             Market reacted <Reaction move={e.move} /> in 4 min
@@ -213,9 +213,9 @@ export function NewsDemo() {
 /* News archive */
 
 const ARCHIVE_EVENTS: readonly SignalEvent[] = [
-  { at: 12, move: 9, time: "Aug 2, 2024", text: "Unemployment jumps to 4.3% in the July jobs report" },
-  { at: 26, move: -5, time: "Aug 14, 2024", text: "July CPI cools to 2.9%, the lowest since 2021" },
-  { at: 38, move: 7, time: "Aug 23, 2024", text: "Powell at Jackson Hole: “The time has come”" },
+  { at: 12, move: 9, time: "Aug 2", text: "Unemployment jumps in the July jobs report" },
+  { at: 26, move: -5, time: "Aug 14", text: "Inflation cools to its lowest level in three years" },
+  { at: 38, move: 7, time: "Aug 23", text: "Fed chair at Jackson Hole: “The time has come”" },
 ];
 const ARCHIVE_SERIES = buildSeries(7, 30, ARCHIVE_EVENTS);
 const ARCHIVE_BARS = (() => {
@@ -230,7 +230,7 @@ export function NewsArchiveDemo() {
   return (
     <SignalTimeline
       title="News archive"
-      market="Fed cuts 50 bps in September 2024? · Yes"
+      market="Fed cuts 50 bps in September? · Yes"
       color="#d97706"
       series={ARCHIVE_SERIES}
       events={ARCHIVE_EVENTS}

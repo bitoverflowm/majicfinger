@@ -264,7 +264,8 @@ const VIEW_ORDER = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
  * The hero's terminal, running on the saved markets and traders. `clock` comes from
- * `useDemoClock` so the hero copy can follow the same scenes. Hovering pauses it (`onPause`) and
+ * `useDemoClock` so the hero copy can follow the same scenes; a clock playing its own order of
+ * scenes passes `next` so the right one is built ahead. Hovering pauses it (`onPause`) and
  * explains the panel under the pointer. Each market and trader is its own view; the ones coming
  * up next are built out of sight ahead of time, so switching to them is instant.
  */
@@ -295,7 +296,7 @@ export default function HeroDemo({ clock, paused, onPause, reduced, onReady }) {
     setFlags({ newWallet: true, firstTrade: true, bothSides: true });
   }, [scene, t]);
 
-  const nextScene = (scene + 1) % SCENES.length;
+  const nextScene = clock.next ?? (scene + 1) % SCENES.length;
   const nextUp = t >= current.ms - PREWARM_AHEAD_MS ? `${viewAt(nextScene, 0)},${viewAt(nextScene, Infinity)}` : "";
   // Built in the background, so putting a heavy dashboard together never holds up the animation on screen.
   const warm = useDeferredValue([viewAt(scene, Infinity), ...nextUp.split(",")].filter(Boolean).join(","));

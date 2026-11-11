@@ -8,7 +8,7 @@ import { BinanceFeedDemo, ChainlinkFeedDemo } from "./data-sources/feed-demos";
 import { KalshiDataDemo } from "./data-sources/kalshi-data-demo";
 import { RequestSourceDemo } from "./data-sources/request-source-demo";
 import { PolymarketDataDemo } from "./data-sources/polymarket-data-demo";
-import { NewsDemo, ProductHuntDemo, RedditDemo, XDemo } from "./data-sources/signal-demos";
+import { NewsArchiveDemo, NewsDemo, ProductHuntDemo, RedditDemo, XDemo } from "./data-sources/signal-demos";
 import { VenueVoteDemo } from "./data-sources/venue-vote-demo";
 import { VoteButton } from "./data-sources/vote-controls";
 
@@ -22,6 +22,8 @@ type SourceCard = {
   links?: readonly SourceLink[];
   /** Coming-soon cards take a vote instead of links. */
   vote?: { id: string; name: string };
+  /** Spans two columns on the three-column layout. */
+  wide?: boolean;
 };
 
 type SourceRow = {
@@ -106,6 +108,34 @@ const ROWS: readonly SourceRow[] = [
       },
     ],
   },
+  {
+    id: "news",
+    heading: "Real-time news",
+    description:
+      "See which stories moved the odds. Headlines are matched to each market and lined up against its price, from breaking news to the coverage behind older moves.",
+    columns: 2,
+    cards: [
+      {
+        id: "news-live",
+        title: "Breaking headlines",
+        description:
+          "Google News headlines matched to a market's keywords, newest first. Pick a story to jump to the moment it broke on the price chart and see how fast traders reacted.",
+        links: [
+          { label: "Open the Holder Terminal", href: "/polymarket-holder-terminal" },
+          { label: "Search today's headlines", href: "/news-archive" },
+        ],
+        demo: <NewsDemo />,
+      },
+      {
+        id: "news-archive",
+        title: "News archive",
+        description:
+          "Every English article GDELT has crawled since our archive began, refreshed every 15 minutes. Search any topic, see when coverage spiked, and read the stories from that stretch.",
+        links: [{ label: "Search the news archive", href: "/news-archive" }],
+        demo: <NewsArchiveDemo />,
+      },
+    ],
+  },
 ];
 
 const COMING_SOON: SourceRow = {
@@ -116,14 +146,6 @@ const COMING_SOON: SourceRow = {
   columns: 3,
   compact: true,
   cards: [
-    {
-      id: "news",
-      title: "News",
-      description:
-        "Breaking headlines overlaid on market prices, so you can see which stories moved the odds and how quickly traders reacted.",
-      vote: { id: "news", name: "News" },
-      demo: <NewsDemo />,
-    },
     {
       id: "x",
       title: "X (Twitter)",
@@ -186,6 +208,7 @@ const COMING_SOON: SourceRow = {
       description:
         "Have a dataset in mind? Vote on the ideas we're weighing or suggest your own. The integrations with the most votes get built first.",
       demo: <RequestSourceDemo />,
+      wide: true,
     },
   ],
 };
@@ -221,8 +244,8 @@ export function DataSourcesSection() {
             Live and historical prediction market data, connected.
           </h2>
           <p className="mt-1 text-muted-foreground">
-            Research Kalshi and Polymarket alongside Binance prices and Chainlink feeds. Bring market odds, trading
-            activity, and underlying crypto prices into the same workspace.
+            Research Kalshi and Polymarket alongside Binance prices, Chainlink feeds, and real-time news. Bring market
+            odds, trading activity, underlying crypto prices, and the headlines behind them into the same workspace.
           </p>
         </div>
 
@@ -276,7 +299,7 @@ function SourceRowView({ row }: { row: SourceRow }) {
 function SourceCardView({ card, nested, compact }: { card: SourceCard; nested: boolean; compact?: boolean }) {
   const Title = nested ? "h4" : "h3";
   return (
-    <article className="flex flex-col rounded-xl bg-muted p-2 sm:p-3">
+    <article className={cn("flex flex-col rounded-xl bg-muted p-2 sm:p-3", card.wide && "lg:col-span-2")}>
       <div
         className={cn(
           "px-3 pt-3 leading-snug tracking-tight sm:px-4 sm:pt-4",
