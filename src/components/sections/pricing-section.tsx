@@ -622,7 +622,7 @@ export function PricingSection({
                   className={cn(
                     "relative flex flex-col rounded-2xl border p-6",
                     plan.isPopular
-                      ? "border-secondary/30 bg-gradient-to-b from-secondary/[0.07] to-secondary/[0.02] shadow-[0_12px_32px_-16px_rgba(59,91,219,0.35)] dark:from-secondary/[0.14] dark:to-secondary/[0.04]"
+                      ? "dark border-secondary/50 bg-[#0e1736] text-foreground shadow-[0_18px_40px_-18px_rgba(30,58,160,0.65)]"
                       : "border-border bg-background",
                     isCurrentTier && "ring-2 ring-[#0d99ff]",
                   )}
