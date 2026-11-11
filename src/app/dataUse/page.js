@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { IoIosArrowRoundBack } from "react-icons/io";
 import { canonicalUrl } from "@/lib/site";
+import { FooterSection } from "@/components/sections/footer-section";
 
 export const metadata = {
   title: "Data Use Policy | Lychee",
@@ -56,6 +57,7 @@ const DataUse = () => {
                     </div>
                 </div>
             </div>
+            <FooterSection />
         </div>
     );
 };

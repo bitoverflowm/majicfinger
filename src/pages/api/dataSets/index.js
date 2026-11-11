@@ -68,7 +68,7 @@ export default async function handler(req, res) {
                         return res.status(403).json({
                             success: false,
                             code: "ADVANCED_DATA_STORAGE_REQUIRED",
-                            message: "A Lite, Researcher, or Quant plan is required to save projects with sheets above the advanced data storage row limit.",
+                            message: "A Lite, Pro, or Max plan is required to save projects with sheets above the advanced data storage row limit.",
                             requiredTier: "lite",
                             storageSummary,
                         });

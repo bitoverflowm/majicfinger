@@ -135,7 +135,7 @@ export default async function handler(req, res) {
   const passwordOn = !!body.passwordOn;
   let passwordHash;
   if (passwordOn) {
-    if (!canPassword) return res.status(402).json({ success: false, code: "QUANT_REQUIRED", message: "Password-protected pages come with the Quant plan." });
+    if (!canPassword) return res.status(402).json({ success: false, code: "QUANT_REQUIRED", message: "Password-protected pages come with the Max plan." });
     const password = typeof body.password === "string" ? body.password : "";
     if (password) {
       if (password.length < PUBLISH_LIMITS.passwordMin || password.length > PUBLISH_LIMITS.passwordMax) {

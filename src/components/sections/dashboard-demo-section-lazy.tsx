@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect } from "react";
 
 import {
   DEMO_WINDOW_TITLE,
@@ -68,8 +69,20 @@ export function DashboardDemoSkeleton({
  * Homepage demo. Phones and small tablets get the cropped preview instead of the live app; until the
  * screen size is known (server render, hydration) both are laid out and CSS shows the right one.
  */
+/** The full-width demo spans 100vw, which counts a classic scrollbar; publish its width so it can be taken off. */
+function useScrollbarWidth() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const measure = () => root.style.setProperty("--scrollbar", `${window.innerWidth - root.clientWidth}px`);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+}
+
 function HomepageDemo(props: DashboardDemoSectionProps) {
   const compact = useCompactScreen();
+  useScrollbarWidth();
   if (compact === false) return <FramedDashboardDemoSection {...props} />;
   return (
     <section id="demo" className={cn(HOMEPAGE_DEMO_SECTION_CLASS, "z-30")}>

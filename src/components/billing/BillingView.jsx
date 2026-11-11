@@ -36,9 +36,11 @@ const statusFetcher = (url) =>
 
 const CYCLE_NOUN = { weekly: "weekly", monthly: "monthly", annual: "annually" };
 
+const TIER_NAMES = { researcher: "Pro", quant: "Max", pro: "Legacy Pro" };
+
 function tierName(tier) {
   const t = String(tier || "");
-  return t ? t.charAt(0).toUpperCase() + t.slice(1) : "";
+  return TIER_NAMES[t] || (t ? t.charAt(0).toUpperCase() + t.slice(1) : "");
 }
 
 function formatMoney(cents, currency = "usd") {

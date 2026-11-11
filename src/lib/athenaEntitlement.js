@@ -91,8 +91,8 @@ export function joinTierLabel(userLike) {
   if (String(userLike.userId || "") === "dev-bypass-no-db") return "Elite";
   if (isOwnerFullAccessUser(userLike) || userLike.lifetimeMember) return "Elite";
   const tier = normalizedSubscriptionTier(userLike);
-  if (tier === "quant") return "Quant";
-  if (tier === "researcher") return "Researcher";
+  if (tier === "quant") return "Max";
+  if (tier === "researcher") return "Pro";
   if (tier === "lite") return "Lite";
   if (tier === "elite" || tier === "premium") return "Elite";
   if (tier === "pro") return "Pro";

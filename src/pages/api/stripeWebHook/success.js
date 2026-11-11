@@ -21,6 +21,10 @@ export const config = {
 // Keep legacy plans so existing subscribers are not downgraded.
 const PLAN_MAP = {
   // Current plans
+  "600:week": { tier: "lite", cycle: "weekly" },
+  "1100:month": { tier: "lite", cycle: "monthly" },
+  "9900:year": { tier: "lite", cycle: "annual" },
+  // Earlier Lite prices, still billed for existing subscribers
   "900:week": { tier: "lite", cycle: "weekly" },
   "2300:month": { tier: "lite", cycle: "monthly" },
   "23000:year": { tier: "lite", cycle: "annual" },

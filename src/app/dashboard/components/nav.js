@@ -2201,7 +2201,7 @@ const Nav = () => {
           <AlertDialogTitle>Paid plan required</AlertDialogTitle>
           <AlertDialogDescription className="space-y-3">
             <span className="block">
-              Hey, upgrade to Lite, Researcher, or Quant because you are working with extremely large data
+              Hey, upgrade to Lite, Pro, or Max because you are working with extremely large data
               ({upgradeSizeLabel} estimated), or use aggregations and operations to reduce data size.
             </span>
             {upgradeLargestSheet && (

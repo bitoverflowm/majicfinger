@@ -733,7 +733,7 @@ export function PublishPanel({ projectId, user, tabs, filledTabIds, dashboardNam
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-[13px] font-medium text-foreground">
                   Password protect
-                  <span className="rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[10.5px] font-semibold text-violet-600 dark:text-violet-300">Quant</span>
+                  <span className="rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[10.5px] font-semibold text-violet-600 dark:text-violet-300">Max</span>
                 </p>
                 <p className="text-[12px] text-muted-foreground">Only people with the password can open it. Search engines skip it.</p>
               </div>
@@ -741,8 +741,8 @@ export function PublishPanel({ projectId, user, tabs, filledTabIds, dashboardNam
             </div>
             {!loaded.canPassword ? (
               <p className="mt-2 text-[12px] text-muted-foreground">
-                Comes with the Quant plan.{" "}
-                <a href="/pricing" className="font-medium text-foreground underline-offset-2 hover:underline">
+                Comes with the Max plan.{" "}
+                <a href="/#pricing" className="font-medium text-foreground underline-offset-2 hover:underline">
                   See plans
                 </a>
               </p>

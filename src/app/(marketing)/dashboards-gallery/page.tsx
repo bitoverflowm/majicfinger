@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DashboardsSection } from "@/components/sections/dashboards-section";
+import { FooterSection } from "@/components/sections/footer-section";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -103,6 +104,8 @@ export default function DashboardsGalleryPage() {
       <div className="pb-16 pt-8">
         <GalleryCta />
       </div>
+
+      <FooterSection />
     </main>
   );
 }

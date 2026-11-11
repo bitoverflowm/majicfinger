@@ -65,9 +65,9 @@ const PRODUCTS = [
     name: "Lychee Lite",
     description: "Every integration and the full no-code workflow, sized for lighter research.",
     prices: [
-      { key: "lite_weekly", amount: 900, interval: "week", nickname: "Lite weekly" },
-      { key: "lite_monthly", amount: 2300, interval: "month", nickname: "Lite monthly" },
-      { key: "lite_annual", amount: 23000, interval: "year", nickname: "Lite annual" },
+      { key: "lite_weekly", amount: 600, interval: "week", nickname: "Lite weekly" },
+      { key: "lite_monthly", amount: 1100, interval: "month", nickname: "Lite monthly" },
+      { key: "lite_annual", amount: 9900, interval: "year", nickname: "Lite annual" },
     ],
   },
   {

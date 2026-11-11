@@ -9,7 +9,7 @@ export function DemoBackdrop({ className, children, ...props }: HTMLAttributes<H
   return (
     <div
       data-hides-nav
-      className={cn("relative overflow-hidden rounded-xl p-3 sm:p-8 lg:p-12", className)}
+      className={cn("relative overflow-hidden rounded-xl p-3 sm:p-8 lg:rounded-none lg:p-12", className)}
       {...props}
     >
       <Image
@@ -18,7 +18,7 @@ export function DemoBackdrop({ className, children, ...props }: HTMLAttributes<H
         fill
         priority
         placeholder="blur"
-        sizes="(min-width: 1696px) 1664px, 100vw"
+        sizes="100vw"
         className="pointer-events-none select-none object-cover"
       />
       {children}

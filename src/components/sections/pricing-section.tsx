@@ -67,6 +67,7 @@ type Plan = {
   buttonText: string;
   href?: string;
   isPopular?: boolean;
+  badgeLabel?: string;
   includesLabel?: string;
   venuesLabel?: string;
   features: readonly PlanFeature[];
@@ -641,6 +642,10 @@ export function PricingSection({
                     {isCurrentTier ? (
                       <span className="inline-flex h-5 items-center rounded-full bg-[#0d99ff] px-2 text-[11px] font-medium text-white">
                         Your plan
+                      </span>
+                    ) : plan.badgeLabel ? (
+                      <span className="inline-flex h-5 items-center rounded-full border border-secondary/25 bg-secondary/10 px-2 text-[11px] font-medium text-secondary dark:border-secondary/40 dark:bg-secondary/20 dark:text-blue-200">
+                        {plan.badgeLabel}
                       </span>
                     ) : null}
                   </div>

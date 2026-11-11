@@ -38,6 +38,10 @@ if (!Number.isFinite(SINCE_DAYS) || SINCE_DAYS <= 0) throw new Error("Invalid SI
 // Keep this mapping aligned with src/pages/api/stripeWebHook/success.js
 const PLAN_MAP = {
   // Current plans
+  "600:week": { tier: "lite", cycle: "weekly" },
+  "1100:month": { tier: "lite", cycle: "monthly" },
+  "9900:year": { tier: "lite", cycle: "annual" },
+  // Earlier Lite prices, still billed for existing subscribers
   "900:week": { tier: "lite", cycle: "weekly" },
   "2300:month": { tier: "lite", cycle: "monthly" },
   "23000:year": { tier: "lite", cycle: "annual" },
