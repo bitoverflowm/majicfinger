@@ -518,6 +518,19 @@ function useInView(ref, margin = "0px") {
   return inView;
 }
 
+/** True once the element has scrolled up and out past the top of the screen. */
+function useScrolledPast(ref) {
+  const [past, setPast] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const observer = new IntersectionObserver(([entry]) => setPast(!entry.isIntersecting && entry.boundingClientRect.top < 0));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref]);
+  return past;
+}
+
 function Breadcrumb({ page }) {
   return (
     <nav aria-label="Breadcrumb" className="text-[12px] text-muted-foreground">
@@ -733,8 +746,9 @@ export function HolderLandingExperience({ pageKey, initial }) {
 
   const heroCtaRef = useRef(null);
   const finalRef = useRef(null);
-  const heroCtaInView = useInView(heroCtaRef);
+  const heroCtaPassed = useScrolledPast(heroCtaRef);
   const finalInView = useInView(finalRef);
+  const finalPassed = useScrolledPast(finalRef);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const recording = useDemoRecording();
@@ -826,7 +840,7 @@ export function HolderLandingExperience({ pageKey, initial }) {
         </div>
       </div>
       <MobileCtaBar
-        shown={mounted && !heroCtaInView && !finalInView}
+        shown={mounted && heroCtaPassed && !finalInView && !finalPassed}
         label={subjectName(focusChapter.kind, focusSubject) || page.navLabel}
         terminalHref={terminalHref}
       />

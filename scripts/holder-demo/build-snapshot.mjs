@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
- * Turns a Holder Terminal recording into the snapshot the landing page's hero demo plays back.
+ * Turns a Holder Terminal recording of one market and one of its holders into a saved pair the
+ * landing page's hero demo plays back.
  *
  *   1. With the dev server running, open
  *      /polymarket-holder-terminal?recordDemo=1&recordMarket=<conditionId>&recordTrader=<wallet>
  *      and wait for the recorder's panels to fill (a few minutes for the holder lookups).
- *   2. Save `JSON.stringify(window.__holderDemo.dump())` to .local/holder-demo/raw-dump.json.
- *   3. node scripts/holder-demo/build-snapshot.mjs [raw-dump.json]
+ *   2. Save `JSON.stringify(window.__holderDemo.dump())` to .local/holder-demo/<name>.json.
+ *   3. node scripts/holder-demo/build-snapshot.mjs <name> [recording.json]
  *
- * Writes src/lib/holderLanding/demoSnapshot.json and copies the images it shows first into
- * public/holder-demo/, so the demo plays with no network at all.
+ * Writes src/lib/holderLanding/demoPairs/<name>.json and copies the images it shows first into
+ * public/holder-demo/<name>/, so the demo plays with no network at all. The demo lists its pairs
+ * in components/holderLanding/demo/demoSession.jsx.
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -18,19 +20,26 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const RAW = resolve(process.argv[2] || join(ROOT, ".local/holder-demo/raw-dump.json"));
-const OUT = join(ROOT, "src/lib/holderLanding/demoSnapshot.json");
-const IMAGE_DIR = join(ROOT, "public/holder-demo");
-const IMAGE_URL = "/holder-demo";
+const NAME = process.argv[2];
+if (!NAME || !/^[a-z0-9-]+$/.test(NAME)) throw new Error("Name the pair, e.g. `node scripts/holder-demo/build-snapshot.mjs newsom`.");
+const RAW = resolve(process.argv[3] || join(ROOT, `.local/holder-demo/${NAME}.json`));
+const OUT = join(ROOT, `src/lib/holderLanding/demoPairs/${NAME}.json`);
+const IMAGE_DIR = join(ROOT, `public/holder-demo/${NAME}`);
+const IMAGE_URL = `/holder-demo/${NAME}`;
 const IMAGE_PX = 96;
 
-/** What the demo's search shows for the typed query. Real markets, picked by hand. */
-const QUERY = "gavin newsom 2028";
-const SUGGESTIONS = [
-  { conditionId: "0x52226ec4393285ffc942019f20e3210e9311fc64cf1c7a9d1e9fbf27237352a6", title: "Will Gavin Newsom announce a Presidential run by December 31, 2026?", volume: 70875, icon: "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-gavin-newsom-announce-presidential-run-by-2pO1J7ud3cLi.jpg" },
-  { conditionId: "0xd2401a2ead0226a29901704e04fba02ab6612260e3246bc805830621ea6a8ae9", title: "Newsom flips Vance for 2028 president by March 31?", volume: 9677, icon: "https://polymarket-upload.s3.us-east-2.amazonaws.com/presidential-election-winner-2024-afdda358-219d-448a-abb5-ba4d14118d71.png" },
-  { conditionId: "", title: "Gavin Newsom 2028 presidential odds leader on November 30?", volume: 3277, icon: "https://polymarket-upload.s3.us-east-2.amazonaws.com/presidential-election-winner-2024-afdda358-219d-448a-abb5-ba4d14118d71.png" },
-];
+/** What the demo's search shows for the typed query, for pairs the demo searches for. Real markets, picked by hand. */
+const SEARCHES = {
+  newsom: {
+    query: "gavin newsom 2028",
+    suggestions: [
+      { conditionId: "0x52226ec4393285ffc942019f20e3210e9311fc64cf1c7a9d1e9fbf27237352a6", title: "Will Gavin Newsom announce a Presidential run by December 31, 2026?", volume: 70875, icon: "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-gavin-newsom-announce-presidential-run-by-2pO1J7ud3cLi.jpg" },
+      { conditionId: "0xd2401a2ead0226a29901704e04fba02ab6612260e3246bc805830621ea6a8ae9", title: "Newsom flips Vance for 2028 president by March 31?", volume: 9677, icon: "https://polymarket-upload.s3.us-east-2.amazonaws.com/presidential-election-winner-2024-afdda358-219d-448a-abb5-ba4d14118d71.png" },
+      { conditionId: "", title: "Gavin Newsom 2028 presidential odds leader on November 30?", volume: 3277, icon: "https://polymarket-upload.s3.us-east-2.amazonaws.com/presidential-election-winner-2024-afdda358-219d-448a-abb5-ba4d14118d71.png" },
+    ],
+  },
+};
+const { query: QUERY = "", suggestions: SUGGESTIONS = [] } = SEARCHES[NAME] || {};
 
 const LIMITS = { activity: 200, positions: 150, finished: 300, articles: 150, firstImages: 24 };
 const DROP = new Set(["profile_image", "profile_image_optimized", "bio", "source_block", "interval", "fidelity", "source_fidelity"]);

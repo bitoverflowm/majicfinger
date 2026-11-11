@@ -49,11 +49,20 @@ function expand(part) {
   return part.rows.map((row) => ({ ...part.common, ...row }));
 }
 
-let loading = null;
+/**
+ * The saved pairs, a market and one of its largest holders each, in the order the script numbers
+ * them (`pair` in demoScript.js). `scripts/holder-demo/build-snapshot.mjs` writes them.
+ */
+const PAIRS = [
+  () => import("@/lib/holderLanding/demoPairs/newsom.json"),
+  () => import("@/lib/holderLanding/demoPairs/iran.json"),
+  () => import("@/lib/holderLanding/demoPairs/fed.json"),
+];
+const loading = [];
 
-/** The recording, moved to now. Loads once per page, after the hero has painted. */
-export function loadDemoSnapshot() {
-  loading ||= import("@/lib/holderLanding/demoSnapshot.json").then((mod) => {
+/** A saved pair, moved to now. Each loads once per page. */
+export function loadDemoPair(index) {
+  loading[index] ||= PAIRS[index]().then((mod) => {
     const raw = mod.default || mod;
     const snap = shiftTimes(raw, Date.now() - raw.recordedAt);
     snap.market.trades = expand(snap.market.trades);
@@ -65,20 +74,26 @@ export function loadDemoSnapshot() {
     snap.feed = replayFeed(snap);
     return snap;
   });
-  return loading;
+  return loading[index];
 }
 
-export function useDemoSnapshot(enabled = true) {
-  const [snap, setSnap] = useState(null);
+/** Every saved pair, null until it loads: the first straight away, the others one after another behind it. */
+export function useDemoPairs(enabled = true) {
+  const [pairs, setPairs] = useState(() => PAIRS.map(() => null));
   useEffect(() => {
     if (!enabled) return undefined;
     let alive = true;
-    loadDemoSnapshot().then((value) => alive && setSnap(value));
+    (async () => {
+      for (let index = 0; index < PAIRS.length && alive; index += 1) {
+        const pair = await loadDemoPair(index).catch(() => null);
+        if (alive && pair) setPairs((prev) => prev.map((item, at) => (at === index ? pair : item)));
+      }
+    })();
     return () => {
       alive = false;
     };
   }, [enabled]);
-  return snap;
+  return pairs;
 }
 
 function between(lines, startSec, endSec) {

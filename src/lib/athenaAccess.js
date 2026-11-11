@@ -98,7 +98,7 @@ function liteLimits() {
   };
 }
 
-function freeLimits() {
+export function freeLimits() {
   return {
     maxSelectRows: ATHENA_SAMPLE_ROW_LIMIT,
     maxComposeRows: COMPOSE_UNCONSTRAINED_ROW_CAP,

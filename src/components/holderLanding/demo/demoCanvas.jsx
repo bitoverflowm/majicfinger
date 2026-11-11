@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
+import { createContext, memo, useContext, useEffect, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { formatUsd } from "@/components/dashboardComposer/recipes/polymarketMarketSearch";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -62,8 +62,12 @@ export const PANEL_COPY = {
   "trader.marketFocus": ["Market specific", "Every buy and sell the wallet made in one market, on the price line, next to the headlines of the day."],
 };
 
+/** The panel a canvas opened on. It lands first, whatever its place in the layout. */
+const LeadPanelContext = createContext(null);
+
 /** Grows in like a block landing on the dashboard canvas, with a skeleton until its panel is ready. */
-function DemoCard({ id, span = 24, height, fit = true, order = 0, hovered, children }) {
+function DemoCard({ id, span = 24, height, fit = true, order: listed = 0, hovered, children }) {
+  const order = useContext(LeadPanelContext) === id ? 0 : listed;
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const timer = window.setTimeout(() => setReady(true), 260 + order * 140);
@@ -151,9 +155,19 @@ function DemoPriceNewsPanel() {
   );
 }
 
-export const MarketCanvas = memo(function MarketCanvas({ hovered }) {
+/** The canvas grid. `lead` is kept from the first render, so the panel the canvas opened on lands first. */
+function CanvasGrid({ lead, children }) {
+  const [first] = useState(lead);
   return (
-    <div className="grid grid-cols-6 gap-3">
+    <LeadPanelContext.Provider value={first}>
+      <div className="grid grid-cols-6 gap-3">{children}</div>
+    </LeadPanelContext.Provider>
+  );
+}
+
+export const MarketCanvas = memo(function MarketCanvas({ hovered, lead }) {
+  return (
+    <CanvasGrid lead={lead}>
       <DemoCard id="market.stats" span={8} height={470} order={0} hovered={hovered}>
         <MarketStatsPanel />
       </DemoCard>
@@ -186,13 +200,13 @@ export const MarketCanvas = memo(function MarketCanvas({ hovered }) {
           <MarketScoresPanel />
         </DemoCard>
       </SteadyMarketSession>
-    </div>
+    </CanvasGrid>
   );
 });
 
-export const TraderCanvas = memo(function TraderCanvas({ hovered }) {
+export const TraderCanvas = memo(function TraderCanvas({ hovered, lead }) {
   return (
-    <div className="grid grid-cols-6 gap-3">
+    <CanvasGrid lead={lead}>
       <DemoCard id="trader.stats" span={8} height={500} order={0} hovered={hovered}>
         <TraderStatsPanel />
       </DemoCard>
@@ -226,13 +240,15 @@ export const TraderCanvas = memo(function TraderCanvas({ hovered }) {
       <DemoCard id="trader.marketFocus" order={9} hovered={hovered}>
         <TraderMarketFocusPanel />
       </DemoCard>
-    </div>
+    </CanvasGrid>
   );
 });
 
 /** Looks like the terminal's search, driven by the demo instead of the keyboard. */
-export function DemoSearchPanel({ query, typed, focused, open, highlight, suggestions, hovered }) {
+export function DemoSearchPanel({ mode = "market", query, typed, focused, open, highlight, suggestions, hovered }) {
   const loading = focused && typed.length === query.length && !open;
+  const traders = mode === "trader";
+  const tab = (active) => cn("rounded-md px-3 py-1 font-medium transition-colors duration-200", active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground");
   return (
     <div
       data-demo-panel="search"
@@ -243,8 +259,10 @@ export function DemoSearchPanel({ query, typed, focused, open, highlight, sugges
     >
       <div className="max-w-3xl">
         <div className="mb-2 inline-flex rounded-lg bg-muted p-0.5 text-[12px]">
-          <span className="rounded-md bg-background px-3 py-1 font-medium text-foreground shadow-sm">Search market</span>
-          <span className="rounded-md px-3 py-1 font-medium text-muted-foreground">Search trader</span>
+          <span className={tab(!traders)}>Search market</span>
+          <span data-demo="trader-tab" className={tab(traders)}>
+            Search trader
+          </span>
         </div>
         <div className="relative">
           <span className="pointer-events-none absolute left-3 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
@@ -257,7 +275,13 @@ export function DemoSearchPanel({ query, typed, focused, open, highlight, sugges
               focused && "ring-2 ring-ring ring-offset-2 ring-offset-background",
             )}
           >
-            {typed ? <span className="text-foreground">{typed}</span> : <span className="text-muted-foreground">Search markets, events or series in plain English, or paste a link</span>}
+            {typed ? (
+              <span className="text-foreground">{typed}</span>
+            ) : (
+              <span className="text-muted-foreground">
+                {traders ? "Search a username or paste a wallet address" : "Search markets, events or series in plain English, or paste a link"}
+              </span>
+            )}
             {focused && typed.length < query.length ? <span className="ml-px h-4 w-px bg-foreground" style={{ animation: "hd-caret 1s steps(1) infinite" }} /> : null}
           </div>
           {open ? (
@@ -272,13 +296,19 @@ export function DemoSearchPanel({ query, typed, focused, open, highlight, sugges
                   <span className="flex items-center gap-2">
                     {item.icon ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.icon} alt="" className="size-5 shrink-0 rounded object-cover" />
+                      <img src={item.icon} alt="" className={cn("size-5 shrink-0 object-cover", traders ? "rounded-full" : "rounded")} />
                     ) : null}
                     <span className="min-w-0 text-sm font-medium text-foreground">{item.title}</span>
+                    {item.handle ? <span className="text-xs text-muted-foreground">{item.handle}</span> : null}
                   </span>
                   <span className="flex items-center gap-1.5 pl-7 text-[10px] text-muted-foreground">
-                    <span className="rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[0.65rem] font-medium text-sky-700 dark:text-sky-300">market</span>
+                    {traders ? (
+                      <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[0.65rem] font-medium text-emerald-700 dark:text-emerald-300">trader</span>
+                    ) : (
+                      <span className="rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[0.65rem] font-medium text-sky-700 dark:text-sky-300">market</span>
+                    )}
                     {item.volume ? <span>vol {formatUsd(item.volume)}</span> : null}
+                    {item.pnl != null ? <span>realized P&amp;L {formatUsd(item.pnl)}</span> : null}
                   </span>
                 </li>
               ))}

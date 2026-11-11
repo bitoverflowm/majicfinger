@@ -2,7 +2,7 @@
 
 /**
  * Small, real samples for the integration dialog preview.
- * Deep-history pulls go through Athena once per tab; live sources use the existing proxies.
+ * Deep-history samples come from an edge-cached route; live sources use the existing proxies.
  */
 
 import { toast } from "sonner";
@@ -124,23 +124,17 @@ function rowsToObjects(columns, rows) {
   });
 }
 
-async function postAthena(body) {
-  const res = await fetch("/api/data-lake/athena-query", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    body: JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || "Sample pull failed");
-  return rowsToObjects(json.columns || [], json.rows || []);
-}
-
 async function getJson(url) {
   const res = await fetch(url, { credentials: "same-origin" });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || "Sample pull failed");
   return json;
+}
+
+/** A fixed historical sample, cached at the edge by `/api/integrations/preview-sample`. */
+async function lakeSample(sample) {
+  const json = await getJson(`/api/integrations/preview-sample?sample=${sample}`);
+  return rowsToObjects(json.columns || [], json.rows || []);
 }
 
 function volumeStats(label, volumes, { money = false, sentence }) {
@@ -158,44 +152,7 @@ function volumeStats(label, volumes, { money = false, sentence }) {
 }
 
 async function loadKalshiHistorical() {
-  const [markets, trades] = await Promise.all([
-    postAthena({
-      lake: "kalshi",
-      table: "markets",
-      queryType: "compose",
-      demo: true,
-      limit: 6,
-      compose: {
-        select: [
-          { column: "ticker", alias: "ticker" },
-          { column: "title", alias: "title" },
-          { column: "status", alias: "status" },
-          { column: "last_price", alias: "last_price" },
-          { column: "volume", alias: "volume" },
-        ],
-        groupByAliases: [],
-        orderBy: [{ alias: "volume", direction: "desc" }],
-      },
-    }),
-    postAthena({
-      lake: "kalshi",
-      table: "trades",
-      queryType: "compose",
-      demo: true,
-      limit: 6,
-      compose: {
-        select: [
-          { column: "ticker", alias: "ticker" },
-          { column: "count", alias: "count" },
-          { column: "yes_price", alias: "yes_price" },
-          { column: "taker_side", alias: "taker_side" },
-          { column: "created_time", alias: "created_time" },
-        ],
-        groupByAliases: [],
-        orderBy: [{ alias: "count", direction: "desc" }],
-      },
-    }),
-  ]);
+  const [markets, trades] = await Promise.all([lakeSample("kalshi-markets"), lakeSample("kalshi-trades")]);
 
   const tradeRows = trades.reduce((acc, row) => {
     const ticker = String(row.ticker || "");
@@ -366,23 +323,7 @@ async function loadKalshiLive() {
 }
 
 async function loadPolymarketHistorical() {
-  const markets = await postAthena({
-    lake: "polymarket",
-    table: "markets",
-    queryType: "compose",
-    demo: true,
-    limit: 6,
-    compose: {
-      select: [
-        { column: "question", alias: "question" },
-        { column: "volume", alias: "volume" },
-        { column: "outcome_prices", alias: "outcome_prices" },
-        { column: "closed", alias: "closed" },
-      ],
-      groupByAliases: [],
-      orderBy: [{ alias: "volume", direction: "desc" }],
-    },
-  });
+  const markets = await lakeSample("polymarket-markets");
   const marketRows = markets.slice(0, 6).map((row) => {
     let yes = null;
     try {
@@ -499,25 +440,18 @@ export function formatUsd(value) {
 let binanceQuoteTask = null;
 let chainlinkQuoteTask = null;
 
-/** One socket per pair: the topics only stream live updates for one symbol per connection. */
+/**
+ * One socket for every pair. It only streams live updates for one symbol, but the opening snapshot of
+ * recent prices arrives for each subscription, which is all the preview needs. Browsers open sockets
+ * to one host one at a time, so a socket per pair took seconds longer.
+ */
 function samplePairQuotes(topic, pairs) {
-  return Promise.all(
-    pairs.map((pair) =>
-      collectQuoteFeed({
-        topic,
-        pairs: [pair],
-        subscriptions: [priceStreamSubscription(topic, pair.symbol)],
-        stopAt: 3,
-        timeoutMs: 5000,
-      }).catch(() => new Map()),
-    ),
-  ).then((maps) => {
-    const merged = new Map();
-    for (const map of maps) {
-      for (const [id, quote] of map) merged.set(id, quote);
-    }
-    if (!merged.size) throw new Error("No live prices came through");
-    return merged;
+  return collectQuoteFeed({
+    topic,
+    pairs,
+    subscriptions: pairs.map((pair) => priceStreamSubscription(topic, pair.symbol)),
+    stopAt: 3,
+    timeoutMs: 5000,
   });
 }
 
@@ -605,7 +539,7 @@ function collectQuoteFeed({ topic, pairs, subscriptions, stopAt, timeoutMs }) {
         const series = [...(prev?.series || []), price].slice(-16);
         quotes.set(pair.id, { price, at: num(msg.payload.timestamp) || Date.now(), series });
       }
-      if ((quotes.get(pair.id)?.series.length || 0) >= stopAt) finish();
+      if (pairs.every((item) => (quotes.get(item.id)?.series.length || 0) >= stopAt)) finish();
     };
     ws.onerror = () => {
       if (!settled && !quotes.size) {

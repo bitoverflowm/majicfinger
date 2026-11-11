@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { FAQSection } from "@/components/sections/faq-section";
+import { FooterSection } from "@/components/sections/footer-section";
 import { loadHolderLandingSubjects } from "@/lib/holderLanding/featuredSubjects";
 import { HOLDER_LANDING_PAGES, HOLDER_PATHS } from "@/lib/holderLanding/pages";
 import { getSiteUrl } from "@/lib/site";
@@ -145,6 +146,8 @@ export async function HolderLandingPage({ pageKey }: { pageKey: PageKey }) {
           </ul>
         </div>
       </section>
+
+      <FooterSection />
     </main>
   );
 }
