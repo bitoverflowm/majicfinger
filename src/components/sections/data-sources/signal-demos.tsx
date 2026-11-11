@@ -210,6 +210,44 @@ export function NewsDemo() {
   );
 }
 
+/* News archive */
+
+const ARCHIVE_EVENTS: readonly SignalEvent[] = [
+  { at: 12, move: 9, time: "Aug 2, 2024", text: "Unemployment jumps to 4.3% in the July jobs report" },
+  { at: 26, move: -5, time: "Aug 14, 2024", text: "July CPI cools to 2.9%, the lowest since 2021" },
+  { at: 38, move: 7, time: "Aug 23, 2024", text: "Powell at Jackson Hole: “The time has come”" },
+];
+const ARCHIVE_SERIES = buildSeries(7, 30, ARCHIVE_EVENTS);
+const ARCHIVE_BARS = (() => {
+  const rand = mulberry32(23);
+  return Array.from({ length: SERIES_LENGTH }, (_, i) => {
+    const burst = ARCHIVE_EVENTS.reduce((sum, e) => (i >= e.at ? sum + 36 * Math.exp(-(i - e.at) / 2) : sum), 0);
+    return 6 + rand() * 8 + burst;
+  });
+})();
+
+export function NewsArchiveDemo() {
+  return (
+    <SignalTimeline
+      title="News archive"
+      market="Fed cuts 50 bps in September 2024? · Yes"
+      color="#d97706"
+      series={ARCHIVE_SERIES}
+      events={ARCHIVE_EVENTS}
+      bars={ARCHIVE_BARS}
+      renderCard={(e) => (
+        <>
+          <p className="text-[9.5px] text-muted-foreground">{e.time} · GDELT</p>
+          <p className="mt-0.5 font-medium text-primary">{e.text}</p>
+          <p className="mt-1 text-muted-foreground">
+            Odds <Reaction move={e.move} /> as coverage spiked
+          </p>
+        </>
+      )}
+    />
+  );
+}
+
 /* X */
 
 const X_EVENTS: readonly SignalEvent[] = [

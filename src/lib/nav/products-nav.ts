@@ -47,6 +47,7 @@ export type ProductsNavProduct = {
   label: string;
   href: string;
   description: string;
+  badge?: string;
 };
 
 export type ProductsNavData = {
@@ -176,6 +177,21 @@ export function getProductsNavData(): ProductsNavData {
       },
     ],
     products: [
+      {
+        id: "holder-terminal",
+        label: "Holder Terminal",
+        href: "/polymarket-holder-terminal",
+        description:
+          "Who holds every Polymarket market, what they paid, and how each trader is doing.",
+        badge: "New",
+      },
+      {
+        id: "news-archive",
+        label: "News archive",
+        href: "/news-archive",
+        description:
+          "Search headlines by keyword and see when coverage spiked around a market.",
+      },
       {
         id: "charts",
         label: "Charts",

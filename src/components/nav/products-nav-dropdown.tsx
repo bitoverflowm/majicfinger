@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type {
   ProductsNavData,
   ProductsNavHub,
@@ -17,6 +17,75 @@ type ProductsNavDropdownProps = {
 
 const DROPDOWN_HOVER_BRIDGE = "pt-0.5";
 const VIEWPORT_MARGIN_PX = 12;
+
+function NavBadge({ label }: { label: string }) {
+  return (
+    <span className="inline-flex h-[18px] items-center rounded-full bg-gradient-to-r from-secondary to-violet-500 px-1.5 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-white">
+      {label}
+    </span>
+  );
+}
+
+type TrendingHeadline = {
+  headline: { title: string; url: string; source: string; t: number };
+  market: { title: string; href: string };
+  terms: string[];
+};
+
+function agoLabel(t: number) {
+  const minutes = Math.max(1, Math.round((Date.now() - t) / 60_000));
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  return hours < 48 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
+}
+
+/** Loads once, the first time `active` turns true. */
+function useTrendingHeadline(active: boolean) {
+  const [value, setValue] = useState<TrendingHeadline | null>(null);
+  const requested = useRef(false);
+  useEffect(() => {
+    if (!active || requested.current) return;
+    requested.current = true;
+    fetch("/api/news/headline")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.headline) setValue(data as TrendingHeadline);
+      })
+      .catch(() => {});
+  }, [active]);
+  return value;
+}
+
+/** The newest headline about a trending market, leading to the News archive search for it. */
+function TrendingHeadlineStrip({ value }: { value: TrendingHeadline | null }) {
+  if (!value) return null;
+  const params = new URLSearchParams();
+  for (const term of value.terms) params.append("q", term);
+  return (
+    <Link
+      href={`/news-archive?${params}`}
+      className="group mt-4 flex items-start gap-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 transition-colors hover:border-amber-500/40 hover:bg-amber-500/10"
+    >
+      <span className="relative mt-1.5 flex size-2 shrink-0">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-500/60 motion-reduce:hidden" />
+        <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-amber-700 dark:text-amber-300">
+          In the news · {agoLabel(value.headline.t)}
+          {value.headline.source ? ` · ${value.headline.source}` : ""}
+        </span>
+        <span className="mt-0.5 block truncate text-sm font-medium text-foreground">{value.headline.title}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+          Trending market: {value.market.title}
+        </span>
+      </span>
+      <span className="shrink-0 self-center text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
+        News archive →
+      </span>
+    </Link>
+  );
+}
 
 function HubFlyout({ hub }: { hub: ProductsNavHub }) {
   return (
@@ -107,6 +176,7 @@ function DesktopProductsPanel({
   panelLeft: number;
   onNavigate: () => void;
 }) {
+  const trending = useTrendingHeadline(open);
   return (
     <div
       ref={panelRef}
@@ -177,7 +247,10 @@ function DesktopProductsPanel({
                     href={product.href}
                     className="block rounded-md px-3 py-2.5 transition-colors hover:bg-accent hover:text-accent-foreground"
                   >
-                    <span className="text-sm font-medium text-foreground">{product.label}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground">{product.label}</span>
+                      {product.badge ? <NavBadge label={product.badge} /> : null}
+                    </span>
                     <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
                       {product.description}
                     </span>
@@ -187,6 +260,7 @@ function DesktopProductsPanel({
             </ul>
           </div>
         </div>
+        <TrendingHeadlineStrip value={trending} />
       </div>
     </div>
   );
@@ -376,9 +450,10 @@ function MobileProductsSection({ data }: { data: ProductsNavData }) {
             <li key={product.id}>
               <Link
                 href={product.href}
-                className="text-sm text-foreground/80 hover:text-secondary"
+                className="inline-flex items-center gap-2 text-sm text-foreground/80 hover:text-secondary"
               >
                 {product.label}
+                {product.badge ? <NavBadge label={product.badge} /> : null}
               </Link>
             </li>
           ))}

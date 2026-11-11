@@ -75,15 +75,21 @@ function SidebarRow({ item, icon: Icon, active = false, onClick, hoverProps }) {
           aria-hidden
         />
         <span className="min-w-0 flex-1">
-          <span className="flex items-baseline gap-2">
+          <span className="flex items-center gap-2">
             <span
               className={cn(
-                "min-w-0 flex-1 truncate text-[13px] font-medium text-foreground opacity-80 transition-opacity group-hover:opacity-100",
+                "min-w-0 truncate text-[13px] font-medium text-foreground opacity-80 transition-opacity group-hover:opacity-100",
                 active && "opacity-100",
               )}
             >
               {item.title}
             </span>
+            {item.badge ? (
+              <span className="inline-flex h-4 shrink-0 items-center rounded-full bg-gradient-to-r from-secondary to-violet-500 px-1.5 text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-white">
+                {item.badge}
+              </span>
+            ) : null}
+            <span className="flex-1" />
             {item.tag ? <span className="shrink-0 text-[11px] text-muted-foreground">{item.tag}</span> : null}
           </span>
           <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">{item.description}</span>
@@ -117,7 +123,7 @@ export function RecipesSidebar({ onOpen, onOpenTerminal, onHover, activeId = nul
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-black/[0.015] pb-4 dark:bg-white/[0.02]">
         <SectionHeader title="Terminals" count={TERMINALS.length} className="pt-6">
-          Out-of-the-box dashboards. Each one opens in its own tab.
+          Out-of-the-box terminals to supercharge your research.
         </SectionHeader>
         <ul>
           {TERMINALS.map((terminal) => (

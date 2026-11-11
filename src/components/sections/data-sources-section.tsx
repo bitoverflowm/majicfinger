@@ -106,88 +106,89 @@ const ROWS: readonly SourceRow[] = [
       },
     ],
   },
-  {
-    id: "coming-soon",
-    heading: "Coming soon",
-    description:
-      "The next sources we're connecting, so you can see what moved a market and how fast it reacted. Vote for the ones you want first.",
-    columns: 3,
-    compact: true,
-    cards: [
-      {
-        id: "news",
-        title: "News",
-        description:
-          "Breaking headlines overlaid on market prices, so you can see which stories moved the odds and how quickly traders reacted.",
-        vote: { id: "news", name: "News" },
-        demo: <NewsDemo />,
-      },
-      {
-        id: "x",
-        title: "X (Twitter)",
-        description:
-          "Posts, mentions, and engagement from X lined up against market moves. Spot when the conversation leads the price, and when it follows.",
-        vote: { id: "x", name: "X (Twitter)" },
-        demo: <XDemo />,
-      },
-      {
-        id: "reddit",
-        title: "Reddit",
-        description:
-          "Posts, comments, and sentiment from communities like r/wallstreetbets and r/economics, tracked next to the markets they're discussing.",
-        vote: { id: "reddit", name: "Reddit" },
-        demo: <RedditDemo />,
-      },
-      {
-        id: "product-hunt",
-        title: "Product Hunt",
-        description:
-          "Daily launch rankings and upvotes as they change, for markets on which products finish at the top of the leaderboard.",
-        vote: { id: "productHunt", name: "Product Hunt" },
-        demo: <ProductHuntDemo />,
-      },
-      {
-        id: "satellite",
-        title: "Government satellite data",
-        description:
-          "Storm tracks, wildfires, and weather from NOAA and NASA satellites, next to the weather and climate markets they inform.",
-        vote: { id: "satellite", name: "Government satellite data" },
-        demo: <SatelliteDemo />,
-      },
-      {
-        id: "hyperliquid",
-        title: "Hyperliquid",
-        description:
-          "Perpetual futures prices, funding rates, and open interest, to compare leveraged crypto positioning with prediction market odds.",
-        vote: { id: "hyperliquid", name: "Hyperliquid" },
-        demo: <HyperliquidDemo />,
-      },
-      {
-        id: "polls",
-        title: "Polling data",
-        description:
-          "Polling averages from RealClearPolling and FiveThirtyEight's archive, compared with what election markets are pricing.",
-        vote: { id: "polls", name: "Polling data" },
-        demo: <PollsDemo />,
-      },
-      {
-        id: "economic-reports",
-        title: "Economic reports",
-        description:
-          "CPI, mortgage rates, and gas prices as they're released, next to the rate and economy markets that react to them.",
-        vote: { id: "economicReports", name: "Economic reports" },
-        demo: <EconomicReportsDemo />,
-      },
-      {
-        id: "request",
-        title: "Request a data source",
-        description:
-          "Have a dataset in mind? Vote on the ideas we're weighing or suggest your own. The integrations with the most votes get built first.",
-        demo: <RequestSourceDemo />,
-      },
-    ],
-  },
 ];
+
+const COMING_SOON: SourceRow = {
+  id: "coming-soon",
+  heading: "Coming soon",
+  description:
+    "The next sources we're connecting, so you can see what moved a market and how fast it reacted. Vote for the ones you want first.",
+  columns: 3,
+  compact: true,
+  cards: [
+    {
+      id: "news",
+      title: "News",
+      description:
+        "Breaking headlines overlaid on market prices, so you can see which stories moved the odds and how quickly traders reacted.",
+      vote: { id: "news", name: "News" },
+      demo: <NewsDemo />,
+    },
+    {
+      id: "x",
+      title: "X (Twitter)",
+      description:
+        "Posts, mentions, and engagement from X lined up against market moves. Spot when the conversation leads the price, and when it follows.",
+      vote: { id: "x", name: "X (Twitter)" },
+      demo: <XDemo />,
+    },
+    {
+      id: "reddit",
+      title: "Reddit",
+      description:
+        "Posts, comments, and sentiment from communities like r/wallstreetbets and r/economics, tracked next to the markets they're discussing.",
+      vote: { id: "reddit", name: "Reddit" },
+      demo: <RedditDemo />,
+    },
+    {
+      id: "product-hunt",
+      title: "Product Hunt",
+      description:
+        "Daily launch rankings and upvotes as they change, for markets on which products finish at the top of the leaderboard.",
+      vote: { id: "productHunt", name: "Product Hunt" },
+      demo: <ProductHuntDemo />,
+    },
+    {
+      id: "satellite",
+      title: "Government satellite data",
+      description:
+        "Storm tracks, wildfires, and weather from NOAA and NASA satellites, next to the weather and climate markets they inform.",
+      vote: { id: "satellite", name: "Government satellite data" },
+      demo: <SatelliteDemo />,
+    },
+    {
+      id: "hyperliquid",
+      title: "Hyperliquid",
+      description:
+        "Perpetual futures prices, funding rates, and open interest, to compare leveraged crypto positioning with prediction market odds.",
+      vote: { id: "hyperliquid", name: "Hyperliquid" },
+      demo: <HyperliquidDemo />,
+    },
+    {
+      id: "polls",
+      title: "Polling data",
+      description:
+        "Polling averages from RealClearPolling and FiveThirtyEight's archive, compared with what election markets are pricing.",
+      vote: { id: "polls", name: "Polling data" },
+      demo: <PollsDemo />,
+    },
+    {
+      id: "economic-reports",
+      title: "Economic reports",
+      description:
+        "CPI, mortgage rates, and gas prices as they're released, next to the rate and economy markets that react to them.",
+      vote: { id: "economicReports", name: "Economic reports" },
+      demo: <EconomicReportsDemo />,
+    },
+    {
+      id: "request",
+      title: "Request a data source",
+      description:
+        "Have a dataset in mind? Vote on the ideas we're weighing or suggest your own. The integrations with the most votes get built first.",
+      demo: <RequestSourceDemo />,
+    },
+  ],
+};
 
 const KEYFRAMES = `
 @keyframes ds-row-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
@@ -204,7 +205,7 @@ const KEYFRAMES = `
 .ds-up { animation: ds-up 1s ease-out both; }
 .ds-down { animation: ds-down 1s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
-  #data-sources [class*="ds-"] { animation: none !important; }
+  #data-sources [class*="ds-"], #coming-soon-sources [class*="ds-"] { animation: none !important; }
 }
 `;
 
@@ -227,30 +228,48 @@ export function DataSourcesSection() {
 
         <div className="mt-8 flex flex-col gap-14 md:mt-10">
           {ROWS.map((row) => (
-            <div key={row.id}>
-              {row.heading ? (
-                <div className="mb-4 max-w-2xl">
-                  <h3 className="text-lg font-normal tracking-tight text-primary">{row.heading}</h3>
-                  {row.description ? <p className="text-muted-foreground">{row.description}</p> : null}
-                </div>
-              ) : (
-                <p className="mb-4 text-lg font-normal tracking-tight text-primary">{row.label}</p>
-              )}
-              <div
-                className={cn(
-                  "grid grid-cols-1 gap-4",
-                  row.columns === 2 ? "lg:grid-cols-2" : row.compact ? "sm:grid-cols-2 lg:grid-cols-3" : "lg:grid-cols-3",
-                )}
-              >
-                {row.cards.map((card) => (
-                  <SourceCardView key={card.id} card={card} nested={!!row.heading} compact={row.compact} />
-                ))}
-              </div>
-            </div>
+            <SourceRowView key={row.id} row={row} />
           ))}
         </div>
       </div>
     </section>
+  );
+}
+
+/** Sources that aren't connected yet; sits after the live features so nothing above it reads as unreleased. */
+export function ComingSoonSourcesSection() {
+  return (
+    <section id="coming-soon-sources" className="relative w-full scroll-mt-28">
+      <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
+      <div className="mx-auto w-full max-w-[min(100%,84rem)] px-6 pb-12 sm:px-8 md:pb-16 lg:px-10">
+        <SourceRowView row={COMING_SOON} />
+      </div>
+    </section>
+  );
+}
+
+function SourceRowView({ row }: { row: SourceRow }) {
+  return (
+    <div>
+      {row.heading ? (
+        <div className="mb-4 max-w-2xl">
+          <h3 className="text-lg font-normal tracking-tight text-primary">{row.heading}</h3>
+          {row.description ? <p className="text-muted-foreground">{row.description}</p> : null}
+        </div>
+      ) : (
+        <p className="mb-4 text-lg font-normal tracking-tight text-primary">{row.label}</p>
+      )}
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-4",
+          row.columns === 2 ? "lg:grid-cols-2" : row.compact ? "sm:grid-cols-2 lg:grid-cols-3" : "lg:grid-cols-3",
+        )}
+      >
+        {row.cards.map((card) => (
+          <SourceCardView key={card.id} card={card} nested={!!row.heading} compact={row.compact} />
+        ))}
+      </div>
+    </div>
   );
 }
 

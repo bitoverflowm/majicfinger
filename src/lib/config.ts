@@ -77,10 +77,10 @@ export const siteConfig = {
     },
   },
   hero: {
-    title: "Analyze live and historical prediction market data.",
-    subtitle: "No code. No setup.",
+    title: "The ultimate intelligence platform for prediction markets",
+    subtitle: "Analyze the past. Monitor the present. Predict the future.",
     description:
-      "Research Kalshi and Polymarket, market data, and real-world signals. Explore trades, investigate wallets, build custom charts and live terminals—all in one workspace.",
+      "Research Kalshi and Polymarket, market data, and real-world signals. Explore trades, investigate wallets, build custom charts and live terminals. No code. No setup.",
     /** Phrases in `description` that show their data sources on hover. */
     descriptionTerms: [
       { text: "Kalshi and Polymarket", color: "orange", sources: [pricingVenue("Kalshi"), pricingVenue("Polymarket")] },
@@ -108,8 +108,7 @@ export const siteConfig = {
             name: "Real-time News",
             icon: "news",
             tileClass: "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900",
-            badge: "Coming soon",
-            description: "Breaking headlines to line up against market moves.",
+            description: "Breaking headlines from Google News and GDELT, lined up against market moves.",
           },
           pricingVenue("Reddit"),
           {
@@ -146,6 +145,15 @@ export const siteConfig = {
         { id: 3, title: "Dashboard", url: "/dashboard" },
         { id: 4, title: "Charts", url: "/charts" },
         { id: 20, title: "Kalshi vs Polymarket", url: "/kalshi-vs-polymarket-odds" },
+        { id: 25, title: "News archive", url: "/news-archive" },
+      ],
+    },
+    {
+      title: "Holder Terminal",
+      links: [
+        { id: 22, title: "Holder Terminal", url: "/polymarket-holder-terminal" },
+        { id: 23, title: "Market holders", url: "/polymarket-market-holders" },
+        { id: 24, title: "Wallet tracker", url: "/polymarket-wallet-tracker" },
       ],
     },
     {

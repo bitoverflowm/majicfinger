@@ -32,7 +32,8 @@ function isNamed(name) {
   return !!value && !/^0x[a-fA-F0-9]{40}(-\d+)?$/.test(value);
 }
 
-async function pickMarkets() {
+/** Live Polymarket markets that stay open a while, news-heavy topics first. */
+export async function pickMarkets() {
   const markets = await fetchPolymarketLiveFeaturedMarkets({ limit: 12 });
   const now = Date.now();
   const usable = markets.filter((market) => {

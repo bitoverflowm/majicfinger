@@ -17,7 +17,7 @@ export function HeroSection() {
           <h1 className="text-balance text-[1.5rem] font-normal leading-[1.25] tracking-tight text-primary sm:text-[1.625rem]">
             {hero.title}
             {hero.subtitle ? (
-              <span className="block text-muted-foreground">{hero.subtitle}</span>
+              <span className="block text-muted-foreground lg:whitespace-nowrap">{hero.subtitle}</span>
             ) : null}
           </h1>
           <p className="text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">

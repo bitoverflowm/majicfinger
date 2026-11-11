@@ -66,6 +66,19 @@ function ChangelogRelease({ item }: { item: ContentItem }) {
                 <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
               ) : null}
             </div>
+            {extras.highlights?.length ? (
+              <ul className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+                {extras.highlights.map((highlight) => (
+                  <li key={highlight.title} className="flex gap-2.5">
+                    <span aria-hidden className="mt-[0.55rem] size-1.5 shrink-0 rounded-full bg-secondary" />
+                    <span>
+                      <span className="font-medium text-foreground">{highlight.title}</span>{" "}
+                      {highlight.body}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {extras.tweetId ? (
               <TweetCard id={extras.tweetId} className="my-0 justify-start" />
             ) : null}

@@ -9,6 +9,7 @@ export const TERMINALS = [
     id: "holder",
     title: "Holder Terminal",
     description: "An out-of-the-box dashboard for market holders. Opens in its own tab.",
+    badge: "New",
   },
 ];
 

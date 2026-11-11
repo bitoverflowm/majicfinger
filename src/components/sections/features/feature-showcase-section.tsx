@@ -15,6 +15,7 @@ import { ConnectDemo } from "./connect-demo";
 import { DashboardDemo } from "./dashboard-demo";
 import { DemoRecipeLink } from "./demo-recipe-link";
 import { FEATURE_KEYFRAMES } from "./feature-keyframes";
+import { HolderTerminalShowcase } from "./holder-terminal-showcase";
 import { LiveTerminalDemo } from "./live-terminal-demo";
 import { TradeHistoryDemo } from "./trade-history-demo";
 import { TransformDemo } from "./transform-demo";
@@ -86,8 +87,8 @@ const CTA_CLASS = "w-fit text-sm text-secondary transition-colors hover:text-pri
 
 type ShowcaseRow = { id: string; title: string; description: string | readonly string[]; showcase: Showcase };
 
-/** `afterConnect` renders between the "Connect" row and the rest of the showcase. */
-export function FeatureShowcaseSection({ afterConnect }: { afterConnect?: ReactNode }) {
+/** `afterConnect` renders between the "Connect" row and the rest of the showcase; `end` after the last row. */
+export function FeatureShowcaseSection({ afterConnect, end }: { afterConnect?: ReactNode; end?: ReactNode }) {
   const { title, description, items } = siteConfig.bentoSection;
   const rows: ShowcaseRow[] = items.flatMap((item) => {
     const showcase = SHOWCASE[item.id];
@@ -112,14 +113,32 @@ export function FeatureShowcaseSection({ afterConnect }: { afterConnect?: ReactN
         <p className="text-balance text-center font-medium text-muted-foreground">{description}</p>
       </SectionHeader>
 
-      {lead.length ? <ShowcaseRows rows={lead} className="pt-10 md:pt-14" /> : null}
+      {lead.length ? (
+        <ShowcaseRows rows={lead} start={<HolderTerminalShowcase />} className="pt-10 md:pt-14" />
+      ) : null}
       {afterConnect}
-      <ShowcaseRows rows={rest} offset={lead.length} className={lead.length ? "pb-10 md:pb-14" : "py-10 md:py-14"} />
+      <ShowcaseRows
+        rows={rest}
+        offset={lead.length}
+        start={lead.length ? null : <HolderTerminalShowcase />}
+        className={lead.length ? "pb-10 md:pb-14" : "py-10 md:py-14"}
+      />
+      {end}
     </section>
   );
 }
 
-function ShowcaseRows({ rows, offset = 0, className }: { rows: ShowcaseRow[]; offset?: number; className?: string }) {
+function ShowcaseRows({
+  rows,
+  offset = 0,
+  start,
+  className,
+}: {
+  rows: ShowcaseRow[];
+  offset?: number;
+  start?: ReactNode;
+  className?: string;
+}) {
   return (
     <div
       className={cn(
@@ -127,6 +146,7 @@ function ShowcaseRows({ rows, offset = 0, className }: { rows: ShowcaseRow[]; of
         className,
       )}
     >
+      {start}
       {rows.map((item, index) => {
         const { showcase } = item;
         const flip = (offset + index) % 2 === 1;

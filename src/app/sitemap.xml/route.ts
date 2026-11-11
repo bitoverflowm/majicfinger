@@ -291,6 +291,7 @@ export async function GET() {
     { path: "/polymarket-holder-terminal", priority: "0.9", changefreq: "weekly", lastmod: "2026-11-10" },
     { path: "/polymarket-market-holders", priority: "0.85", changefreq: "weekly", lastmod: "2026-11-10" },
     { path: "/polymarket-wallet-tracker", priority: "0.85", changefreq: "weekly", lastmod: "2026-11-10" },
+    { path: "/news-archive", priority: "0.8", changefreq: "weekly", lastmod: "2026-11-11" },
     // /data-sheet, /csv-exports, /quant-analysis, and catalog /integrations/*
     // use ProductLandingShell placeholders — excluded until substantive.
     { path: "/help", priority: "0.4", changefreq: "yearly", lastmod: "2026-07-04" },

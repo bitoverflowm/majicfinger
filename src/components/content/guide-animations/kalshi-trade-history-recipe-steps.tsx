@@ -450,8 +450,7 @@ export function VenuePickerMock() {
   return (
     <div className="flex min-w-0 flex-1">
       <div className="flex w-[52.5%] flex-col bg-background px-4 pt-5">
-        <p className="text-[15px] font-semibold tracking-tight text-foreground">What is the first venue you want to research with Lychee?</p>
-        <p className="mt-1 text-[12px] text-muted-foreground">Pick a source. You&apos;ll shape the pull in the next step.</p>
+        <p className="text-[15px] font-semibold tracking-tight text-foreground">Pick a data source, we&apos;ll guide you through how it works.</p>
         <div className="mt-3 space-y-2">
           {VENUES.map((v) => (
             <div key={v.name} className="flex items-start gap-2.5 rounded-xl border border-border/70 bg-background px-2.5 py-2">

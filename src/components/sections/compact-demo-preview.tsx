@@ -197,9 +197,8 @@ function SourcePicker({ pressed }: { pressed: boolean }) {
   return (
     <div className="max-w-[36rem]">
       <h3 className="text-[1.375rem] font-semibold leading-snug tracking-tight text-primary">
-        What is the first venue you want to research with Lychee?
+        Pick a data source, we&apos;ll guide you through how it works.
       </h3>
-      <p className="mt-1.5 text-sm text-muted-foreground">Pick a source. You’ll shape the pull in the next step.</p>
       <ul className="mt-5 flex flex-col gap-2.5">
         {SOURCES.map((source, i) => {
           const active = pressed && i === 0;

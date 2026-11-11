@@ -142,6 +142,13 @@
       "integrationTopic": "general"
     },
     {
+      "slug": "polymarket-holder-terminal-launch",
+      "contentClass": "changelog",
+      "integrationHub": "platform",
+      "integrationTopic": "general",
+      "publishedAt": "2026-11-11"
+    },
+    {
       "slug": "polymarket-top-holders",
       "contentClass": "changelog",
       "integrationHub": "platform",

@@ -428,6 +428,7 @@ function IntegrationConnectFlow({
   inline = false,
   withClose = !inline,
   title = "Which integration should feed this dashboard?",
+  description = "Pick a source. You’ll shape the pull in the next step.",
   onCancel,
   onPhaseChange,
   onSelectIntegration,
@@ -565,9 +566,9 @@ function IntegrationConnectFlow({
           <div className="flex min-h-0 flex-col bg-background">
             <div className={cn("px-6 pb-3 pt-6", withClose && "pr-12")}>
               <Title className="text-xl font-semibold tracking-tight text-foreground">{title}</Title>
-              <Description className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                Pick a source. You’ll shape the pull in the next step.
-              </Description>
+              {description ? (
+                <Description className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{description}</Description>
+              ) : null}
             </div>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-6 pb-4">
               <div role="listbox" aria-label="Integrations" className="space-y-2">
@@ -773,7 +774,8 @@ export function IntegrationConnectLandingDemo({
         <IntegrationConnectFlow
           inline
           withClose={active}
-          title="What is the first venue you want to research with Lychee?"
+          title="Pick a data source, we'll guide you through how it works."
+          description={null}
           onPhaseChange={setPhase}
           onSelectIntegration={onSelectIntegration}
           onOpenRecipe={onOpenRecipe}
