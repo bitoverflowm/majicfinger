@@ -386,6 +386,12 @@ function startHomepageDemo(event: MouseEvent<HTMLAnchorElement>) {
   scrollToDemoSection();
 }
 
+function warmStripeJs() {
+  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  if (!key || typeof window === "undefined") return;
+  void import("@stripe/stripe-js").then(({ loadStripe }) => loadStripe(key));
+}
+
 function PlanButton({
   action,
   href,
@@ -417,6 +423,7 @@ function PlanButton({
       {action?.busy ? "One moment…" : text}
     </>
   );
+  const warmsCheckout = typeof href === "string" && href.startsWith("/checkout");
 
   if (!action) {
     return isCurrent ? (
@@ -424,14 +431,26 @@ function PlanButton({
         {content}
       </button>
     ) : (
-      <a href={href} onClick={onClick} className={className}>
+      <a
+        href={href}
+        onClick={onClick}
+        onPointerEnter={warmsCheckout ? warmStripeJs : undefined}
+        onFocus={warmsCheckout ? warmStripeJs : undefined}
+        className={className}
+      >
         {content}
       </a>
     );
   }
   if (action.href && !action.disabled) {
+    const actionWarms = action.href.startsWith("/checkout");
     return (
-      <a href={action.href} className={className}>
+      <a
+        href={action.href}
+        onPointerEnter={actionWarms ? warmStripeJs : undefined}
+        onFocus={actionWarms ? warmStripeJs : undefined}
+        className={className}
+      >
         {content}
       </a>
     );
