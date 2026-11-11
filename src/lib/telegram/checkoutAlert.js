@@ -5,6 +5,9 @@ import { escapeHtml, formatFieldLines } from "@/lib/telegram/format";
  * Operational checkout alert. Production sends to the Telegram bot.
  * Local/dev only logs — sendTelegramMessage is disabled outside production.
  *
+ * Never block a buyer response on this. Prefer `void notifyCheckoutAlert(...)` or
+ * `waitUntil(notifyCheckoutAlert(...))` on API hot paths.
+ *
  * @param {{ severity?: 'error' | 'notice'; title: string; fields?: Record<string, string | number | boolean | null | undefined> }} opts
  */
 export async function notifyCheckoutAlert({ severity = "error", title, fields = {} }) {

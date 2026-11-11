@@ -387,7 +387,9 @@ function startHomepageDemo(event: MouseEvent<HTMLAnchorElement>) {
 }
 
 function warmStripeJs() {
-  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  const key =
+    (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_STRIPE_DEV_PUBLISHABLE_KEY) ||
+    process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   if (!key || typeof window === "undefined") return;
   void import("@stripe/stripe-js").then(({ loadStripe }) => loadStripe(key));
 }

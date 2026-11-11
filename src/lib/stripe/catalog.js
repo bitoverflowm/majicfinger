@@ -159,7 +159,7 @@ async function priceFromLookupKey(stripe, plan) {
   if (!price) return null;
   const interval = price.recurring?.interval || null;
   if (price.unit_amount !== plan.amount || interval !== plan.interval) {
-    await notifyCheckoutAlert({
+    void notifyCheckoutAlert({
       title: "Stripe price doesn't match plan",
       fields: {
         Plan: plan.key,
@@ -213,16 +213,16 @@ export async function resolveCheckoutPrice(plan) {
     };
   }
 
+  // Hardcoded catalog priceIds skip a Stripe round trip on every cold start.
+  if (plan.priceId && !isStripeTestKey()) {
+    return { priceId: plan.priceId, extras: {}, fallbackUrl };
+  }
+
   const stripe = getStripe();
   try {
     if (isStripeTestKey()) {
       const priceId = await ensureTestPrice(stripe, plan);
       return { priceId, extras: { allow_promotion_codes: true }, fallbackUrl };
-    }
-    // Live prices are the same ones already sold by the Payment Links.
-    // Resolving them here avoids a Payment Link list call on every checkout.
-    if (plan.priceId) {
-      return { priceId: plan.priceId, extras: {}, fallbackUrl };
     }
     const fromLookup = await priceFromLookupKey(stripe, plan);
     if (fromLookup) {
@@ -235,7 +235,8 @@ export async function resolveCheckoutPrice(plan) {
       }
     }
   } catch (err) {
-    await notifyCheckoutAlert({
+    // Don't await Telegram — checkout should fail fast to the buyer.
+    void notifyCheckoutAlert({
       title: "Could not resolve Stripe price",
       fields: {
         Plan: plan.key,
@@ -246,7 +247,7 @@ export async function resolveCheckoutPrice(plan) {
     return null;
   }
 
-  await notifyCheckoutAlert({
+  void notifyCheckoutAlert({
     title: "No Stripe price for plan",
     fields: {
       Plan: plan.key,
@@ -254,6 +255,24 @@ export async function resolveCheckoutPrice(plan) {
     },
   });
   return null;
+}
+
+/**
+ * Best-effort warm of lookup-key prices for current plans that lack a hardcoded
+ * priceId. Safe to fire from a checkout request via waitUntil — never throws.
+ */
+export async function warmCheckoutPriceCache(plans = CHECKOUT_PLANS) {
+  if (isStripeTestKey()) return;
+  const pending = plans.filter((plan) => !plan.priceId && !envPriceId(plan.key) && plan.mode === "subscription");
+  await Promise.all(
+    pending.map(async (plan) => {
+      try {
+        await priceFromLookupKey(getStripe(), plan);
+      } catch {
+        // Warm only; failures surface on the real checkout path.
+      }
+    }),
+  );
 }
 
 export function requestOrigin(req) {

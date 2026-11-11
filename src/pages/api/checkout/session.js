@@ -13,6 +13,7 @@ import { extractClientMeta } from "@/lib/analytics/requestClientMeta";
 import {
   planFromQuery,
   resolveCheckoutPrice,
+  warmCheckoutPriceCache,
   requestOrigin,
   cleanReferral,
   checkoutPlanSummary,
@@ -40,6 +41,11 @@ function checkoutSource(req) {
     userAgent: meta.user_agent ? meta.user_agent.slice(0, 300) : undefined,
     language: meta.accept_language || undefined,
   };
+}
+
+/** Ops alert that must not delay the HTTP response. */
+function alertLater(opts) {
+  waitUntil(notifyCheckoutAlert(opts));
 }
 
 /** Runs after the response so the buyer isn't waiting on Mongo or Telegram. */
@@ -81,7 +87,7 @@ export default async function handler(req, res) {
     const rawCycle = String(req.body?.cycle || "").trim();
     // Empty query = bare /checkout or a bot. Only ping Telegram when someone sent a real unknown combo.
     if (rawPlan || rawCycle) {
-      await notifyCheckoutAlert({
+      alertLater({
         title: "Checkout started for an unknown plan",
         fields: { Plan: rawPlan || "(empty)", Cycle: rawCycle || "(empty)" },
       });
@@ -90,7 +96,7 @@ export default async function handler(req, res) {
   }
 
   if (!stripeSecretKey() || !stripePublishableKey()) {
-    await notifyCheckoutAlert({
+    alertLater({
       title: "Checkout is missing Stripe keys",
       fields: { Plan: plan.key, "Secret key": "missing" },
     });
@@ -100,7 +106,7 @@ export default async function handler(req, res) {
   const keyProblem = stripeKeysMismatch();
   if (keyProblem && !global.__stripeKeyMismatchAlerted) {
     global.__stripeKeyMismatchAlerted = true;
-    await notifyCheckoutAlert({
+    alertLater({
       title: "Stripe keys don't match: the payment form will fail to load",
       fields: {
         Problem: keyProblem,
@@ -131,7 +137,7 @@ export default async function handler(req, res) {
 
     const resolved = await resolvedPromise;
     if (!resolved?.priceId) {
-      return res.status(500).json({ error: "Could not start checkout" });
+      return res.status(500).json({ error: "Could not start checkout", code: "PRICE_UNRESOLVED" });
     }
 
     const attemptId = crypto.randomBytes(16).toString("hex");
@@ -173,7 +179,8 @@ export default async function handler(req, res) {
       session = await createSession();
     } catch (err) {
       if (!promo) throw err;
-      await notifyCheckoutAlert({
+      // Retry at full price immediately — Telegram must not sit on the critical path.
+      alertLater({
         title: `${promo.name} coupon was rejected; checkout continued at full price`,
         fields: { Plan: plan.key, Coupon: promo.couponId, Error: err?.message || String(err) },
       });
@@ -181,7 +188,7 @@ export default async function handler(req, res) {
       session = await createSession();
     }
     if (promo && session?.total_details?.amount_discount === 0) {
-      await notifyCheckoutAlert({
+      alertLater({
         title: `${promo.name} coupon attached but Stripe shows no discount`,
         fields: { Plan: plan.key, Coupon: promo.couponId, "Stripe session": session.id, Total: `$${(session.amount_total / 100).toFixed(2)}` },
       });
@@ -192,6 +199,12 @@ export default async function handler(req, res) {
     }
 
     const visitorSessionId = String(req.body?.visitorSessionId || "").trim().slice(0, 80) || undefined;
+    // Warm sibling plan prices in the background so the next checkout on this
+    // instance skips the lookup-key round trip.
+    if (!global.__lycheePriceWarmStarted) {
+      global.__lycheePriceWarmStarted = true;
+      waitUntil(warmCheckoutPriceCache());
+    }
     waitUntil(
       recordAttempt({
         plan,
@@ -244,7 +257,7 @@ export default async function handler(req, res) {
       promoCodes: !promo && !!resolved.extras?.allow_promotion_codes,
     });
   } catch (err) {
-    await notifyCheckoutAlert({
+    alertLater({
       title: "Could not create checkout session",
       fields: {
         Plan: plan.key,
@@ -252,6 +265,6 @@ export default async function handler(req, res) {
         Error: err?.message || String(err),
       },
     });
-    return res.status(500).json({ error: "Could not start checkout" });
+    return res.status(500).json({ error: "Could not start checkout", code: "SESSION_CREATE_FAILED" });
   }
 }
