@@ -19,13 +19,20 @@ import { landingPageV2Config } from "@/lib/landingPageV2Config";
 import { flushJourneyQueue } from "@/lib/analytics/journeyClient";
 import { getOrCreateVisitorSessionId } from "@/lib/analytics/visitorSession";
 import { checkoutEntryPage, msSinceCheckoutClick, trackCheckoutStep } from "@/lib/checkout/trackCheckoutStep";
+import { isKnownCheckoutQuery } from "@/lib/stripe/checkoutPlanQuery";
 
 const stripePromises = new Map();
+const ENV_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
 
 function stripeFor(publishableKey) {
   if (!publishableKey) return null;
   if (!stripePromises.has(publishableKey)) stripePromises.set(publishableKey, loadStripe(publishableKey));
   return stripePromises.get(publishableKey);
+}
+
+// Start Stripe.js as soon as this chunk loads, not after the session API returns.
+if (typeof window !== "undefined" && ENV_PUBLISHABLE_KEY) {
+  stripeFor(ENV_PUBLISHABLE_KEY);
 }
 
 /** Past this, the buyer is offered Stripe's hosted checkout page instead. */
@@ -43,7 +50,7 @@ function postCheckoutSession(body) {
 const sessionRequests = new Map();
 
 function requestCheckoutSession(body) {
-  const key = `${body.plan}:${body.cycle}`;
+  const key = `${body.plan}:${body.cycle}:${body.hosted ? "hosted" : "elements"}`;
   if (!sessionRequests.has(key)) {
     const started = performance.now();
     const request = postCheckoutSession(body).then((result) => ({
@@ -199,18 +206,53 @@ function RichText({ text }) {
 
 export default function CheckoutClient({ plan, cycle, referral }) {
   const { resolvedTheme } = useTheme();
-  const [state, setState] = useState({
-    clientSecret: "",
-    publishableKey: "",
+  const known = isKnownCheckoutQuery(plan, cycle);
+  const [meta, setMeta] = useState({
     summary: null,
     email: "",
     promoCodes: false,
     sessionMs: null,
+    sessionId: "",
+    publishableKey: "",
   });
-  const [error, setError] = useState("");
+  const [error, setError] = useState(known ? "" : "That plan isn't available.");
   const [formReady, setFormReady] = useState(false);
   const [slow, setSlow] = useState(false);
   const mountedAt = useRef(typeof performance !== "undefined" ? performance.now() : 0);
+  const flushedJourney = useRef(false);
+
+  // Open the session as soon as the page hydrates. Stripe mounts on this Promise so
+  // js.stripe.com download + iframe skeleton overlap the API round trip instead of waiting on it.
+  const sessionRequest = useMemo(() => {
+    if (!known || typeof window === "undefined") return null;
+    if (!flushedJourney.current) {
+      flushedJourney.current = true;
+      // Server reads the marketing journey after it replies; flush before the request lands.
+      flushJourneyQueue(false).catch(() => {});
+    }
+    return requestCheckoutSession({
+      plan,
+      cycle,
+      referral: referralFromWindow(referral),
+      from: checkoutEntryPage(),
+      visitorSessionId: getOrCreateVisitorSessionId() || undefined,
+    });
+  }, [known, plan, cycle, referral]);
+
+  const clientSecret = useMemo(() => {
+    if (!sessionRequest) return null;
+    return sessionRequest.then((res) => {
+      const data = res.data || {};
+      if (data.code === "ALREADY_MEMBER" && data.redirect) {
+        window.location.assign(data.redirect);
+        return new Promise(() => {});
+      }
+      if (!res.ok || !data.clientSecret) {
+        throw new Error(res.status === 400 ? "That plan isn't available." : "We couldn't open checkout. Please try again.");
+      }
+      return data.clientSecret;
+    });
+  }, [sessionRequest]);
 
   useEffect(() => {
     if (formReady) return undefined;
@@ -219,21 +261,12 @@ export default function CheckoutClient({ plan, cycle, referral }) {
   }, [formReady]);
 
   useEffect(() => {
+    if (!sessionRequest) return undefined;
     let cancelled = false;
-    // The server reads the marketing journey after it replies, so this only has to land
-    // before then for the checkout Telegram to include the pricing path.
-    flushJourneyQueue(false).catch(() => {});
-    (async () => {
-      try {
-        const res = await requestCheckoutSession({
-          plan,
-          cycle,
-          referral: referralFromWindow(referral),
-          from: checkoutEntryPage(),
-          visitorSessionId: getOrCreateVisitorSessionId() || undefined,
-        });
-        const data = res.data || {};
+    sessionRequest
+      .then((res) => {
         if (cancelled) return;
+        const data = res.data || {};
         if (data.code === "ALREADY_MEMBER" && data.redirect) {
           window.location.assign(data.redirect);
           return;
@@ -242,44 +275,51 @@ export default function CheckoutClient({ plan, cycle, referral }) {
           setError(res.status === 400 ? "That plan isn't available." : "We couldn't open checkout. Please try again.");
           return;
         }
-        setState({
-          clientSecret: data.clientSecret,
-          publishableKey: data.publishableKey || "",
+        setMeta({
           summary: data.plan || null,
           email: data.email || "",
           promoCodes: !!data.promoCodes,
           sessionMs: res.ms ?? null,
+          sessionId: sessionIdFromSecret(data.clientSecret),
+          publishableKey: data.publishableKey || "",
         });
-      } catch {
+      })
+      .catch(() => {
         if (!cancelled) setError("We couldn't open checkout. Please try again.");
-      }
-    })();
+      });
     return () => {
       cancelled = true;
     };
-  }, [plan, cycle, referral]);
+  }, [sessionRequest]);
 
   const theme = resolvedTheme === "dark" ? "dark" : "light";
+  const publishableKey = ENV_PUBLISHABLE_KEY || meta.publishableKey;
+  const stripePromise = stripeFor(publishableKey);
   const options = useMemo(
     () =>
-      state.clientSecret
+      clientSecret && publishableKey
         ? {
-            clientSecret: state.clientSecret,
-            elementsOptions: { appearance: appearanceFor(theme), fonts: STRIPE_FONTS },
-            ...(state.email ? { defaultValues: { email: state.email } } : {}),
+            clientSecret,
+            elementsOptions: {
+              appearance: appearanceFor(theme),
+              fonts: STRIPE_FONTS,
+              // Keep Stripe's skeleton visible while the session Promise and iframe finish.
+              loader: "always",
+            },
+            ...(meta.email ? { defaultValues: { email: meta.email } } : {}),
           }
         : null,
-    // Stripe reads these once; theme changes go through changeAppearance below.
+    // Stripe reads appearance/email once at mount; theme flips go through changeAppearance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.clientSecret],
+    [clientSecret, publishableKey],
   );
 
   const showSlow = slow && !formReady;
   const hostedFallback = { plan, cycle, referral };
-  const stripePromise = stripeFor(state.publishableKey);
+
   if (error || (options && !stripePromise)) {
     return (
-      <CheckoutLayout summary={state.summary}>
+      <CheckoutLayout summary={meta.summary}>
         <div className="rounded-xl border border-border bg-card p-6 text-sm">
           <p className="font-medium text-foreground">{error || "Checkout is not configured."}</p>
           <p className="mt-1 text-muted-foreground">
@@ -298,9 +338,9 @@ export default function CheckoutClient({ plan, cycle, referral }) {
     );
   }
 
-  if (!options) {
+  if (!options || !stripePromise) {
     return (
-      <CheckoutLayout summary={state.summary}>
+      <CheckoutLayout summary={meta.summary}>
         {showSlow ? <HostedCheckoutNotice {...hostedFallback} /> : null}
         <PaymentSkeleton />
       </CheckoutLayout>
@@ -310,11 +350,12 @@ export default function CheckoutClient({ plan, cycle, referral }) {
   return (
     <CheckoutElementsProvider stripe={stripePromise} options={options}>
       <ConnectedCheckout
-        summary={state.summary}
-        promoCodes={state.promoCodes}
+        summary={meta.summary}
+        promoCodes={meta.promoCodes}
         theme={theme}
-        sessionId={sessionIdFromSecret(state.clientSecret)}
-        sessionMs={state.sessionMs}
+        sessionId={meta.sessionId}
+        sessionMs={meta.sessionMs}
+        email={meta.email}
         mountedAt={mountedAt.current}
         slow={showSlow}
         hostedFallback={hostedFallback}
@@ -394,6 +435,7 @@ function ConnectedCheckout({
   theme,
   sessionId,
   sessionMs,
+  email,
   mountedAt,
   slow,
   hostedFallback,
@@ -403,9 +445,13 @@ function ConnectedCheckout({
   const checkout = result.type === "success" ? result.checkout : null;
   const journey = useRef({ submitted: false, paid: false, left: false, method: "", email: "" });
   if (checkout?.status?.type === "complete") journey.current.paid = true;
+  if (email && !journey.current.email) journey.current.email = email;
 
   const track = useCallback(
-    (step, data, opts) => trackCheckoutStep(sessionId, step, { method: journey.current.method || undefined, ...data }, opts),
+    (step, data, opts) => {
+      if (!sessionId) return;
+      trackCheckoutStep(sessionId, step, { method: journey.current.method || undefined, ...data }, opts);
+    },
     [sessionId],
   );
 
@@ -441,6 +487,12 @@ function ConnectedCheckout({
     // Only re-theme when the site theme flips.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme, Boolean(checkout)]);
+
+  // Prefill from the session response when Stripe mounted before it arrived.
+  useEffect(() => {
+    if (!checkout || !email || typeof checkout.updateEmail !== "function") return;
+    Promise.resolve(checkout.updateEmail(email)).catch(() => {});
+  }, [checkout, email]);
 
   useEffect(() => {
     if (slow) track("form_slow", { ms: msSinceCheckoutClick(mountedAt), sessionMs: sessionMs ?? undefined }, { once: true });

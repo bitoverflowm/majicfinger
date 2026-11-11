@@ -1,5 +1,6 @@
 import { landingPageV2Config } from "@/lib/landingPageV2Config";
 import { getStripe, isStripeTestKey } from "@/lib/stripe/client";
+import { normalizeCheckoutCycle } from "@/lib/stripe/checkoutPlanQuery";
 import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
 
 const pricing = landingPageV2Config.pricing;
@@ -55,8 +56,7 @@ export const CHECKOUT_PLANS = [
 export function planFromQuery(plan, cycle) {
   const name = String(plan || "").trim().toLowerCase();
   if (name === "lifetime") return CHECKOUT_PLANS.find((item) => item.key === "lifetime") || null;
-  const rawCycle = String(cycle || "").trim().toLowerCase();
-  const normalizedCycle = rawCycle === "yearly" || rawCycle === "year" ? "annual" : rawCycle;
+  const normalizedCycle = normalizeCheckoutCycle(cycle);
   return CHECKOUT_PLANS.find((item) => item.tier === name && item.cycle === normalizedCycle) || null;
 }
 

@@ -2187,7 +2187,7 @@ function EnrichStep({
                           You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "row" : "rows"} in your markets query. So{" "}
                           {sheetCount.toLocaleString()} trade {sheetCount === 1 ? "sheet" : "sheets"} will be created for each market.
                           <span className="mt-2 block">{sheetLimitLine}</span>
-                          <a href="/checkout" className="mt-2 block font-medium text-[#0d99ff] underline-offset-2 hover:underline">
+                          <a href="/#pricing" className="mt-2 block font-medium text-[#0d99ff] underline-offset-2 hover:underline">
                             Upgrade to increase your limit.
                           </a>
                         </p>

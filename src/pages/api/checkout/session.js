@@ -77,27 +77,16 @@ export default async function handler(req, res) {
 
   const plan = planFromQuery(req.body?.plan, req.body?.cycle);
   if (!plan) {
-    await notifyCheckoutAlert({
-      title: "Checkout started for an unknown plan",
-      fields: { Plan: req.body?.plan, Cycle: req.body?.cycle },
-    });
-    return res.status(400).json({ error: "Unknown plan" });
-  }
-
-  let loginEmail = "";
-  try {
-    const { session: login, user, state } = await loadSessionMember(req);
-    const renewalFailing = ["past_due", "unpaid"].includes(String(user?.subscriptionStatus || "").toLowerCase());
-    if (login && (ALREADY_BILLED_REASONS.has(state.reason) || renewalFailing)) {
-      return res.status(409).json({
-        code: "ALREADY_MEMBER",
-        reason: state.reason,
-        redirect: "/dashboard?view=billing",
+    const rawPlan = String(req.body?.plan || "").trim();
+    const rawCycle = String(req.body?.cycle || "").trim();
+    // Empty query = bare /checkout or a bot. Only ping Telegram when someone sent a real unknown combo.
+    if (rawPlan || rawCycle) {
+      await notifyCheckoutAlert({
+        title: "Checkout started for an unknown plan",
+        fields: { Plan: rawPlan || "(empty)", Cycle: rawCycle || "(empty)" },
       });
     }
-    loginEmail = String(login?.email || user?.email || "").trim().toLowerCase();
-  } catch {
-    // Account lookup is best-effort here; logged-out checkout must keep working.
+    return res.status(400).json({ error: "Unknown plan" });
   }
 
   if (!stripeSecretKey() || !stripePublishableKey()) {
@@ -121,7 +110,26 @@ export default async function handler(req, res) {
   }
 
   try {
-    const resolved = await resolveCheckoutPrice(plan);
+    // Member lookup and price resolve are independent — run together so checkout isn't waiting twice.
+    const memberPromise = loadSessionMember(req).catch(() => null);
+    const resolvedPromise = resolveCheckoutPrice(plan);
+
+    let loginEmail = "";
+    const member = await memberPromise;
+    if (member) {
+      const { session: login, user, state } = member;
+      const renewalFailing = ["past_due", "unpaid"].includes(String(user?.subscriptionStatus || "").toLowerCase());
+      if (login && (ALREADY_BILLED_REASONS.has(state.reason) || renewalFailing)) {
+        return res.status(409).json({
+          code: "ALREADY_MEMBER",
+          reason: state.reason,
+          redirect: "/dashboard?view=billing",
+        });
+      }
+      loginEmail = String(login?.email || user?.email || "").trim().toLowerCase();
+    }
+
+    const resolved = await resolvedPromise;
     if (!resolved?.priceId) {
       return res.status(500).json({ error: "Could not start checkout" });
     }
