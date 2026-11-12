@@ -24,6 +24,7 @@ import {
 import { getFlowsCatalog, findFlow } from "@/lib/mcp/data/flowsCatalog";
 import { compareVenues } from "@/lib/mcp/data/compareVenues";
 import { runHolderAnalysisRecipe, runTradeHistoryRecipe } from "@/lib/mcp/data/recipes";
+import { catalogRealtimeFeeds, getRealtimeSnapshot } from "@/lib/mcp/data/realtime";
 import { analyzeCalibration, analyzeHolders, analyzeTape } from "@/lib/mcp/data/stats";
 import {
   addInsightBlocks,
@@ -46,7 +47,7 @@ export function createLycheeMcpServer(actor) {
   const server = new McpServer(
     {
       name: "lychee-mcp",
-      version: "0.4.0",
+      version: "0.5.0",
     },
     {
       instructions: lycheeMcpInstructions(),
@@ -105,11 +106,44 @@ export function createLycheeMcpServer(actor) {
               "Execute as a Lychee assistant walkthrough:",
               "1) Briefly restate the plan",
               "2) Orient (list_research_flows / search / closed markets as needed) — keep ids",
-              "3) Pull + compose Lychee charts early; share dashboard_url (?workspace=)",
+              "3) Pull + compose Lychee charts early; PASTE share.open_now_markdown / dashboard_url as markdown",
               "4) Analyze (holders/tape/calibration or your own math on Lychee rows)",
               "5) Narrate sources used; ask one steering question; suggest next pulls",
-              "6) Offer publish_project when shareable",
+              "6) Offer publish_project when shareable — PASTE publication.url + og_image_url",
               "Never scrape venue HTML. Never invent empty chart shells.",
+            ].join("\n"),
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    "lychee_bot_poll",
+    {
+      description: "Drive a trading bot off Lychee realtime snapshots (poll MCP; no vendor WS held open).",
+      argsSchema: {
+        condition_id: z.string().optional(),
+        ticker: z.string().optional(),
+        feed: z.string().optional(),
+      },
+    },
+    ({ condition_id, ticker, feed }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: [
+              lycheeMcpInstructions(),
+              "",
+              "Bot poll mode:",
+              "1) list_realtime_feeds",
+              `2) Loop get_realtime_snapshot with feed=${feed || "polymarket:trades|orderbook|prices or kalshi:market"}`,
+              condition_id ? `   condition_id=${condition_id}` : "   condition_id=… for Polymarket feeds",
+              ticker ? `   ticker=${ticker}` : "   ticker=… for Kalshi feeds",
+              "3) Drive bot logic from snapshot JSON; respect bot_poll_hint_ms",
+              "4) Optional human side: pull_and_compose + PASTE dashboard_url",
             ].join("\n"),
           },
         },
@@ -220,6 +254,58 @@ export function createLycheeMcpServer(actor) {
             next: "Use pull_and_compose with a live dataset id + required key (condition_id / ticker / proxy_wallet).",
           };
         },
+      }),
+  );
+
+  server.registerTool(
+    "list_realtime_feeds",
+    {
+      description:
+        "Catalog Lychee realtime / live feeds for research + trading bots. MCP cannot hold vendor websockets — bots poll get_realtime_snapshot.",
+    },
+    async () =>
+      runMcpTool(actor, {
+        tool: "list_realtime_feeds",
+        actionClass: "orient",
+        args: {},
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...catalogRealtimeFeeds(),
+          suggest_next: [
+            { tool: "get_realtime_snapshot", why: "Poll trades/book/prices for a condition_id or ticker" },
+            { tool: "pull_and_compose", why: "Optional human charts alongside the bot loop" },
+          ],
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "get_realtime_snapshot",
+    {
+      description:
+        "One-shot live snapshot for bots (poll on an interval). Feeds: polymarket:trades, polymarket:orderbook, polymarket:prices, kalshi:market. Returns bot_poll_hint_ms + optional vendor_socket URL.",
+      inputSchema: {
+        feed: z.string().min(2).max(80),
+        condition_id: z.string().max(80).optional(),
+        ticker: z.string().max(80).optional(),
+        limit: z.number().int().min(1).max(200).optional(),
+      },
+    },
+    async ({ feed, condition_id, ticker, limit = 50 }) =>
+      runMcpTool(actor, {
+        tool: "get_realtime_snapshot",
+        actionClass: "sample",
+        args: { feed, condition_id, ticker, limit },
+        rows: limit,
+        summary: `Realtime snapshot ${feed}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await getRealtimeSnapshot({ feed, condition_id, ticker, limit })),
+          suggest_next: [
+            { tool: "get_realtime_snapshot", why: "Poll again after bot_poll_hint_ms" },
+            { tool: "pull_and_compose", why: "Land a research chart for the human" },
+          ],
+        }),
       }),
   );
 

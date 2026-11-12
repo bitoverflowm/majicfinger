@@ -430,12 +430,15 @@ export async function publishProject(userId, projectId, { slug, title, descripti
   await WorkspaceDashboard.updateOne({ _id: projectId }, { $set: { published_at: now } }, { timestamps: false });
 
   const path = publishedProjectPath(handle, normalized);
+  const url = `${getSiteUrl()}${path}`;
+  const og_image_url = `${getSiteUrl()}/${encodeURIComponent(handle)}/${encodeURIComponent(normalized)}/image?kind=og`;
   return {
     project_id: String(projectId),
     slug: normalized,
     visibility: vis,
     path,
-    url: `${getSiteUrl()}${path}`,
+    url,
+    og_image_url,
     dashboard_url: absoluteDashboardUrl(projectId),
   };
 }

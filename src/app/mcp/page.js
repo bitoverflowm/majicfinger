@@ -10,21 +10,23 @@ const MCP_URL = "https://lycheedata.com/api/mcp";
 const STARTER_PROMPT = `Be my Lychee research assistant (walk me through it):
 1) Restate your plan in 1–2 sentences
 2) Call list_research_flows, then get_most_active_markets (or search_closed_markets if I need settled races)
-3) pull_market_bundle / preview_prices early and share the dashboard_url (?workspace=) so I can watch charts
+3) pull_market_bundle / preview_prices early — PASTE share.open_now_markdown / dashboard_url as a markdown link so I can click charts
 4) Analyze (holders / tape / calibration) and tell me which Lychee sources you used
 5) Ask me one question, then suggest 2–4 next pulls
-6) Offer publish_project when it's shareable
-Never scrape Polymarket/Kalshi HTML — only Lychee tools.`;
+6) Offer publish_project when it's shareable — PASTE publication.url + og_image_url
+Never scrape Polymarket/Kalshi HTML — only Lychee tools.
+For a trading bot: list_realtime_feeds → poll get_realtime_snapshot.`;
 
 const TOOL_ROWS = [
   ["list_capabilities / list_research_flows / list_datasets", "Orient — what you can pull and how pieces compose"],
+  ["list_realtime_feeds / get_realtime_snapshot", "Live snapshots for research + trading bots (poll)"],
   ["get_most_active_markets / search_markets / search_closed_markets", "Find open or settled markets (+ winners)"],
   ["get_lookalike_markets / compare_venues", "Related deadlines · Kalshi↔Polymarket gaps"],
   ["preview_holders / preview_market_activity / preview_prices / preview_orderbook", "Sample pulls (prices are callable)"],
   ["preview_trader / preview_kalshi_market / preview_open_interest", "Trader + Kalshi + OI samples"],
   ["pull_market_bundle / pull_and_compose / run_recipe_*", "Land real Lychee sheets + charts"],
   ["analyze_holders / analyze_tape / analyze_calibration", "Risk, tape, Brier / reliability"],
-  ["add_sheet_with_chart / add_insight_blocks / publish_project", "Compose + shareable research"],
+  ["add_sheet_with_chart / add_insight_blocks / publish_project", "Compose + shareable URL + OG preview"],
 ];
 
 export default function McpConnectPage() {

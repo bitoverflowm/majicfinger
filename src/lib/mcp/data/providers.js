@@ -92,9 +92,29 @@ export async function searchKalshi(query, { limit = 12 } = {}) {
   }));
 }
 
+function looksLikeHottestQuery(query) {
+  const q = String(query || "").toLowerCase();
+  return (
+    /\b(hottest|most active|top volume|highest volume|what's hot|whats hot|trending)\b/.test(q) ||
+    q === "hot" ||
+    q === "active"
+  );
+}
+
 export async function searchPolymarket(query, { limit = 12 } = {}) {
   const q = String(query || "").trim();
   if (q.length < 2) return [];
+
+  // Agents often search "hottest" instead of calling get_most_active_markets — fulfill either way.
+  if (looksLikeHottestQuery(q)) {
+    const active = await getMostActivePolymarketMarkets({ limit });
+    return active.map((row) => ({
+      ...row,
+      matched_via: "get_most_active_markets",
+      note: "Query looked like a volume ranking — used Lychee 24h active markets, not keyword search.",
+    }));
+  }
+
   const url = `${GAMMA_BASE}/public-search?q=${encodeURIComponent(q)}&limit_per_type=${Math.min(20, limit)}`;
   let body;
   try {
@@ -649,8 +669,9 @@ export function catalogCapabilities() {
       { name: "list_capabilities", stage: "orient", purpose: "Short catalog + best practices" },
       { name: "list_research_flows", stage: "orient", purpose: "Named composable research paths" },
       { name: "list_datasets", stage: "orient", purpose: "Every dataset id + status (live/partial/next)" },
+      { name: "list_realtime_feeds", stage: "orient", purpose: "Realtime/live feeds for bots + research" },
       { name: "get_most_active_markets", stage: "orient", purpose: "Rank Polymarket by 24h volume" },
-      { name: "search_markets", stage: "orient", purpose: "Search Kalshi + Polymarket; pull hints" },
+      { name: "search_markets", stage: "orient", purpose: "Search Kalshi + Polymarket; pull hints (hottest → active)" },
       { name: "search_closed_markets", stage: "orient", purpose: "Settled markets with winner / yes_won" },
       { name: "get_lookalike_markets", stage: "orient", purpose: "Related deadlines / same-event contracts" },
       { name: "compare_venues", stage: "orient", purpose: "Kalshi ↔ Polymarket gap scan with pull hints" },
@@ -661,6 +682,7 @@ export function catalogCapabilities() {
       { name: "preview_open_interest", stage: "sample", purpose: "Open interest" },
       { name: "preview_trader", stage: "sample", purpose: "Positions + activity + PnL for a wallet" },
       { name: "preview_kalshi_market", stage: "sample", purpose: "Kalshi live market snapshot" },
+      { name: "get_realtime_snapshot", stage: "sample", purpose: "Pollable live snapshot for trading bots" },
       { name: "pull_market_bundle", stage: "ingest+compose", purpose: "Holders+trades → Lychee sheets+charts" },
       { name: "pull_and_compose", stage: "ingest+compose", purpose: "Any live dataset → sheet+chart" },
       { name: "run_recipe_holder_analysis", stage: "ingest+compose", purpose: "UI holder-analysis recipe cousin" },
@@ -670,7 +692,7 @@ export function catalogCapabilities() {
       { name: "analyze_calibration", stage: "analyze", purpose: "Brier + reliability bands from forecast/outcome rows" },
       { name: "add_sheet_with_chart", stage: "compose", purpose: "Rows → Lychee sheet + chart" },
       { name: "add_insight_blocks", stage: "compose", purpose: "Narrative conclusions" },
-      { name: "publish_project", stage: "publish", purpose: "Shareable research URL" },
+      { name: "publish_project", stage: "publish", purpose: "Shareable research URL + OG image" },
     ],
   };
 }
