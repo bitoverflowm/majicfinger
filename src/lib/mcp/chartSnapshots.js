@@ -1,6 +1,7 @@
 /**
  * Compact SVG chart snapshots for MCP chat (inline image content + markdown).
- * Clients that render MCP ImageContent / markdown images show these without a click.
+ * Styled to read like Lychee terminal charts (dark field, orange accent, grid)
+ * — not generic blue bars. Full interactive charts still live in the workspace.
  */
 
 function esc(s) {
@@ -48,19 +49,79 @@ export function imageMarkdown(image, alt = "Lychee chart") {
   return `![${alt}](data:${mime};base64,${image.data})`;
 }
 
-/** Horizontal / vertical bar chart from labeled values. */
-export function renderBarsSvg(rows, {
-  title = "Chart",
-  labelKeys = ["name", "pseudonym", "label", "proxy_wallet", "outcome"],
-  valueKeys = ["amount", "size", "value", "price", "shares"],
-  maxBars = 12,
-  width = 720,
-  height = 360,
-} = {}) {
+function wrapSvg(width, height, title, body) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}">
+  <defs>
+    <linearGradient id="lycheeBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#120a08"/>
+    </linearGradient>
+    <linearGradient id="lycheeOrange" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ea580c"/>
+      <stop offset="100%" stop-color="#fb923c"/>
+    </linearGradient>
+    <linearGradient id="lycheeSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" rx="18" fill="url(#lycheeBg)"/>
+  <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="17" fill="none" stroke="#1e293b"/>
+  <text x="24" y="30" fill="#f8fafc" font-size="15" font-weight="600" font-family="ui-sans-serif,system-ui">${esc(title)}</text>
+  <text x="${width - 24}" y="30" text-anchor="end" fill="#64748b" font-size="11" font-family="ui-sans-serif,system-ui">Lychee</text>
+  ${body}
+</svg>`;
+}
+
+function formatCompact(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "—";
+  const abs = Math.abs(v);
+  if (abs >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
+  if (abs >= 1e3) return `${(v / 1e3).toFixed(1)}k`;
+  if (abs >= 10) return v.toFixed(1);
+  if (abs >= 1) return v.toFixed(2);
+  return v.toFixed(3);
+}
+
+function gridLines(padL, padT, innerW, innerH, ticks = 4) {
+  const lines = [];
+  for (let i = 0; i <= ticks; i++) {
+    const y = padT + (innerH * i) / ticks;
+    lines.push(
+      `<line x1="${padL}" y1="${y}" x2="${padL + innerW}" y2="${y}" stroke="#1e293b" stroke-width="1"/>`,
+    );
+  }
+  return lines.join("");
+}
+
+/** Horizontal ranked bars — holder / book style. */
+export function renderBarsSvg(
+  rows,
+  {
+    title = "Chart",
+    labelKeys = ["name", "pseudonym", "label", "proxy_wallet", "outcome", "title"],
+    valueKeys = [
+      "amount",
+      "current_size",
+      "current_value",
+      "size",
+      "value",
+      "usdc_size",
+      "shares",
+      "price",
+    ],
+    maxBars = 12,
+    width = 720,
+    height = 380,
+  } = {},
+) {
   const points = (rows || [])
     .map((row, i) => ({
-      label: pickLabel(row, labelKeys, `#${i + 1}`).slice(0, 22),
+      label: pickLabel(row, labelKeys, `#${i + 1}`).slice(0, 26),
       value: pickNumeric(row, valueKeys),
+      outcome: String(row?.outcome || "").toUpperCase(),
     }))
     .filter((p) => p.value != null && p.value >= 0)
     .sort((a, b) => b.value - a.value)
@@ -68,69 +129,77 @@ export function renderBarsSvg(rows, {
   if (!points.length) return null;
 
   const max = Math.max(...points.map((p) => p.value), 1e-9);
-  const padL = 140;
-  const padR = 24;
-  const padT = 48;
+  const padL = 150;
+  const padR = 28;
+  const padT = 52;
   const padB = 28;
   const innerW = width - padL - padR;
   const innerH = height - padT - padB;
-  const barH = Math.min(28, innerH / points.length - 6);
+  const barH = Math.min(26, innerH / points.length - 6);
   const gap = (innerH - barH * points.length) / Math.max(1, points.length);
 
   const bars = points
     .map((p, i) => {
       const y = padT + i * (barH + gap);
       const w = Math.max(2, (p.value / max) * innerW);
+      const fill = p.outcome === "NO" ? "#38bdf8" : "url(#lycheeOrange)";
       return `
-      <rect x="${padL}" y="${y}" width="${w}" height="${barH}" rx="6" fill="url(#lycheeBar)"/>
+      <rect x="${padL}" y="${y}" width="${w}" height="${barH}" rx="5" fill="${fill}" opacity="0.92"/>
       <text x="${padL - 10}" y="${y + barH * 0.72}" text-anchor="end" fill="#cbd5e1" font-size="12" font-family="ui-sans-serif,system-ui">${esc(p.label)}</text>
       <text x="${padL + w + 8}" y="${y + barH * 0.72}" fill="#f8fafc" font-size="11" font-family="ui-sans-serif,system-ui">${esc(formatCompact(p.value))}</text>`;
     })
     .join("");
 
-  return wrapSvg(
-    width,
-    height,
-    title,
-    `
-    <defs>
-      <linearGradient id="lycheeBar" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#f97316"/>
-        <stop offset="100%" stop-color="#fb923c"/>
-      </linearGradient>
-    </defs>
-    ${bars}`,
-  );
+  return wrapSvg(width, height, title, `${bars}`);
 }
 
-/** Price / tape line from chronological rows. */
-export function renderLineSvg(rows, {
-  title = "Price",
-  xKeys = ["timestamp", "t", "time", "createdAt"],
-  yKeys = ["price", "yes_price", "mid", "value"],
-  maxPoints = 80,
-  width = 720,
-  height = 360,
-} = {}) {
+/** Price / tape / PnL line with area fill + grid. */
+export function renderLineSvg(
+  rows,
+  {
+    title = "Price",
+    xKeys = ["timestamp", "t", "time", "createdAt", "published_at"],
+    yKeys = [
+      "price",
+      "yes_price",
+      "mid",
+      "economic_pnl",
+      "realized_pnl",
+      "unrealized_pnl",
+      "p",
+      "value",
+      "current_value",
+    ],
+    maxPoints = 96,
+    width = 720,
+    height = 380,
+    stroke = "#fb923c",
+  } = {},
+) {
   const points = (rows || [])
     .map((row, i) => ({
       xLabel: pickLabel(row, xKeys, String(i)),
       y: pickNumeric(row, yKeys),
       i,
+      ts: toNum(row?.timestamp ?? row?.t),
     }))
     .filter((p) => p.y != null);
   if (points.length < 2) return null;
 
-  const step = Math.max(1, Math.ceil(points.length / maxPoints));
-  const sampled = points.filter((_, i) => i % step === 0 || i === points.length - 1);
+  const ordered = [...points].sort((a, b) => {
+    if (a.ts != null && b.ts != null) return a.ts - b.ts;
+    return a.i - b.i;
+  });
+  const step = Math.max(1, Math.ceil(ordered.length / maxPoints));
+  const sampled = ordered.filter((_, i) => i % step === 0 || i === ordered.length - 1);
   const ys = sampled.map((p) => p.y);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
   const span = Math.max(1e-9, maxY - minY);
-  const padL = 48;
-  const padR = 20;
-  const padT = 48;
-  const padB = 36;
+  const padL = 56;
+  const padR = 24;
+  const padT = 52;
+  const padB = 40;
   const innerW = width - padL - padR;
   const innerH = height - padT - padB;
 
@@ -141,38 +210,100 @@ export function renderLineSvg(rows, {
   });
   const d = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
   const area = `${d} L${coords[coords.length - 1].x.toFixed(1)},${padT + innerH} L${coords[0].x.toFixed(1)},${padT + innerH} Z`;
+  const last = coords[coords.length - 1];
 
   return wrapSvg(
     width,
     height,
     title,
     `
-    <defs>
-      <linearGradient id="lycheeLineFill" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#f97316" stop-opacity="0.35"/>
-        <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <path d="${area}" fill="url(#lycheeLineFill)"/>
-    <path d="${d}" fill="none" stroke="#fb923c" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${coords[coords.length - 1].x}" cy="${coords[coords.length - 1].y}" r="4" fill="#fff7ed" stroke="#f97316" stroke-width="2"/>
-    <text x="${padL}" y="${height - 12}" fill="#94a3b8" font-size="11" font-family="ui-sans-serif,system-ui">${esc(formatCompact(minY))} → ${esc(formatCompact(maxY))}</text>`,
+    ${gridLines(padL, padT, innerW, innerH)}
+    <path d="${area}" fill="url(#lycheeSky)"/>
+    <path d="${d}" fill="none" stroke="${stroke}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${last.x}" cy="${last.y}" r="4.5" fill="#fff7ed" stroke="${stroke}" stroke-width="2"/>
+    <text x="${padL}" y="${padT - 8}" fill="#94a3b8" font-size="11" font-family="ui-sans-serif,system-ui">${esc(formatCompact(maxY))}</text>
+    <text x="${padL}" y="${padT + innerH + 22}" fill="#94a3b8" font-size="11" font-family="ui-sans-serif,system-ui">${esc(formatCompact(minY))} → ${esc(formatCompact(maxY))} · last ${esc(formatCompact(last.yVal))}</text>`,
+  );
+}
+
+/** Stacked YES/NO holder share bars for concentration snapshots. */
+export function renderHolderSplitSvg(rows, { title = "Holders", width = 720, height = 380 } = {}) {
+  const yes = (rows || []).filter((r) => r.outcome === "YES" || r.outcome_index === 0);
+  const no = (rows || []).filter((r) => r.outcome === "NO" || r.outcome_index === 1);
+  if (!yes.length && !no.length) return null;
+
+  const topN = (list) =>
+    [...list]
+      .map((r) => ({
+        label: pickLabel(r, ["name", "pseudonym", "proxy_wallet"], "wallet").slice(0, 18),
+        value: pickNumeric(r, ["amount", "current_size", "size"]) || 0,
+      }))
+      .filter((p) => p.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+
+  const yesPts = topN(yes);
+  const noPts = topN(no);
+  const max = Math.max(...yesPts.map((p) => p.value), ...noPts.map((p) => p.value), 1);
+
+  const padT = 56;
+  const colW = (width - 72) / 2;
+  const drawCol = (pts, x0, color, label) => {
+    const header = `<text x="${x0}" y="${padT - 12}" fill="${color}" font-size="12" font-weight="600" font-family="ui-sans-serif,system-ui">${label}</text>`;
+    const bars = pts
+      .map((p, i) => {
+        const y = padT + i * 48;
+        const w = Math.max(4, (p.value / max) * (colW - 20));
+        return `
+        <text x="${x0}" y="${y}" fill="#94a3b8" font-size="11" font-family="ui-sans-serif,system-ui">${esc(p.label)}</text>
+        <rect x="${x0}" y="${y + 6}" width="${w}" height="14" rx="4" fill="${color}" opacity="0.9"/>
+        <text x="${x0 + w + 6}" y="${y + 17}" fill="#e2e8f0" font-size="11" font-family="ui-sans-serif,system-ui">${esc(formatCompact(p.value))}</text>`;
+      })
+      .join("");
+    return header + bars;
+  };
+
+  return wrapSvg(
+    width,
+    height,
+    title,
+    `
+    ${drawCol(yesPts, 28, "#fb923c", "YES")}
+    ${drawCol(noPts, 28 + colW + 16, "#38bdf8", "NO")}`,
   );
 }
 
 export function snapshotForSheet({ title, rows, chartView = "bars" }) {
   const view = String(chartView || "bars").toLowerCase();
   let svg = null;
-  if (view === "trade-price" || view === "price" || view === "line" || view === "liveline" || view === "activity") {
-    svg = renderLineSvg(rows, { title });
+  if (view === "trade-price" || view === "price" || view === "line" || view === "liveline") {
+    svg = renderLineSvg(rows, { title, stroke: "#fb923c" });
+  } else if (view === "portfolio" || view === "pnl") {
+    svg = renderLineSvg(rows, {
+      title,
+      yKeys: ["economic_pnl", "realized_pnl", "unrealized_pnl", "position_pnl", "value"],
+      stroke: "#38bdf8",
+    });
+  } else if (view === "activity") {
+    svg = renderLineSvg(rows, {
+      title,
+      yKeys: ["usdc_size", "size", "price", "value"],
+      stroke: "#fb923c",
+    }) || renderBarsSvg(rows, { title });
   } else if (view === "order-book") {
     svg = renderBarsSvg(rows, {
       title,
       labelKeys: ["side", "outcome", "label"],
       valueKeys: ["size", "amount", "quantity", "price"],
     });
+  } else if (view === "treemap" || view === "holders") {
+    svg =
+      renderHolderSplitSvg(rows, { title }) ||
+      renderBarsSvg(rows, {
+        title,
+        valueKeys: ["amount", "current_size", "current_value", "size"],
+      });
   } else {
-    // bars / treemap / default — ranked bars read well in chat
     svg = renderBarsSvg(rows, { title });
   }
   if (!svg) {
@@ -222,26 +353,6 @@ export function jarvisPowerUpSvg({ subtitle = "Proactive Lychee watch online" } 
 
 export function jarvisPowerUpImage() {
   return svgToImageContent(jarvisPowerUpSvg(), { title: "Jarvis power-up" });
-}
-
-function wrapSvg(width, height, title, body) {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}">
-  <rect width="100%" height="100%" rx="18" fill="#0b1220"/>
-  <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="17" fill="none" stroke="#1e293b"/>
-  <text x="24" y="30" fill="#f8fafc" font-size="16" font-weight="600" font-family="ui-sans-serif,system-ui">${esc(title)}</text>
-  <text x="${width - 24}" y="30" text-anchor="end" fill="#64748b" font-size="11" font-family="ui-sans-serif,system-ui">Lychee</text>
-  ${body}
-</svg>`;
-}
-
-function formatCompact(n) {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return "";
-  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
-  if (Math.abs(v) >= 1e3) return `${(v / 1e3).toFixed(1)}k`;
-  if (Math.abs(v) < 1 && Math.abs(v) > 0) return v.toFixed(3);
-  return String(Math.round(v * 1000) / 1000);
 }
 
 /** Collect chart_images from a tool payload (nested sheets / composed). */

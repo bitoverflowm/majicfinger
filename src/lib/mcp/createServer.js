@@ -33,6 +33,8 @@ import {
   resolvePendingConfirmation,
 } from "@/lib/mcp/confirm";
 import { analyzeCalibration, analyzeHolders, analyzeTape } from "@/lib/mcp/data/stats";
+import { analyzeTraderTheme } from "@/lib/mcp/data/traderTheme";
+import { searchNewsHeadlines } from "@/lib/mcp/data/news";
 import {
   addInsightBlocks,
   addSheetWithChart,
@@ -41,6 +43,7 @@ import {
   openProject,
   publishProject,
   pullMarketBundleIntoProject,
+  pullTraderBundleIntoProject,
 } from "@/lib/mcp/workspace";
 import { getCreditSnapshot, recentLedger } from "@/lib/mcp/credits";
 import { listDelegations } from "@/lib/mcp/confirm";
@@ -54,7 +57,7 @@ export function createLycheeMcpServer(actor) {
   const server = new McpServer(
     {
       name: "lychee-mcp",
-      version: "0.7.0",
+      version: "0.8.0",
     },
     {
       instructions: lycheeMcpInstructions(),
@@ -960,7 +963,7 @@ export function createLycheeMcpServer(actor) {
     "preview_trader",
     {
       description:
-        "Pull Polymarket trader positions + activity + PnL for a proxy_wallet (0x…). Prefer this over scraping profiles.",
+        "Pull Polymarket trader positions + activity + PnL equity curve for a proxy_wallet (0x…). Uses Lychee normalizers (current_size, economic_pnl). Prefer pull_trader_bundle to land charts. Never magic-link login.",
       inputSchema: {
         proxy_wallet: z.string().min(40).max(64),
         limit: z.number().int().min(10).max(200).optional(),
@@ -975,6 +978,110 @@ export function createLycheeMcpServer(actor) {
         handler: async () => ({
           ...guidancePreamble(),
           ...(await getPolymarketTrader(proxy_wallet, { limit })),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "pull_trader_bundle",
+    {
+      description:
+        "One-shot trader compose: positions (treemap) + activity + PnL portfolio sheets with Lychee-styled chat chart snapshots. Use after preview_trader or with proxy_wallet alone.",
+      inputSchema: {
+        proxy_wallet: z.string().min(40).max(64),
+        project_id: z.string().min(8).max(40).optional(),
+        project_name: z.string().max(120).optional(),
+        label: z.string().max(80).optional(),
+        limit: z.number().int().min(10).max(200).optional(),
+      },
+    },
+    async (args) =>
+      runMcpTool(actor, {
+        tool: "pull_trader_bundle",
+        actionClass: "sample",
+        args,
+        summary: `Trader bundle ${args.proxy_wallet}`,
+        handler: async () => {
+          const trader = await getPolymarketTrader(args.proxy_wallet, { limit: args.limit || 80 });
+          const composed = await pullTraderBundleIntoProject(actor.userId, {
+            projectId: args.project_id || "",
+            projectName: args.project_name || "",
+            proxyWallet: args.proxy_wallet,
+            label: args.label || "",
+            positions: trader.positions,
+            activity: trader.activity,
+            pnl: trader.pnl,
+            analysisMarkdown: trader.pnl_summary
+              ? `## ${args.label || args.proxy_wallet}\n\n- Economic PnL (last): **${trader.pnl_summary.economic_pnl}**\n- PnL points: ${trader.pnl_summary.points}\n- Positions: ${trader.positions.length} · Activity: ${trader.activity.length}`
+              : "",
+          });
+          return {
+            ...guidancePreamble(),
+            trader_summary: {
+              proxy_wallet: trader.proxy_wallet,
+              pnl_summary: trader.pnl_summary,
+              positions: trader.positions.length,
+              activity: trader.activity.length,
+              pnl_points: trader.pnl.length,
+            },
+            composed,
+            chart_images: composed.chart_images || [],
+            next: "SHOW chart images. For Fed/macro hit-rates call analyze_trader_theme. Overlay search_news. Prefer publish_project over asking users to log in.",
+          };
+        },
+      }),
+  );
+
+  server.registerTool(
+    "analyze_trader_theme",
+    {
+      description:
+        "Score a wallet on a theme (default Fed/rates): match activity/positions, settle hit-rate on closed markets, list open theme exposure. Use after preview_trader when user asks win/loss history on Fed markets.",
+      inputSchema: {
+        proxy_wallet: z.string().min(40).max(64),
+        theme: z.string().max(80).optional(),
+        limit: z.number().int().min(20).max(200).optional(),
+        max_markets: z.number().int().min(3).max(24).optional(),
+      },
+    },
+    async (args) =>
+      runMcpTool(actor, {
+        tool: "analyze_trader_theme",
+        actionClass: "analyze",
+        args,
+        summary: `Theme score ${args.proxy_wallet}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await analyzeTraderTheme(args.proxy_wallet, {
+            theme: args.theme || "fed",
+            limit: args.limit || 120,
+            maxMarkets: args.max_markets || 12,
+          })),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "search_news",
+    {
+      description:
+        "Lychee news headlines (Google News via Lychee) for theme overlays — Fed, FOMC, etc. Pair with analyze_trader_theme timestamps. Do not scrape random sites.",
+      inputSchema: {
+        terms: z.array(z.string()).optional(),
+        query: z.string().max(200).optional(),
+        days: z.number().int().min(1).max(90).optional(),
+        limit: z.number().int().min(5).max(80).optional(),
+      },
+    },
+    async (args) =>
+      runMcpTool(actor, {
+        tool: "search_news",
+        actionClass: "sample",
+        args,
+        summary: `News ${args.query || (args.terms || []).join(",")}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await searchNewsHeadlines(args)),
         }),
       }),
   );
@@ -1230,7 +1337,7 @@ export function createLycheeMcpServer(actor) {
     "pull_market_bundle",
     {
       description:
-        "Preferred one-shot: resolve market, pull FULL holders+trades from Lychee, create/open project, add real sheets+charts (+ inline chat snapshots), optional analysis. Returns dashboard_url (?workspace=).",
+        "Preferred one-shot: resolve market, pull FULL prices+holders+trades from Lychee, create/open project, add real sheets+charts (+ Lychee-styled inline chat snapshots), optional analysis.",
       inputSchema: {
         condition_id: z.string().min(8).max(120),
         project_id: z.string().min(8).max(40).optional(),
@@ -1250,9 +1357,10 @@ export function createLycheeMcpServer(actor) {
         summary: `Bundle pull ${args.condition_id}`,
         handler: async () => {
           const market = await getPolymarketMarketByCondition(args.condition_id);
-          const [holders, trades] = await Promise.all([
+          const [holders, trades, pricePull] = await Promise.all([
             getPolymarketHolders(args.condition_id, { limit: args.holders_limit || 500 }),
             getPolymarketTradesPreview(args.condition_id, { limit: args.trades_limit || 500 }),
+            getPolymarketPrices(args.condition_id, { limit: 240, interval: "1h" }).catch(() => null),
           ]);
           const prices = Array.isArray(market.outcome_prices) ? market.outcome_prices.map(Number) : [];
           const holderAnalysis = analyzeHolders(holders.rows, {
@@ -1289,6 +1397,7 @@ export function createLycheeMcpServer(actor) {
             market,
             holdersRows: holders.rows,
             tradesRows: trades.rows,
+            pricesRows: pricePull?.rows || [],
             analysisMarkdown,
           });
 
@@ -1297,12 +1406,13 @@ export function createLycheeMcpServer(actor) {
             market,
             holders_count: holders.count,
             trades_count: trades.trade_count,
+            prices_count: pricePull?.rows?.length || 0,
             holder_analysis: holderAnalysis,
             tape_analysis: tapeAnalysis,
             composed,
             chart_images: composed.chart_images || [],
             sheets: composed.sheets,
-            next: "SHOW each chart_snapshot inline as Chart 1/2… then PASTE composed.dashboard_url. Optionally get_lookalike_markets, then publish_project.",
+            next: "SHOW Lychee-styled chart images inline. Drill wallets with pull_trader_bundle + analyze_trader_theme. Overlay search_news. Prefer publish_project for shareable links — do not ask for email magic-link.",
             show_in_chat: composed.show_in_chat,
           };
         },
@@ -1420,7 +1530,7 @@ export function createLycheeMcpServer(actor) {
             title: pulled.title,
             rows: pulled.rows,
             preferredColumns: pulled.preferredColumns,
-            chartView: args.chart_view || pulled.meta.chart_view || "bars",
+            chartView: args.chart_view || pulled.chartView || pulled.meta.chart_view || "bars",
             table: pulled.meta.table,
             integrationId: pulled.meta.venue === "kalshi" ? "kalshi-live" : "polymarket",
           });
@@ -1429,7 +1539,8 @@ export function createLycheeMcpServer(actor) {
             dataset: pulled.meta,
             row_count: pulled.rows.length,
             composed: { ...composed, dashboard_url: composed.dashboard_url || dashboardUrl },
-            next: "analyze_* if relevant, then add_insight_blocks, then publish_project for sharing.",
+            chart_images: composed.chart_images || [],
+            next: "SHOW chart images. For wallets use analyze_trader_theme + search_news. Prefer publish_project — never magic-link.",
           };
         },
       }),

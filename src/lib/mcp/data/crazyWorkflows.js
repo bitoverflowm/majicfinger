@@ -55,9 +55,9 @@ Only Lychee tools.`,
     prompt: `Be my Lychee research assistant. Stalk smart money:
 1) get_most_active_markets → pull holders on #1
 2) Pick the most interesting proxy_wallet (size, both-sides, or recent aggressor)
-3) preview_trader + pull_and_compose trader_positions / trader_activity / trader_pnl
-4) PASTE dashboard; tell me what they're doing and the risk
-5) Ask if I want another wallet, related markets, or publish
+3) preview_trader + pull_trader_bundle (datasets polymarket.trader_positions / activity / pnl)
+4) analyze_trader_theme theme=fed if it's a macro market; search_news for headline overlay
+5) SHOW chart images; publish_project — never magic-link login
 Only Lychee tools.`,
   },
   {

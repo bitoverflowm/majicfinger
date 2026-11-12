@@ -159,6 +159,14 @@ assert.match(lycheeMcpInstructions(), /Jarvis mode/i);
 assert.match(lycheeMcpInstructions(), /list_capabilities with action=jarvis_on/);
 assert.match(lycheeMcpInstructions(), /approve_pending/);
 assert.match(lycheeMcpInstructions(), /say approve/i);
+assert.match(lycheeMcpInstructions(), /analyze_trader_theme/);
+assert.match(lycheeMcpInstructions(), /search_news/);
+assert.match(lycheeMcpInstructions(), /magic-link/i);
+assert.match(lycheeMcpInstructions(), /polymarket\.trader_positions/);
+assert.ok(findFlow("trader_deep_dive")?.tools.includes("pull_trader_bundle"));
+assert.ok(findFlow("trader_deep_dive")?.tools.includes("analyze_trader_theme"));
+assert.equal(findFlow("news_and_social_context")?.status, "live");
+assert.ok(findFlow("news_and_social_context")?.tools.includes("search_news"));
 assert.ok(guidancePreamble().walkthrough.some((s) => /Jarvis/i.test(s)));
 assert.ok(guidancePreamble().hard_rules.some((r) => /action=jarvis_on/i.test(r)));
 assert.ok(findFlow("jarvis_proactive")?.tools.includes("jarvis_pulse"));
@@ -215,6 +223,31 @@ const snap = snapshotForSheet({
 });
 assert.ok(snap?.image?.data);
 assert.equal(snap.image.mimeType, "image/svg+xml");
+assert.ok(String(Buffer.from(snap.image.data, "base64")).includes("#fb923c"));
+
+const pnlSnap = snapshotForSheet({
+  title: "PnL",
+  chartView: "portfolio",
+  rows: [
+    { timestamp: 1, economic_pnl: -10 },
+    { timestamp: 2, economic_pnl: 5 },
+    { timestamp: 3, economic_pnl: 12 },
+  ],
+});
+assert.ok(pnlSnap?.image?.data);
+
+const holderSnap = snapshotForSheet({
+  title: "Holders",
+  chartView: "treemap",
+  rows: [
+    { outcome: "YES", name: "Alpha", amount: 100 },
+    { outcome: "YES", name: "Beta", amount: 40 },
+    { outcome: "NO", name: "Gamma", amount: 200 },
+  ],
+});
+assert.ok(holderSnap?.image?.data);
+assert.ok(String(Buffer.from(holderSnap.image.data, "base64")).includes("YES"));
+
 const powerImg = jarvisPowerUpImage();
 assert.ok(powerImg.data.length > 20);
 assert.ok(imageMarkdown(powerImg, "Jarvis powering up").includes("![Jarvis powering up]"));
@@ -225,5 +258,18 @@ const withCharts = textResult({
 assert.ok(withCharts.content.some((c) => c.type === "image"));
 assert.ok(withCharts.content[0].text.includes("![Trades chart]"));
 assert.equal(collectChartImages({ sheets: [{ chart_snapshot: snap }] }).length, 1);
+
+// Live API shape that used to empty MCP PnL (points nested under data, not data[]).
+const fakePnlEnvelope = {
+  data: {
+    proxy_wallet: "0x24ded84d901a743cfee095f8082b0f9f647183cb",
+    points: [
+      { timestamp: 1, economic_pnl: 1.5 },
+      { timestamp: 2, economic_pnl: 2.5 },
+    ],
+  },
+};
+assert.ok(Array.isArray(fakePnlEnvelope.data.points));
+assert.equal(Array.isArray(fakePnlEnvelope.data), false);
 
 console.log("mcp-smoke-unit: ok");
