@@ -20,13 +20,14 @@ import { WORKSPACE_ENTRY_PATH } from '@/lib/workspaceEntry';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
-const Login = ({ fromHome }) => {
+const Login = ({ fromHome, redirectTo }) => {
   const router = useRouter();
   const contextStateV2 = useMyStateV2();
   const setViewing = contextStateV2?.setViewing;
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const afterLoginPath = typeof redirectTo === 'string' && redirectTo.startsWith('/') ? redirectTo : '';
 
   // Dev: pre-fill main bypass user (magic link skipped) for local sign-in.
   useEffect(() => {
@@ -71,6 +72,10 @@ const Login = ({ fromHome }) => {
       setLoading(false);
       clearInterval(timer);
       setProgress(100);
+      if (afterLoginPath) {
+        router.replace(afterLoginPath);
+        return;
+      }
     } else {
       console.error('Magic Login Failed', await res.text());
       alert('There was an issue with login. Please message @misterrpink1 on Twitter.');
@@ -107,8 +112,15 @@ const Login = ({ fromHome }) => {
           ) : user ? (
             <div className="space-y-4 rounded-lg border p-4">
               <p className="text-sm">Welcome, {user.email}</p>
-              <Button onClick={() => (fromHome ? router.push(WORKSPACE_ENTRY_PATH) : setViewing?.('dashboard'))} className="w-full">
-                Go to dashboard
+              <Button
+                onClick={() => {
+                  if (afterLoginPath) return router.push(afterLoginPath);
+                  if (fromHome) return router.push(WORKSPACE_ENTRY_PATH);
+                  setViewing?.('dashboard');
+                }}
+                className="w-full"
+              >
+                {afterLoginPath ? 'Continue' : 'Go to dashboard'}
               </Button>
             </div>
           ) : (

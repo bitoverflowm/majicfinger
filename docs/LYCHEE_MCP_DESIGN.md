@@ -1,10 +1,20 @@
 # Lychee MCP — Locked Design
 
 Working design for exposing Lychee to Claude, ChatGPT, Cursor, and similar agents.
-Status: **locked for v1 direction** after product review. Implementation starts only after
-credit numbers / domain / Telegram routing TBDs below are filled, then build order A.
+Status: **Phase 1–2 private test build in progress** on `cursor/mcp-678e`.
+Design remains locked; placeholder credit numbers are in code for owner ChatGPT testing.
 
 Last updated: Nov 12, 2026 (Asia/Katmandu).
+
+### Private ChatGPT test (owner)
+
+1. Deploy this branch (Vercel preview or production).
+2. Open `/mcp` while signed in as `rikesh@bitoverflow.org` (MisterrPink).
+3. In ChatGPT, add a remote MCP connector to `{origin}/api/mcp`.
+4. Complete OAuth approve in the browser.
+5. Ask a research question (holders / activity / dashboard). Credits for the owner
+   account are **unlimited** but still ledgered for billing tests.
+6. Optional: create a personal access token on `/mcp` for Cursor (`Authorization: Bearer lychee_pat_…`).
 
 ---
 
@@ -370,16 +380,18 @@ the same `User` and entitlement helpers.
 
 ---
 
-## 13. Open TBDs (block implementation numbers, not direction)
+## 13. Open TBDs / placeholders in code
 
-1. Free taste size (credits and/or “serious pulls”).
-2. Monthly allotments for Lite / Pro / Max (and legacy tier mapping).
-3. Credit pack prices and sizes ($10 / $40 / $100 as starting strawman).
-4. Exact credit weights for one Athena pull vs one compose/publish.
-5. Confirm threshold: credit amount that always requires confirm.
-6. Telegram destination for MCP audit (existing billing chat vs dedicated).
-7. DNS: `mcp.lycheedata.com` vs `lycheedata.com/mcp` for v1.
-8. Teams: confirmed out of v1 beyond a design footnote.
+Placeholder values live in `src/lib/mcp/config.js` for private testing; tune after owner ChatGPT use.
+
+1. Free taste: **100 credits/month** (`MCP_TIER_MONTHLY_CREDITS.free`).
+2. Monthly allotments: Lite 2k / Pro(researcher) 10k / Max(quant) 50k (+ legacy mapped).
+3. Credit packs: not sold in UI yet (Stripe packs still TBD).
+4. Weights: orient 1 / sample 8 / analyze 15 / compose 4 / publish 6 / materialize 80+25 per 1k rows.
+5. Confirm threshold: **40 credits** or publish/delete/materialize/export classes.
+6. Telegram: reuses existing billing notifier (`notifyBillingEvent`) for expensive/failed MCP calls.
+7. DNS: v1 serves MCP at **`{site}/api/mcp`** (no `mcp.` subdomain required yet). Connect UI at `/mcp`.
+8. Teams: out of v1.
 
 ---
 
