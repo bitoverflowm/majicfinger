@@ -148,6 +148,9 @@ export default function McpConnectPage() {
             <Link href="/dashboard" className="underline underline-offset-4">
               Open dashboard
             </Link>
+            <Link href="/jarvis" className="underline underline-offset-4">
+              MCP + Jarvis prereg
+            </Link>
           </div>
         </header>
 

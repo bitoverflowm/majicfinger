@@ -17,5 +17,6 @@ export function isKnownCheckoutQuery(plan, cycle) {
   const name = String(plan || "").trim().toLowerCase();
   if (!name) return false;
   if (name === "lifetime") return true;
+  if (name === "mcp_prereg" || name === "mcp-prereg" || name === "jarvis") return true;
   return PAID_TIERS.has(name) && PAID_CYCLES.has(normalizeCheckoutCycle(cycle));
 }

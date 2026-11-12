@@ -1,0 +1,81 @@
+.landing {
+  --jarvis-ink: #0b1220;
+  --jarvis-sky: #0ea5e9;
+  --jarvis-ember: #ea580c;
+  --jarvis-sand: #f7f4ef;
+}
+
+.grid {
+  background-image:
+    linear-gradient(rgba(125, 211, 252, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125, 211, 252, 0.08) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 40%, black 20%, transparent 72%);
+}
+
+.pulse {
+  animation: jarvisPulse 3.2s ease-in-out infinite;
+}
+
+.ring {
+  animation: jarvisSpin 12s linear infinite;
+  border-style: dashed;
+}
+
+.ringSlow {
+  animation: jarvisSpin 22s linear infinite reverse;
+}
+
+.rise {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s ease;
+}
+
+.riseIn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.riseDelay1 {
+  transition-delay: 0.12s;
+}
+
+.riseDelay2 {
+  transition-delay: 0.24s;
+}
+
+.scanline {
+  background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.35), transparent);
+  background-size: 200% 100%;
+  animation: jarvisScan 2.8s linear infinite;
+}
+
+@keyframes jarvisPulse {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.95;
+  }
+}
+
+@keyframes jarvisSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes jarvisScan {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}

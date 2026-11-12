@@ -9,6 +9,7 @@ import { recordCheckoutStep } from "@/lib/telegram/checkoutJourney";
 import { stripeSecretKey } from "@/lib/stripe/client";
 import { planByKey } from "@/lib/stripe/catalog";
 import { BLACK_FRIDAY, blackFridayAppliesTo, blackFridayCents } from "@/lib/promo/blackFriday";
+import { grantCredits } from "@/lib/mcp/credits";
 import { buffer } from "micro";
 
 export const config = {
@@ -64,6 +65,9 @@ const PLAN_MAP = {
 
   // Lifetime Payment Link ($199.99 one-time): Elite-tier entitlements + lifetimeMember in DB
   "19999:one-time": { tier: "elite", cycle: "lifetime", lifetimeMember: true },
+
+  // Lychee MCP + Jarvis prereg ($49 one-time) — does NOT grant Elite/lifetime membership
+  "4900:one-time": { tier: "mcp", cycle: "prereg", mcpPrereg: true, creditGrant: 5000 },
 };
 
 function resolvePlan({ amount, interval, mode }) {
@@ -665,6 +669,17 @@ async function handleCheckoutCompleted(session) {
       });
       return { ok: false, reason: "no_email" };
     }
+
+    // MCP + Jarvis $49 prereg: flag + credits, not Elite membership.
+    if (mapping.mcpPrereg) {
+      await grantMcpPreregPurchase(email, name, amount, {
+        stripeCustomerId: session.customer || null,
+        creditGrant: mapping.creditGrant || 5000,
+        sessionId: session?.id,
+      });
+      return { ok: true, mcpPrereg: true };
+    }
+
     await updateUserPayment(email, name, amount, {
       tier: mapping.tier,
       cycle: mapping.cycle,
@@ -1049,6 +1064,45 @@ function shouldNotifyStripeActivation(user, { status, lifetimeMember }) {
 
 function notifyStripeSignup(payload) {
   notifySignup(payload).catch((err) => console.error("[telegram] signup notify failed", err));
+}
+
+/** $49 MCP/Jarvis prereg — metadata flag + credit grant, not a membership tier. */
+async function grantMcpPreregPurchase(email, name, amount, { stripeCustomerId, creditGrant = 5000, sessionId } = {}) {
+  await dbConnect();
+  const normalizedEmail = normalizeEmail(email);
+  let user = await findUserForWebhook({ email: normalizedEmail, stripeCustomerId });
+  const displayName = name || user?.name || normalizedEmail.split("@")[0] || "Customer";
+  if (!user) {
+    user = await User.create({
+      email: normalizedEmail,
+      name: displayName,
+      stripeCustomerId: stripeCustomerId || undefined,
+      metadata: {},
+    });
+  }
+  const meta = { ...(user.metadata && typeof user.metadata === "object" ? user.metadata : {}) };
+  const already = !!meta.mcp_prereg_paid_at;
+  meta.mcp_prereg_paid_at = meta.mcp_prereg_paid_at || new Date().toISOString();
+  meta.mcp_prereg_amount_cents = amount;
+  meta.mcp_prereg_session_id = sessionId || meta.mcp_prereg_session_id || "";
+  await User.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        name: displayName,
+        stripeCustomerId: stripeCustomerId || user.stripeCustomerId || null,
+        metadata: meta,
+        netPay: user?.netPay ? Number(user.netPay) + Number(amount) : amount,
+      },
+    },
+  );
+  if (!already && creditGrant > 0) {
+    await grantCredits(user._id, creditGrant, {
+      reason: "mcp_prereg_grant",
+      meta: { amount_cents: amount, session_id: sessionId || null },
+    });
+  }
+  console.log(`[Stripe Webhook] MCP prereg granted for ${normalizedEmail} (credits=${already ? 0 : creditGrant})`);
 }
 
 async function updateUserPayment(email, name, amount, opts) {

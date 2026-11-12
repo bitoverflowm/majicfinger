@@ -157,9 +157,36 @@ assert.equal(pitchCrazyWorkflows(3)[0].vibe, "Whale war room");
 assert.match(lycheeMcpInstructions(), /list_crazy_workflows/);
 assert.match(lycheeMcpInstructions(), /Jarvis mode/i);
 assert.match(lycheeMcpInstructions(), /list_capabilities with action=jarvis_on/);
+assert.match(lycheeMcpInstructions(), /approve_pending/);
+assert.match(lycheeMcpInstructions(), /say approve/i);
 assert.ok(guidancePreamble().walkthrough.some((s) => /Jarvis/i.test(s)));
 assert.ok(guidancePreamble().hard_rules.some((r) => /action=jarvis_on/i.test(r)));
 assert.ok(findFlow("jarvis_proactive")?.tools.includes("jarvis_pulse"));
+
+import { parseMentionIntent } from "../src/lib/mcp/xJarvis/intent.js";
+import { isKnownCheckoutQuery } from "../src/lib/stripe/checkoutPlanQuery.js";
+
+const holdersIntent = parseMentionIntent({
+  text: "@lychee_data holders on this",
+  parent_text: "Will BTC hit 150k?",
+  author_handle: "trader",
+});
+assert.equal(holdersIntent.mode, "holders");
+assert.ok(holdersIntent.subject.parent_excerpt);
+
+const pulseIntent = parseMentionIntent({
+  text: "@lychee_data what's hot right now",
+  author_handle: "a",
+});
+assert.equal(pulseIntent.mode, "pulse");
+
+const clarifyIntent = parseMentionIntent({ text: "@lychee_data", author_handle: "a" });
+assert.equal(clarifyIntent.mode, "clarify");
+assert.ok(clarifyIntent.ask_user);
+
+assert.equal(isKnownCheckoutQuery("mcp_prereg"), true);
+assert.equal(isKnownCheckoutQuery("jarvis"), true);
+assert.equal(isKnownCheckoutQuery("mcp-prereg"), true);
 
 import {
   jarvisPowerUpImage,

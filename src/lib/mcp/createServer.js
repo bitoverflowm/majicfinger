@@ -27,6 +27,11 @@ import { runHolderAnalysisRecipe, runTradeHistoryRecipe } from "@/lib/mcp/data/r
 import { catalogRealtimeFeeds, getRealtimeSnapshot } from "@/lib/mcp/data/realtime";
 import { findCrazyWorkflow, listCrazyWorkflows, pitchCrazyWorkflows } from "@/lib/mcp/data/crazyWorkflows";
 import { jarvisPowerUpPayload, jarvisPulse } from "@/lib/mcp/data/jarvis";
+import {
+  getLatestPendingConfirmation,
+  listPendingConfirmations,
+  resolvePendingConfirmation,
+} from "@/lib/mcp/confirm";
 import { analyzeCalibration, analyzeHolders, analyzeTape } from "@/lib/mcp/data/stats";
 import {
   addInsightBlocks,
@@ -49,7 +54,7 @@ export function createLycheeMcpServer(actor) {
   const server = new McpServer(
     {
       name: "lychee-mcp",
-      version: "0.6.1",
+      version: "0.7.0",
     },
     {
       instructions: lycheeMcpInstructions(),
@@ -441,6 +446,89 @@ export function createLycheeMcpServer(actor) {
               { note: "Pitch the 3 items in pitch_now to the user (title + hook), then wait for a pick" },
               { tool: "get_most_active_markets", why: "If they say pick for me → start whale war room" },
             ],
+          };
+        },
+      }),
+  );
+
+  server.registerTool(
+    "list_pending_approvals",
+    {
+      description:
+        "List open MCP confirmations for this user (publish / expensive pulls). When the user says approve, call approve_pending.",
+      inputSchema: {
+        limit: z.number().int().min(1).max(10).optional(),
+      },
+    },
+    async ({ limit = 5 } = {}) =>
+      runMcpTool(actor, {
+        tool: "list_pending_approvals",
+        actionClass: "orient",
+        args: { limit },
+        handler: async () => {
+          const rows = await listPendingConfirmations(actor.userId, { limit });
+          return {
+            ...guidancePreamble(),
+            pending: rows.map((r) => ({
+              confirmation_token: r.token,
+              tool: r.tool,
+              action_class: r.action_class,
+              credit_quote: r.credit_quote,
+              summary: r.summary,
+              expires_at: r.expires_at,
+            })),
+            next: rows.length
+              ? "User can say approve → call approve_pending, then retry the original tool with confirmation_token."
+              : "No open approvals.",
+          };
+        },
+      }),
+  );
+
+  server.registerTool(
+    "approve_pending",
+    {
+      description:
+        "Approve or deny the latest (or specified) MCP confirmation when the user says approve / deny / always allow in chat — no need to open the Lychee approve page.",
+      inputSchema: {
+        confirmation_token: z.string().max(80).optional(),
+        decision: z.enum(["approve", "deny"]).optional(),
+        allow_forever: z.boolean().optional(),
+      },
+    },
+    async ({ confirmation_token = "", decision = "approve", allow_forever = false } = {}) =>
+      runMcpTool(actor, {
+        tool: "approve_pending",
+        actionClass: "orient",
+        args: { confirmation_token, decision, allow_forever },
+        handler: async () => {
+          let token = String(confirmation_token || "").trim();
+          if (!token) {
+            const latest = await getLatestPendingConfirmation(actor.userId);
+            if (!latest) {
+              return {
+                ...guidancePreamble(),
+                status: "none",
+                message: "No pending MCP approval to resolve. Ask the user what they wanted to run.",
+              };
+            }
+            token = latest.token;
+          }
+          const approve = decision !== "deny";
+          const pending = await resolvePendingConfirmation(token, actor.userId, {
+            approve,
+            allowForever: !!(approve && allow_forever),
+          });
+          return {
+            ...guidancePreamble(),
+            status: approve ? "approved" : "denied",
+            confirmation_token: token,
+            tool: pending.tool,
+            action_class: pending.action_class,
+            allow_forever: !!(approve && allow_forever),
+            next: approve
+              ? `Retry ${pending.tool} now with confirmation_token=\"${token}\".`
+              : "User denied. Do not retry unless they ask again.",
           };
         },
       }),

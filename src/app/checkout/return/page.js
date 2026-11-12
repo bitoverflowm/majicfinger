@@ -101,7 +101,19 @@ function CheckoutReturn() {
 
   if (checkout.found && checkout.status === "open") {
     const retry = checkout.plan
-      ? `/checkout?plan=${encodeURIComponent(checkout.plan.cycle === "lifetime" ? "lifetime" : checkout.plan.tier)}&cycle=${encodeURIComponent(checkout.plan.cycle)}`
+      ? `/checkout?plan=${encodeURIComponent(
+          checkout.plan.cycle === "lifetime"
+            ? "lifetime"
+            : checkout.plan.key === "mcp_prereg" || checkout.plan.cycle === "prereg"
+              ? "mcp_prereg"
+              : checkout.plan.tier,
+        )}${
+          checkout.plan.cycle === "lifetime" ||
+          checkout.plan.key === "mcp_prereg" ||
+          checkout.plan.cycle === "prereg"
+            ? ""
+            : `&cycle=${encodeURIComponent(checkout.plan.cycle)}`
+        }`
       : "/#pricing";
     return (
       <div className="flex min-h-dvh w-screen items-center justify-center p-6">
