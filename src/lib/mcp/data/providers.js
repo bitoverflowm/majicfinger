@@ -533,7 +533,9 @@ export async function resolveDatasetPull(datasetId, args = {}) {
       const kalshi = await getKalshiMarket(args.ticker);
       return { meta, title: `Kalshi · ${kalshi.market.ticker}`, rows: kalshi.rows, preferredColumns: ["ticker", "title", "yes_bid", "yes_ask", "volume", "open_interest"] };
     }
-    case "lake.athena_trades":
+    case "lake.athena_polymarket_trades":
+    case "lake.athena_kalshi_trades":
+    case "lake.athena_markets":
       throw new Error("Athena lake dumps use prepare_full_pull (confirm + expensive). Prefer live market datasets first.");
     default:
       throw new Error(`Dataset ${meta.id} is not pullable yet (status=${meta.status}).`);
@@ -556,6 +558,7 @@ export function catalogCapabilities() {
       { name: "get_most_active_markets", stage: "orient", purpose: "Rank Polymarket by 24h volume" },
       { name: "search_markets", stage: "orient", purpose: "Search Kalshi + Polymarket; pull hints" },
       { name: "get_lookalike_markets", stage: "orient", purpose: "Related deadlines / same-event contracts" },
+      { name: "compare_venues", stage: "orient", purpose: "Kalshi ↔ Polymarket gap scan with pull hints" },
       { name: "preview_holders", stage: "sample", purpose: "Flattened holders" },
       { name: "preview_market_activity", stage: "sample", purpose: "Recent trades" },
       { name: "preview_prices", stage: "sample", purpose: "CLOB price history" },
@@ -565,6 +568,8 @@ export function catalogCapabilities() {
       { name: "preview_kalshi_market", stage: "sample", purpose: "Kalshi live market snapshot" },
       { name: "pull_market_bundle", stage: "ingest+compose", purpose: "Holders+trades → Lychee sheets+charts" },
       { name: "pull_and_compose", stage: "ingest+compose", purpose: "Any live dataset → sheet+chart" },
+      { name: "run_recipe_holder_analysis", stage: "ingest+compose", purpose: "UI holder-analysis recipe cousin" },
+      { name: "run_recipe_trade_history", stage: "ingest+compose", purpose: "Live trade-history recipe (Athena dump separate)" },
       { name: "analyze_holders", stage: "analyze", purpose: "Concentration, risk, trade hypotheses" },
       { name: "analyze_tape", stage: "analyze", purpose: "Tape stats + inference" },
       { name: "add_sheet_with_chart", stage: "compose", purpose: "Rows → Lychee sheet + chart" },

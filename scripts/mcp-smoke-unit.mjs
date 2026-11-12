@@ -88,9 +88,12 @@ assert.ok(preamble.compose_loop.some((s) => /pull_market_bundle|pull_and_compose
 
 const catalog = getFlowsCatalog();
 assert.ok(catalog.flows.some((f) => f.id === "active_market_deep_dive" && f.status === "live"));
+assert.ok(catalog.flows.some((f) => f.id === "cross_venue_gap" && f.status === "live"));
+assert.ok(catalog.flows.some((f) => f.id === "recipe_holder_analysis" && f.status === "live"));
 assert.ok(catalog.datasets.some((d) => d.id === "polymarket.holders" && d.status === "live"));
 assert.equal(findDataset("polymarket.prices")?.chart_view, "price");
 assert.ok(findFlow("trader_deep_dive")?.tools.includes("preview_trader"));
+assert.ok(findFlow("cross_venue_gap")?.tools.includes("compare_venues"));
 assert.ok(catalog.best_practices.length >= 5);
 
 console.log("mcp-smoke-unit: ok");

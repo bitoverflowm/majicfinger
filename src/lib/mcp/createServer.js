@@ -20,6 +20,8 @@ import {
   searchPolymarket,
 } from "@/lib/mcp/data/providers";
 import { getFlowsCatalog, findFlow } from "@/lib/mcp/data/flowsCatalog";
+import { compareVenues } from "@/lib/mcp/data/compareVenues";
+import { runHolderAnalysisRecipe, runTradeHistoryRecipe } from "@/lib/mcp/data/recipes";
 import { analyzeHolders, analyzeTape } from "@/lib/mcp/data/stats";
 import {
   addInsightBlocks,
@@ -41,7 +43,7 @@ import { getSiteUrl } from "@/lib/site";
 export function createLycheeMcpServer(actor) {
   const server = new McpServer({
     name: "lychee-mcp",
-    version: "0.3.0",
+    version: "0.3.1",
   });
 
   server.registerPrompt(
@@ -131,7 +133,7 @@ export function createLycheeMcpServer(actor) {
       description: "Every Lychee dataset id an agent can pull (status live/partial/next) with chart_view hints.",
       inputSchema: {
         status: z.enum(["live", "partial", "next"]).optional(),
-        venue: z.enum(["polymarket", "kalshi", "athena", "news", "twitter"]).optional(),
+        venue: z.enum(["polymarket", "kalshi", "athena", "news", "twitter", "price_stream"]).optional(),
       },
     },
     async ({ status, venue } = {}) =>
@@ -309,6 +311,31 @@ export function createLycheeMcpServer(actor) {
         handler: async () => ({
           ...(await estimatePullSize({ venue, query, rowsRequested: rows_requested })),
           ...guidancePreamble(),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "compare_venues",
+    {
+      description:
+        "Kalshi ↔ Polymarket gap scan. Pass Kalshi ticker, Polymarket condition_id, or a free-text query. Returns matched candidates + pull hints (no scraping).",
+      inputSchema: {
+        query: z.string().min(2).max(200).optional(),
+        ticker: z.string().min(2).max(80).optional(),
+        condition_id: z.string().min(8).max(120).optional(),
+        limit: z.number().int().min(1).max(20).optional(),
+      },
+    },
+    async ({ query, ticker, condition_id, limit = 8 }) =>
+      runMcpTool(actor, {
+        tool: "compare_venues",
+        actionClass: "orient",
+        args: { query, ticker, condition_id, limit },
+        summary: `Compare venues ${ticker || condition_id || query || ""}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await compareVenues({ query, ticker, conditionId: condition_id, limit })),
         }),
       }),
   );
@@ -733,6 +760,72 @@ export function createLycheeMcpServer(actor) {
             next: "Share composed.dashboard_url with the user. Optionally get_lookalike_markets, then publish_project.",
           };
         },
+      }),
+  );
+
+  server.registerTool(
+    "run_recipe_holder_analysis",
+    {
+      description:
+        "Lychee Holder Analysis recipe: holders+tape charts, risk notes, and top-trader position/activity sheets in one project.",
+      inputSchema: {
+        condition_id: z.string().min(8).max(120),
+        project_id: z.string().min(8).max(40).optional(),
+        project_name: z.string().max(120).optional(),
+        top_traders: z.number().int().min(1).max(5).optional(),
+        holders_limit: z.number().int().min(20).max(200).optional(),
+        trades_limit: z.number().int().min(20).max(200).optional(),
+      },
+    },
+    async (args) =>
+      runMcpTool(actor, {
+        tool: "run_recipe_holder_analysis",
+        actionClass: "sample",
+        args,
+        rows: (args.holders_limit || 80) + (args.trades_limit || 80),
+        summary: `Holder analysis recipe ${args.condition_id}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await runHolderAnalysisRecipe(actor.userId, {
+            conditionId: args.condition_id,
+            projectId: args.project_id || "",
+            projectName: args.project_name || "",
+            topTraders: args.top_traders || 3,
+            holdersLimit: args.holders_limit || 80,
+            tradesLimit: args.trades_limit || 80,
+          })),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "run_recipe_trade_history",
+    {
+      description:
+        "Live trade-history recipe (sheet + trade-price chart + tape notes). Full Athena lake history still uses prepare_full_pull.",
+      inputSchema: {
+        condition_id: z.string().min(8).max(120),
+        project_id: z.string().min(8).max(40).optional(),
+        project_name: z.string().max(120).optional(),
+        trades_limit: z.number().int().min(20).max(300).optional(),
+      },
+    },
+    async (args) =>
+      runMcpTool(actor, {
+        tool: "run_recipe_trade_history",
+        actionClass: "sample",
+        args,
+        rows: args.trades_limit || 150,
+        summary: `Trade history recipe ${args.condition_id}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await runTradeHistoryRecipe(actor.userId, {
+            conditionId: args.condition_id,
+            projectId: args.project_id || "",
+            projectName: args.project_name || "",
+            tradesLimit: args.trades_limit || 150,
+          })),
+        }),
       }),
   );
 
