@@ -60,7 +60,14 @@ export function parseMentionIntent(input = {}) {
       ? cleaned
       : parent.slice(0, 200) || "";
 
-  const vague = !condition_id && !tickers.length && !urls.length && query.length < 8 && !parent;
+  // Pulse/scan needs no subject; only clarify when we still lack anything to research.
+  const vague =
+    mode !== "pulse" &&
+    !condition_id &&
+    !tickers.length &&
+    !urls.length &&
+    query.length < 8 &&
+    !parent;
 
   return {
     mode: vague ? "clarify" : mode,

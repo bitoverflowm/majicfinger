@@ -1,6 +1,12 @@
 {
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/x-jarvis/cron",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "redirects": [
     {
       "source": "/:path*",

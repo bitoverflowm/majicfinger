@@ -106,8 +106,8 @@ export async function runXJarvisJob({
     research,
     live: false,
     note: live
-      ? "Live posting is gated — set X_JARVIS_LIVE=1 and wire deliver layer to actually tweet."
-      : "Dry-run only. Review draft_reply before enabling live replies.",
+      ? "Live mode requested — cron/poll will post via Twitter user OAuth when X_JARVIS_LIVE=1."
+      : "Dry-run only. Review draft_reply; cron with live=1 posts when credentials + X_JARVIS_LIVE=1 are set.",
   };
 }
 
