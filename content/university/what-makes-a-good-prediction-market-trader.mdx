@@ -1,0 +1,89 @@
+---
+title: "How Can You Tell If a Polymarket or Kalshi Trader Is Actually Good?"
+seoTitle: "What Makes a Good Polymarket or Kalshi Trader?"
+description: "A trader can win 19 of 20 bets and break even. Learn to evaluate entry prices, fees, shared risks, and the trades a wallet makes after you start watching."
+publishedAt: "2026-11-12"
+author: "misterrpink"
+topics: ["prediction markets", "trader performance", "Polymarket", "Kalshi"]
+integration: []
+coverImage: "/images/university/what-makes-a-good-prediction-market-trader/main.jpg"
+ogImage: "https://lycheedata.com/images/university/what-makes-a-good-prediction-market-trader/main.jpg"
+featured: false
+lesson: 6
+cluster: polymarket-holder-analysis
+slug: "what-makes-a-good-prediction-market-trader"
+readingTime: "4 min"
+keywords: ["polymarket win rate", "kalshi win rate", "polymarket trader win rate", "prediction market trader performance"]
+canonical: "https://lycheedata.com/university/what-makes-a-good-prediction-market-trader"
+ogTitle: "What makes a good Polymarket or Kalshi trader?"
+ogDescription: "A trader can win 19 of 20 bets and break even. Here's what to check before you follow one."
+twitterCard: "summary_large_image"
+---
+
+# How Can You Tell If a Polymarket or Kalshi Trader Is Actually Good?
+
+**Lychee University · Lesson 6**
+
+Would you follow a trader who won 19 of their last 20 bets? Before you answer, ask what they paid.
+
+Suppose they bought one contract at 95¢ each time and held every contract to settlement. Nineteen winners earned 5¢ apiece. The loss cost 95¢. **Twenty bets, a 95% win rate, and exactly $0 in profit before fees.** That arithmetic applies to standard binary contracts paying $1 for a win and $0 for a loss. [Kalshi’s explanation of event contracts](https://help.kalshi.com/en/articles/13823766-what-are-prediction-markets)
+
+<WinStreakAnimation />
+
+A good prediction market trader needs to earn enough on the prices and sizes they actually trade to cover losses and fees. To judge whether someone can do that repeatedly, work backward from the result. What did they pay? How much was at stake? How many separate calls produced the profit? Then follow the trades they make *after* you've picked them.
+
+## What is a good win rate on Polymarket or Kalshi?
+
+A 70% win rate could be terrific or expensive. Suppose you buy ten equal-sized contracts and win seven. At 50¢ per contract, you spend $5 and collect $7. At 80¢, you spend $8 for the same $7 payout. Under those assumptions, **the entry price in cents gives you the break-even win percentage before fees**. Once prices, sizes, or exits vary, calculate dollars earned and dollars lost from the actual trades.
+
+<BreakEvenExplorer />
+
+Consider the reverse of our opening puzzle. A November 10, 2026 Lychee Holder Terminal snapshot of the Polymarket wallet **Contestable-Parfait** showed **273 wins, 312 losses, and a positive 13.2% return on cost** across 585 finished bets. Its Politics breakdown offers a clue: the average winner earned about $2,948 and the average loser cost about $1,358. In that category the wallet could lose more often than it won and still finish ahead. These figures describe the recorded finished positions. Open holdings have their own P&L. [Explore Polymarket wallet performance in Lychee](/polymarket-wallet-tracker)
+
+<WinnersVsLosersAnimation />
+
+## What did the trader actually risk?
+
+Two fills in the same market can earn the same green checkmark and carry very different stakes. In a six-fill Lychee preview of Polymarket’s Gavin Newsom 2028 presidential election market on November 12, 2026, one wallet bought **16.39 YES shares for $1** at 16:29 UTC. About four and a half minutes later, a different wallet bought **4,034.30 YES shares for $250**. Both paid close to 6.2¢ per share. Counting each purchase once gives them equal weight, even though the second buyer committed 250 times as much money. These are individual fills, so either trader may have had other exposure. [View the Newsom market on Polymarket](https://polymarket.com/event/presidential-election-winner-2028/will-gavin-newsom-win-the-2028-us-presidential-election)
+
+<SameCheckmarkAnimation />
+
+Start with the wallet’s position after the fill. If a Polymarket wallet holds 100 YES and 60 NO on the same question, 60 pairs can merge for $60. Only the remaining 40 YES shares change the final payout depending on who wins. The prices paid for all the shares still matter to profit. [How Polymarket pairs and merges shares](https://docs.polymarket.com/trading/positions/manage)
+
+Then group related markets. Ten election contracts might all benefit from one candidate doing well. Write down what each would pay if the candidate won narrowly, won comfortably, or lost. Adding the payoffs in each scenario tells you how much of the record rode on one call. You can do this with a Polymarket wallet’s positions or your own Kalshi trade history.
+
+<ScenarioPayoffExplorer />
+
+## Did they get a good entry price?
+
+Imagine a YES purchase at 42¢. An hour later, other wallets buy YES at 50¢. The original buyer got in 8¢ below those later buyers. That gives you a way to investigate timing even while the outcome is unknown.
+
+<EntryGapAnimation />
+
+Choose the comparison rule before looking at the winners. For example, compare each purchase with the first buy by another trader in the same outcome between 60 and 75 minutes later. Record the gap, the fill size, and whether a headline landed between the trades. Leave the comparison blank when there is no qualifying fill, and report how often that happens. Quiet markets are precisely where a single small fill, a wide spread, or the original buyer’s own order can make a later price misleading.
+
+An 8¢ move in the buyer’s favor is evidence about that entry. To count it as realized profit, you still need an exit or settlement. And if you’re considering following the trader, record the price available to *you* when you spotted the trade. Their 42¢ fill and your 50¢ entry are different bets economically.
+
+## What happens if you remove the biggest win?
+
+Recalculate the record twice: once with everything included, then with the single most profitable event removed, grouping related contracts first. Suppose a trader made $1,200 overall and one election contributed $1,500. The rest of the record lost $300. A long-shot specialist may reasonably rely on a few large wins. Now you know which part of the record needs more evidence.
+
+<RemoveBiggestWinExplorer />
+
+For both calculations, include realized gains and losses, fees actually paid, and unrealized P&L on open positions at a stated price and time. Check whether fees are already included before subtracting them. Show the open portion separately, especially when the displayed price comes from a small trade and the wallet still holds thousands of shares.
+
+## How did they do after you started watching?
+
+A leaderboard tells you whom you would have liked to find *last month*. The cleanest test you can start today is to date a watchlist. Save the trader’s record as it stands, write down why you picked them, and choose a review date. For each new position, log the event, outcome, entry price, size, fees, and eventual exit or settlement. Keep the losers, the still-open positions, and the traders who stop trading.
+
+<WatchlistAnimation />
+
+When the review date arrives, put two lines side by side: **the record that caught your eye** and **the record you watched unfold**. Did the trader still get favorable entries? Did several independent events contribute? How much survived fees? A short follow-up leaves uncertainty, but it answers a question no screenshot of a winning streak ever can: *what happened after you knew whom to watch?*
+
+---
+
+### Sources
+
+- [Kalshi: What are prediction markets?](https://help.kalshi.com/en/articles/13823766-what-are-prediction-markets)
+- [Polymarket: Manage positions (split, merge and redeem)](https://docs.polymarket.com/trading/positions/manage)
+- [Polymarket: Will Gavin Newsom win the 2028 US presidential election?](https://polymarket.com/event/presidential-election-winner-2028/will-gavin-newsom-win-the-2028-us-presidential-election)

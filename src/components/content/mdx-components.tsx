@@ -90,6 +90,16 @@ import {
   SplitInventoryAnimation,
   TwoTradesAnimation,
 } from "@/components/university/both-sides-animations";
+import {
+  BreakEvenExplorer,
+  EntryGapAnimation,
+  RemoveBiggestWinExplorer,
+  SameCheckmarkAnimation,
+  ScenarioPayoffExplorer,
+  WatchlistAnimation,
+  WinnersVsLosersAnimation,
+  WinStreakAnimation,
+} from "@/components/university/trader-quality-animations";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -207,6 +217,9 @@ function MdxHr() {
  *   `<TwoLinesAnimation />`, `<TwoLinesExplorer />`, `<SpreadExplorer />`, `<NewSeasonAnimation />`, `<TableScatterLineAnimation />`
  * - Buy both YES and NO lesson: `<TwoTradesAnimation />`, `<PairUpSharesAnimation />`, `<OutcomePayoutExplorer />`,
  *   `<PairCostExplorer />`, `<SameHoldingsAnimation />`, `<SplitInventoryAnimation />`, `<ReadAWalletAnimation />`
+ * - Good trader lesson: `<WinStreakAnimation />`, `<BreakEvenExplorer />`, `<WinnersVsLosersAnimation />`,
+ *   `<SameCheckmarkAnimation />`, `<ScenarioPayoffExplorer />`, `<EntryGapAnimation />`, `<RemoveBiggestWinExplorer />`,
+ *   `<WatchlistAnimation />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -308,6 +321,14 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     SameHoldingsAnimation,
     SplitInventoryAnimation,
     ReadAWalletAnimation,
+    WinStreakAnimation,
+    BreakEvenExplorer,
+    WinnersVsLosersAnimation,
+    SameCheckmarkAnimation,
+    ScenarioPayoffExplorer,
+    EntryGapAnimation,
+    RemoveBiggestWinExplorer,
+    WatchlistAnimation,
     ...components,
   };
 }
