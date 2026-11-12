@@ -1,7 +1,7 @@
 # Lychee MCP — Locked Design
 
 Working design for exposing Lychee to Claude, ChatGPT, Cursor, and similar agents.
-Status: **Research-partner v0.3** on `cursor/mcp-research-partner-678e` (base Phase 1–2 merged to main).
+Status: **Research assistant v0.4** — walkthrough instructions, calibration, Spectrum-style `/mcp` docs.
 Design remains locked; placeholder credit numbers are in code for owner ChatGPT testing.
 
 Last updated: Nov 12, 2026 (Asia/Katmandu).

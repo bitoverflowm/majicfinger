@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runMcpTool } from "@/lib/mcp/runTool";
 import { guidancePreamble, textResult } from "@/lib/mcp/toolResult";
+import { lycheeMcpInstructions } from "@/lib/mcp/instructions";
 import {
   catalogCapabilities,
   estimatePullSize,
@@ -16,13 +17,14 @@ import {
   getPolymarketTrader,
   getPolymarketTradesPreview,
   resolveDatasetPull,
+  searchClosedPolymarketMarkets,
   searchKalshi,
   searchPolymarket,
 } from "@/lib/mcp/data/providers";
 import { getFlowsCatalog, findFlow } from "@/lib/mcp/data/flowsCatalog";
 import { compareVenues } from "@/lib/mcp/data/compareVenues";
 import { runHolderAnalysisRecipe, runTradeHistoryRecipe } from "@/lib/mcp/data/recipes";
-import { analyzeHolders, analyzeTape } from "@/lib/mcp/data/stats";
+import { analyzeCalibration, analyzeHolders, analyzeTape } from "@/lib/mcp/data/stats";
 import {
   addInsightBlocks,
   addSheetWithChart,
@@ -41,15 +43,50 @@ import { getSiteUrl } from "@/lib/site";
  * @param {object} actor resolveMcpActor result
  */
 export function createLycheeMcpServer(actor) {
-  const server = new McpServer({
-    name: "lychee-mcp",
-    version: "0.3.1",
-  });
+  const server = new McpServer(
+    {
+      name: "lychee-mcp",
+      version: "0.4.0",
+    },
+    {
+      instructions: lycheeMcpInstructions(),
+    },
+  );
+
+  server.registerResource(
+    "lychee-instructions",
+    "lychee://instructions",
+    {
+      description: "Standing instructions for the Lychee research assistant walkthrough.",
+      mimeType: "text/plain",
+    },
+    async () => ({
+      contents: [{ uri: "lychee://instructions", mimeType: "text/plain", text: lycheeMcpInstructions() }],
+    }),
+  );
+
+  server.registerResource(
+    "lychee-tools",
+    "lychee://tools",
+    {
+      description: "Catalog of Lychee MCP tools and live dataset counts.",
+      mimeType: "application/json",
+    },
+    async () => ({
+      contents: [
+        {
+          uri: "lychee://tools",
+          mimeType: "application/json",
+          text: JSON.stringify(catalogCapabilities(), null, 2),
+        },
+      ],
+    }),
+  );
 
   server.registerPrompt(
     "lychee_research",
     {
-      description: "Run a Lychee-native research workflow ending in charts + optional publish.",
+      description: "Walk the user through a Lychee research session: sources → charts → analysis → questions → publish.",
       argsSchema: {
         question: z.string(),
       },
@@ -61,18 +98,49 @@ export function createLycheeMcpServer(actor) {
           content: {
             type: "text",
             text: [
-              guidancePreamble().identity,
+              lycheeMcpInstructions(),
               "",
               `Question: ${question}`,
               "",
-              "Steps:",
-              "1) list_research_flows (or list_capabilities) if unsure",
-              "2) get_most_active_markets or search_markets — keep condition_id / ticker / proxy_wallet",
-              "3) get_lookalike_markets for related deadlines",
-              "4) pull_market_bundle OR pull_and_compose(dataset) OR preview_* + add_sheet_with_chart",
-              "5) analyze_holders / analyze_tape — write inferences into add_insight_blocks",
-              "6) Return dashboard_url (?workspace=). Offer publish_project for sharing.",
-              "Never scrape venue HTML. Never invent empty chart shells without sheet data.",
+              "Execute as a Lychee assistant walkthrough:",
+              "1) Briefly restate the plan",
+              "2) Orient (list_research_flows / search / closed markets as needed) — keep ids",
+              "3) Pull + compose Lychee charts early; share dashboard_url (?workspace=)",
+              "4) Analyze (holders/tape/calibration or your own math on Lychee rows)",
+              "5) Narrate sources used; ask one steering question; suggest next pulls",
+              "6) Offer publish_project when shareable",
+              "Never scrape venue HTML. Never invent empty chart shells.",
+            ].join("\n"),
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    "lychee_calibration",
+    {
+      description: "Calibration / Brier research on settled Polymarket races using Lychee prices + outcomes.",
+      argsSchema: {
+        theme: z.string(),
+      },
+    },
+    ({ theme }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: [
+              lycheeMcpInstructions(),
+              "",
+              `Theme: ${theme}`,
+              "",
+              "1) search_closed_markets for settled races (winner / yes_won included)",
+              "2) For each race (or a sample), preview_prices and take the last YES price at/before your horizon",
+              "3) Build rows { forecast, outcome_won, label } and call analyze_calibration",
+              "4) pull_and_compose / add_sheet_with_chart for reliability bands; add_insight_blocks",
+              "5) Walk the user through sources + Brier; ask if they want another horizon (7d vs 24h)",
             ].join("\n"),
           },
         },
@@ -230,10 +298,43 @@ export function createLycheeMcpServer(actor) {
         actionClass: "orient",
         args: { limit },
         handler: async () => ({
-          ...guidancePreamble(),
           as_of: new Date().toISOString(),
           markets: await getMostActivePolymarketMarkets({ limit }),
           next: "Call pull_market_bundle with the top condition_id, then get_lookalike_markets.",
+          suggest_next: [
+            { tool: "pull_market_bundle", why: "Land holders+trades charts for #1" },
+            { tool: "get_lookalike_markets", why: "Related deadlines" },
+            { tool: "search_closed_markets", why: "If the question needs settled outcomes / calibration" },
+          ],
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "search_closed_markets",
+    {
+      description:
+        "Search settled/closed Polymarket markets with winner / yes_won when available. Use for calibration, postmortems, Brier.",
+      inputSchema: {
+        query: z.string().min(2).max(200),
+        limit: z.number().int().min(1).max(40).optional(),
+      },
+    },
+    async ({ query, limit = 20 }) =>
+      runMcpTool(actor, {
+        tool: "search_closed_markets",
+        actionClass: "orient",
+        args: { query, limit },
+        summary: `Search closed markets "${query}"`,
+        handler: async () => ({
+          query,
+          markets: await searchClosedPolymarketMarkets(query, { limit }),
+          next: "preview_prices per condition_id → build forecast rows → analyze_calibration → compose charts.",
+          suggest_next: [
+            { tool: "preview_prices", why: "YES price history for a forecast horizon" },
+            { tool: "analyze_calibration", why: "Brier + reliability bands from forecast/outcome rows" },
+            { tool: "pull_and_compose", why: "Land reliability chart_rows in Lychee" },
+          ],
         }),
       }),
   );
@@ -570,8 +671,51 @@ export function createLycheeMcpServer(actor) {
           }
           if (!rows?.length) throw new Error("Provide rows or condition_id with trades");
           return {
-            ...guidancePreamble(),
             analysis: analyzeTape(rows, { marketTitle: args.market_title }),
+          };
+        },
+      }),
+  );
+
+  server.registerTool(
+    "analyze_calibration",
+    {
+      description:
+        "Brier score + reliability bands from forecast rows. Each row needs forecast (0–1) and outcome_won (0/1). Agent may build rows from search_closed_markets + preview_prices.",
+      inputSchema: {
+        rows: z.array(z.record(z.any())).min(1).max(500),
+        title: z.string().max(200).optional(),
+        bins: z.number().int().min(2).max(20).optional(),
+        project_id: z.string().min(8).max(40).optional(),
+        compose_chart: z.boolean().optional(),
+      },
+    },
+    async (args) =>
+      runMcpTool(actor, {
+        tool: "analyze_calibration",
+        actionClass: "analyze",
+        args: { row_count: args.rows?.length, bins: args.bins },
+        summary: `Calibration n=${args.rows?.length || 0}`,
+        handler: async () => {
+          const analysis = analyzeCalibration(args.rows, { title: args.title, bins: args.bins });
+          let composed = null;
+          if (args.compose_chart && args.project_id && analysis.chart_rows?.length) {
+            composed = await addSheetWithChart(actor.userId, args.project_id, {
+              title: `${analysis.title} · reliability`,
+              rows: analysis.chart_rows,
+              preferredColumns: ["band", "avg_forecast", "empirical_win_rate", "count"],
+              chartView: "bars",
+              table: "mcp_calibration",
+            });
+            await addInsightBlocks(actor.userId, args.project_id, {
+              title: "Calibration notes",
+              markdown: analysis.inferences.map((line) => `- ${line}`).join("\n"),
+            });
+          }
+          return {
+            analysis,
+            composed,
+            suggest_next: analysis.suggest_next,
           };
         },
       }),
