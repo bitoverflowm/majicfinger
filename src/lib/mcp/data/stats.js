@@ -175,3 +175,103 @@ export function analyzeTape(rows, { marketTitle = "" } = {}) {
     chart_suggestions: [{ sheet_kind: "trades", chart_view: "trade-price", title: "Recent prints" }],
   };
 }
+
+/**
+ * Calibration / reliability from forecast rows.
+ * Each row: { forecast: 0..1 probability of YES (or event), outcome_won: 0|1|boolean, label? }
+ */
+export function analyzeCalibration(rows, { title = "", bins = 10 } = {}) {
+  const list = (Array.isArray(rows) ? rows : [])
+    .map((r) => {
+      const forecast = Number(r.forecast ?? r.yes_price ?? r.p ?? r.price);
+      let won = r.outcome_won ?? r.yes_won ?? r.won;
+      if (typeof won === "boolean") won = won ? 1 : 0;
+      won = Number(won);
+      return {
+        label: r.label || r.title || r.market_title || null,
+        forecast,
+        outcome_won: won,
+      };
+    })
+    .filter((r) => Number.isFinite(r.forecast) && (r.outcome_won === 0 || r.outcome_won === 1));
+
+  if (!list.length) {
+    throw new Error(
+      "Need rows with forecast (0–1) and outcome_won (0/1). Pull closed markets + preview_prices, then build those fields.",
+    );
+  }
+
+  const n = Math.max(2, Math.min(20, Number(bins) || 10));
+  const width = 1 / n;
+  const buckets = Array.from({ length: n }, (_, i) => ({
+    bin: i,
+    lo: i * width,
+    hi: (i + 1) * width,
+    count: 0,
+    wins: 0,
+    forecast_sum: 0,
+  }));
+
+  let brier = 0;
+  for (const row of list) {
+    const f = Math.min(1, Math.max(0, row.forecast));
+    brier += (f - row.outcome_won) ** 2;
+    const idx = Math.min(n - 1, Math.floor(f / width));
+    const b = buckets[idx];
+    b.count += 1;
+    b.wins += row.outcome_won;
+    b.forecast_sum += f;
+  }
+  brier /= list.length;
+
+  const reliability = buckets
+    .filter((b) => b.count > 0)
+    .map((b) => ({
+      band: `${b.lo.toFixed(2)}–${b.hi.toFixed(2)}`,
+      count: b.count,
+      avg_forecast: b.forecast_sum / b.count,
+      empirical_win_rate: b.wins / b.count,
+      gap: b.wins / b.count - b.forecast_sum / b.count,
+    }));
+
+  const chart_rows = reliability.map((r) => ({
+    band: r.band,
+    avg_forecast: r.avg_forecast,
+    empirical_win_rate: r.empirical_win_rate,
+    count: r.count,
+  }));
+
+  const inferences = [];
+  const over = reliability.filter((r) => r.count >= 3 && r.gap < -0.05);
+  const under = reliability.filter((r) => r.count >= 3 && r.gap > 0.05);
+  if (over.length) {
+    inferences.push(
+      `Overconfident in ${over.map((r) => r.band).join(", ")} — forecasts ran hotter than realized win rates.`,
+    );
+  }
+  if (under.length) {
+    inferences.push(
+      `Underconfident in ${under.map((r) => r.band).join(", ")} — forecasts ran cooler than realized win rates.`,
+    );
+  }
+  if (!inferences.length) {
+    inferences.push("In this sample, average forecasts track empirical win rates reasonably; check thin bins.");
+  }
+  inferences.push(`Brier score ${brier.toFixed(4)} (lower is better; 0 = perfect). n=${list.length}.`);
+
+  return {
+    title: title || "Calibration",
+    n: list.length,
+    brier,
+    reliability,
+    chart_rows,
+    inferences,
+    suggest_next: [
+      { tool: "pull_and_compose", why: "Land chart_rows as a Lychee bars sheet (avg_forecast vs empirical_win_rate)" },
+      { tool: "search_closed_markets", why: "Widen the settled sample (more races / another cycle)" },
+      { tool: "preview_prices", why: "Recompute with a different horizon (e.g. 7d before end_date)" },
+      { tool: "publish_project", why: "Share the calibration dashboard" },
+    ],
+    chart_suggestions: [{ sheet_kind: "calibration", chart_view: "bars", title: "Reliability diagram" }],
+  };
+}

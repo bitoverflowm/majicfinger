@@ -19,7 +19,26 @@ async function fetchJson(url) {
   return res.json();
 }
 
+function winnerFromPrices(outcomes, prices) {
+  if (!Array.isArray(outcomes) || !Array.isArray(prices) || !outcomes.length) return null;
+  let best = -1;
+  let idx = -1;
+  for (let i = 0; i < Math.min(outcomes.length, prices.length); i++) {
+    const p = Number(prices[i]);
+    if (Number.isFinite(p) && p > best) {
+      best = p;
+      idx = i;
+    }
+  }
+  if (idx < 0) return null;
+  return { outcome: String(outcomes[idx]), outcome_index: idx, price: best };
+}
+
 function mapMarket(m) {
+  const outcomes = typeof m.outcomes === "string" ? safeJson(m.outcomes) : m.outcomes || null;
+  const outcome_prices = typeof m.outcomePrices === "string" ? safeJson(m.outcomePrices) : m.outcomePrices || null;
+  const closed = m.closed === true || m.closed === "true";
+  const winner = closed ? winnerFromPrices(outcomes, outcome_prices) : null;
   return {
     venue: "polymarket",
     entity: "market",
@@ -32,9 +51,12 @@ function mapMarket(m) {
     liquidity: Number(m.liquidityNum ?? m.liquidity) || null,
     end_date: m.endDate || m.end_date_iso || null,
     active: m.active ?? null,
-    closed: m.closed ?? null,
-    outcomes: typeof m.outcomes === "string" ? safeJson(m.outcomes) : m.outcomes || null,
-    outcome_prices: typeof m.outcomePrices === "string" ? safeJson(m.outcomePrices) : m.outcomePrices || null,
+    closed,
+    outcomes,
+    outcome_prices,
+    winner: winner?.outcome || null,
+    winner_index: winner?.outcome_index ?? null,
+    yes_won: winner ? winner.outcome_index === 0 : null,
     clob_token_ids: typeof m.clobTokenIds === "string" ? safeJson(m.clobTokenIds) : m.clobTokenIds || null,
     event_slug: m.eventSlug || m.events?.[0]?.slug || null,
     event_title: m.events?.[0]?.title || null,
@@ -148,9 +170,9 @@ export async function searchPolymarket(query, { limit = 12 } = {}) {
 export async function getMostActivePolymarketMarkets({ limit = 15, closed = false } = {}) {
   const params = new URLSearchParams({
     limit: String(Math.min(50, Math.max(1, limit))),
-    active: "true",
+    active: closed ? "false" : "true",
     closed: closed ? "true" : "false",
-    order: "volume24hr",
+    order: closed ? "endDate" : "volume24hr",
     ascending: "false",
   });
   const body = await fetchJson(`${GAMMA_BASE}/markets?${params}`);
@@ -159,7 +181,79 @@ export async function getMostActivePolymarketMarkets({ limit = 15, closed = fals
     rank: index + 1,
     ...row,
     pull: row.condition_id
-      ? { tool: "pull_market_bundle", condition_id: row.condition_id, slug: row.slug, title: row.title }
+      ? {
+          tool: closed ? "preview_prices" : "pull_market_bundle",
+          condition_id: row.condition_id,
+          slug: row.slug,
+          title: row.title,
+          next_analyze: closed ? "analyze_calibration" : "analyze_holders",
+        }
+      : null,
+  }));
+}
+
+/**
+ * Closed / settled Polymarket markets for calibration-style research.
+ * Returns winner from outcome prices when available.
+ */
+export async function searchClosedPolymarketMarkets(query, { limit = 20 } = {}) {
+  const q = String(query || "").trim();
+  const needle = q.toLowerCase();
+  const pageSize = 50;
+  const params = new URLSearchParams({
+    limit: String(pageSize),
+    closed: "true",
+    active: "false",
+    order: "endDate",
+    ascending: "false",
+  });
+  const body = await fetchJson(`${GAMMA_BASE}/markets?${params}`);
+  let markets = (Array.isArray(body) ? body : []).map(mapMarket);
+
+  // Prefer public-search hits that are closed, then merge recent closed list.
+  if (q.length >= 2) {
+    try {
+      const search = await fetchJson(
+        `${GAMMA_BASE}/public-search?q=${encodeURIComponent(q)}&limit_per_type=20&keep_closed_markets=1`,
+      );
+      const fromSearch = [];
+      for (const m of Array.isArray(search?.markets) ? search.markets : []) {
+        fromSearch.push(mapMarket(m));
+      }
+      for (const ev of Array.isArray(search?.events) ? search.events : []) {
+        for (const m of Array.isArray(ev?.markets) ? ev.markets : []) {
+          fromSearch.push(mapMarket({ ...m, events: [ev] }));
+        }
+      }
+      const closedHits = fromSearch.filter((m) => m.closed);
+      if (closedHits.length) markets = [...closedHits, ...markets];
+    } catch {
+      /* keep recent closed list */
+    }
+  }
+
+  if (needle) {
+    markets = markets.filter((m) => String(m.title || "").toLowerCase().includes(needle));
+  }
+  const seen = new Set();
+  const deduped = [];
+  for (const row of markets) {
+    const key = row.condition_id || row.id || row.slug;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(row);
+  }
+
+  return deduped.slice(0, limit).map((row, index) => ({
+    rank: index + 1,
+    ...row,
+    pull: row.condition_id
+      ? {
+          tool: "preview_prices",
+          condition_id: row.condition_id,
+          also: ["pull_and_compose", "analyze_calibration"],
+          note: "Use last YES price before end_date as forecast; yes_won is the label.",
+        }
       : null,
   }));
 }
@@ -557,11 +651,12 @@ export function catalogCapabilities() {
       { name: "list_datasets", stage: "orient", purpose: "Every dataset id + status (live/partial/next)" },
       { name: "get_most_active_markets", stage: "orient", purpose: "Rank Polymarket by 24h volume" },
       { name: "search_markets", stage: "orient", purpose: "Search Kalshi + Polymarket; pull hints" },
+      { name: "search_closed_markets", stage: "orient", purpose: "Settled markets with winner / yes_won" },
       { name: "get_lookalike_markets", stage: "orient", purpose: "Related deadlines / same-event contracts" },
       { name: "compare_venues", stage: "orient", purpose: "Kalshi ↔ Polymarket gap scan with pull hints" },
       { name: "preview_holders", stage: "sample", purpose: "Flattened holders" },
       { name: "preview_market_activity", stage: "sample", purpose: "Recent trades" },
-      { name: "preview_prices", stage: "sample", purpose: "CLOB price history" },
+      { name: "preview_prices", stage: "sample", purpose: "CLOB price history (callable — use it)" },
       { name: "preview_orderbook", stage: "sample", purpose: "CLOB book levels" },
       { name: "preview_open_interest", stage: "sample", purpose: "Open interest" },
       { name: "preview_trader", stage: "sample", purpose: "Positions + activity + PnL for a wallet" },
@@ -572,6 +667,7 @@ export function catalogCapabilities() {
       { name: "run_recipe_trade_history", stage: "ingest+compose", purpose: "Live trade-history recipe (Athena dump separate)" },
       { name: "analyze_holders", stage: "analyze", purpose: "Concentration, risk, trade hypotheses" },
       { name: "analyze_tape", stage: "analyze", purpose: "Tape stats + inference" },
+      { name: "analyze_calibration", stage: "analyze", purpose: "Brier + reliability bands from forecast/outcome rows" },
       { name: "add_sheet_with_chart", stage: "compose", purpose: "Rows → Lychee sheet + chart" },
       { name: "add_insight_blocks", stage: "compose", purpose: "Narrative conclusions" },
       { name: "publish_project", stage: "publish", purpose: "Shareable research URL" },

@@ -6,13 +6,26 @@ import { useUser } from "@/lib/hooks";
 import Login from "@/components/login";
 
 const MCP_URL = "https://lycheedata.com/api/mcp";
-const STARTER_PROMPT = `Using Lychee only (do not scrape Polymarket/Kalshi HTML):
-1) Call list_research_flows (or list_capabilities) so you know the compose paths
-2) Call get_most_active_markets, pick #1
-3) pull_market_bundle with its condition_id (real Lychee sheets+charts)
-4) get_lookalike_markets; optionally preview_prices / preview_orderbook / preview_trader
-5) summarize risk + trade hypotheses; give dashboard_url (?workspace=)
-6) offer publish_project so I can share the research`;
+
+const STARTER_PROMPT = `Be my Lychee research assistant (walk me through it):
+1) Restate your plan in 1–2 sentences
+2) Call list_research_flows, then get_most_active_markets (or search_closed_markets if I need settled races)
+3) pull_market_bundle / preview_prices early and share the dashboard_url (?workspace=) so I can watch charts
+4) Analyze (holders / tape / calibration) and tell me which Lychee sources you used
+5) Ask me one question, then suggest 2–4 next pulls
+6) Offer publish_project when it's shareable
+Never scrape Polymarket/Kalshi HTML — only Lychee tools.`;
+
+const TOOL_ROWS = [
+  ["list_capabilities / list_research_flows / list_datasets", "Orient — what you can pull and how pieces compose"],
+  ["get_most_active_markets / search_markets / search_closed_markets", "Find open or settled markets (+ winners)"],
+  ["get_lookalike_markets / compare_venues", "Related deadlines · Kalshi↔Polymarket gaps"],
+  ["preview_holders / preview_market_activity / preview_prices / preview_orderbook", "Sample pulls (prices are callable)"],
+  ["preview_trader / preview_kalshi_market / preview_open_interest", "Trader + Kalshi + OI samples"],
+  ["pull_market_bundle / pull_and_compose / run_recipe_*", "Land real Lychee sheets + charts"],
+  ["analyze_holders / analyze_tape / analyze_calibration", "Risk, tape, Brier / reliability"],
+  ["add_sheet_with_chart / add_insight_blocks / publish_project", "Compose + shareable research"],
+];
 
 export default function McpConnectPage() {
   const user = useUser();
@@ -95,7 +108,7 @@ export default function McpConnectPage() {
         <div className="mx-auto max-w-lg px-4 py-10">
           <h1 className="text-3xl font-semibold tracking-tight">Lychee MCP</h1>
           <p className="mt-2 text-sm text-zinc-600">
-            Sign in to connect ChatGPT as a Lychee research partner.
+            Sign in to connect ChatGPT / Claude / Cursor as a Lychee research assistant.
           </p>
         </div>
         <Login fromHome redirectTo="/mcp" />
@@ -108,12 +121,13 @@ export default function McpConnectPage() {
       <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-12">
         <header className="space-y-3">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-orange-700/80">Lychee MCP</p>
-          <h1 className="text-4xl font-semibold tracking-tight">Add Lychee to ChatGPT</h1>
+          <h1 className="text-4xl font-semibold tracking-tight">Lychee research assistant</h1>
           <p className="max-w-2xl text-base text-zinc-600">
-            Signed in as <span className="font-medium text-zinc-900">{user.email}</span>
-            {user.user_name ? ` (@${user.user_name})` : ""}. Use the{" "}
-            <strong>Plugins → MCPs</strong> path (same place as custom plugins like Higgsfield) — not
-            Coding → Connections (that is Mac remote control).
+            Model Context Protocol lets ChatGPT / Claude / Cursor call Lychee tools directly — pull
+            source-of-truth data, land charts as it thinks, analyze on top, and publish shareable
+            research. Signed in as{" "}
+            <span className="font-medium text-zinc-900">{user.email}</span>
+            {user.user_name ? ` (@${user.user_name})` : ""}.
           </p>
           <div className="flex flex-wrap gap-3 text-sm">
             <Link href="/dashboard" className="underline underline-offset-4">
@@ -127,23 +141,38 @@ export default function McpConnectPage() {
         ) : (
           <>
             <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
-              <h2 className="text-lg font-semibold">1. Create the ChatGPT plugin (3 fields)</h2>
-              <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-zinc-700">
-                <li>ChatGPT → search settings for <strong>MCP servers</strong> → <strong>Plugins</strong></li>
-                <li>
-                  Add custom MCP → name <code className="rounded bg-zinc-100 px-1">lychee</code>
-                </li>
-                <li>
-                  Connection: <strong>Server URL</strong> (or Streamable HTTP) — not STDIO / not Tunnel
-                </li>
-                <li>
-                  URL: <code className="rounded bg-zinc-100 px-1.5 py-0.5">{resource}</code>
-                </li>
-                <li>Auth: <strong>OAuth</strong> · leave advanced OAuth alone · create · approve Lychee</li>
-                <li>
-                  Start a <strong>new chat</strong> and enable the <strong>lychee</strong> plugin for that chat
-                </li>
-              </ol>
+              <h2 className="text-lg font-semibold">Pick your AI tool</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Remote <strong>Streamable HTTP</strong> to the URL below. ChatGPT uses Plugins → MCPs
+                (not Coding → Connections). After deploy, start a <strong>new chat</strong> so tool
+                schemas refresh.
+              </p>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b text-zinc-500">
+                      <th className="py-2 pr-3">Client</th>
+                      <th className="py-2">How to connect</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-zinc-700">
+                    <tr className="border-b border-zinc-100">
+                      <td className="py-2 pr-3 font-medium">ChatGPT</td>
+                      <td className="py-2">Settings → MCP servers → Plugins → custom Streamable HTTP + OAuth</td>
+                    </tr>
+                    <tr className="border-b border-zinc-100">
+                      <td className="py-2 pr-3 font-medium">Claude</td>
+                      <td className="py-2">Add remote MCP connector → same URL + OAuth</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 pr-3 font-medium">Cursor</td>
+                      <td className="py-2">
+                        Bearer PAT (<code className="rounded bg-zinc-100 px-1">lychee_pat_…</code>) in MCP config
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -157,29 +186,79 @@ export default function McpConnectPage() {
                   onClick={() => copy(STARTER_PROMPT, "prompt")}
                   className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium"
                 >
-                  {copied === "prompt" ? "Copied prompt" : "Copy starter prompt"}
+                  {copied === "prompt" ? "Copied prompt" : "Copy walkthrough prompt"}
                 </button>
               </div>
-              <pre className="mt-4 overflow-x-auto rounded-xl bg-zinc-950 p-4 text-xs text-zinc-100 whitespace-pre-wrap">
+              <p className="mt-3 break-all rounded-xl bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-100">
+                {resource}
+              </p>
+              <pre className="mt-3 overflow-x-auto rounded-xl bg-zinc-950 p-4 text-xs text-zinc-100 whitespace-pre-wrap">
                 {STARTER_PROMPT}
               </pre>
             </section>
 
             <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
-              <h2 className="text-lg font-semibold">2. What “working” looks like</h2>
+              <h2 className="text-lg font-semibold">Available tools</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Prefer named flows over inventing scrapes. If a tool is listed here, the agent should{" "}
+                <strong>call</strong> it — not claim it is missing.
+              </p>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b text-zinc-500">
+                      <th className="py-2 pr-3">Tools</th>
+                      <th className="py-2">Purpose</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {TOOL_ROWS.map(([tools, purpose]) => (
+                      <tr key={tools} className="border-b border-zinc-100 align-top">
+                        <td className="py-2 pr-3 font-mono text-xs text-zinc-800">{tools}</td>
+                        <td className="py-2 text-zinc-700">{purpose}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
+              <h2 className="text-lg font-semibold">What “working” looks like</h2>
               <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-zinc-700">
-                <li>ChatGPT calls Lychee tools (holders/trades) — not random Polymarket scraping</li>
+                <li>Agent names Lychee sources/tools as it pulls</li>
                 <li>
-                  Dashboard link uses <code className="rounded bg-zinc-100 px-1">?workspace=</code> and opens
-                  the new project
+                  Charts appear on a <code className="rounded bg-zinc-100 px-1">?workspace=</code> dashboard
+                  while the chat continues
                 </li>
-                <li>Sheets + Lychee charts appear (not empty chart shells)</li>
-                <li>Optional: publish for a shareable research URL</li>
+                <li>It asks you questions and suggests next looks</li>
+                <li>Optional publish → shareable research URL</li>
               </ul>
             </section>
 
             <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
-              <h2 className="text-lg font-semibold">3. Credits</h2>
+              <h2 className="text-lg font-semibold">Troubleshooting</h2>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-zinc-700">
+                <li>
+                  <strong>Tools look stale / “not exposed”</strong> — start a new chat and re-enable the
+                  lychee plugin (clients cache tool schemas).
+                </li>
+                <li>
+                  <strong>Wrong Connections panel</strong> — ChatGPT Coding → Connections is Mac remote
+                  control; use Plugins → MCPs.
+                </li>
+                <li>
+                  <strong>Empty holders</strong> — need a real <code className="rounded bg-zinc-100 px-1">condition_id</code>{" "}
+                  from search / active markets (v2 holders are flattened server-side).
+                </li>
+                <li>
+                  <strong>Auth</strong> — OAuth for ChatGPT/Claude; PAT only for Cursor.
+                </li>
+              </ul>
+            </section>
+
+            <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
+              <h2 className="text-lg font-semibold">Credits</h2>
               <p className="mt-2 text-sm text-zinc-600">
                 Owner accounts are unlimited; every call still lands in the ledger for billing tests.
               </p>
@@ -222,7 +301,7 @@ export default function McpConnectPage() {
             </section>
 
             <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
-              <h2 className="text-lg font-semibold">4. Personal access token (Cursor only)</h2>
+              <h2 className="text-lg font-semibold">Personal access token (Cursor)</h2>
               <p className="mt-2 text-sm text-zinc-600">
                 ChatGPT should use OAuth. For Cursor, Bearer{" "}
                 <code className="rounded bg-zinc-100 px-1">lychee_pat_…</code>.

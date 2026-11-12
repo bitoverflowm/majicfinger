@@ -5,9 +5,10 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { flattenPolymarketHoldersV2 } from "../src/lib/mcp/data/holdersFlatten.js";
-import { analyzeHolders, analyzeTape } from "../src/lib/mcp/data/stats.js";
+import { analyzeCalibration, analyzeHolders, analyzeTape } from "../src/lib/mcp/data/stats.js";
 import { guidancePreamble } from "../src/lib/mcp/toolResult.js";
 import { getFlowsCatalog, findDataset, findFlow } from "../src/lib/mcp/data/flowsCatalog.js";
+import { lycheeMcpInstructions } from "../src/lib/mcp/instructions.js";
 
 const COSTS = {
   orient: 1,
@@ -90,10 +91,26 @@ const catalog = getFlowsCatalog();
 assert.ok(catalog.flows.some((f) => f.id === "active_market_deep_dive" && f.status === "live"));
 assert.ok(catalog.flows.some((f) => f.id === "cross_venue_gap" && f.status === "live"));
 assert.ok(catalog.flows.some((f) => f.id === "recipe_holder_analysis" && f.status === "live"));
+assert.ok(catalog.flows.some((f) => f.id === "calibration_postmortem" && f.status === "live"));
 assert.ok(catalog.datasets.some((d) => d.id === "polymarket.holders" && d.status === "live"));
 assert.equal(findDataset("polymarket.prices")?.chart_view, "price");
 assert.ok(findFlow("trader_deep_dive")?.tools.includes("preview_trader"));
 assert.ok(findFlow("cross_venue_gap")?.tools.includes("compare_venues"));
 assert.ok(catalog.best_practices.length >= 5);
+
+const cal = analyzeCalibration(
+  [
+    { forecast: 0.7, outcome_won: 1, label: "A" },
+    { forecast: 0.7, outcome_won: 0, label: "B" },
+    { forecast: 0.2, outcome_won: 0, label: "C" },
+    { forecast: 0.9, outcome_won: 1, label: "D" },
+  ],
+  { bins: 5 },
+);
+assert.ok(cal.brier >= 0 && cal.brier <= 1);
+assert.ok(cal.reliability.length >= 1);
+assert.ok(cal.chart_rows.length >= 1);
+assert.match(lycheeMcpInstructions(), /walkthrough/i);
+assert.ok(guidancePreamble().walkthrough?.length >= 4);
 
 console.log("mcp-smoke-unit: ok");

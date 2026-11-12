@@ -1,7 +1,29 @@
 import { recordMcpAudit } from "@/lib/mcp/audit";
 import { chargeCredits, quoteCredits } from "@/lib/mcp/credits";
 import { gateConfirmation } from "@/lib/mcp/confirm";
-import { textResult } from "@/lib/mcp/toolResult";
+import { textResult, withAssistantTurn } from "@/lib/mcp/toolResult";
+
+function pickDashboardUrl(result) {
+  if (!result || typeof result !== "object") return "";
+  return (
+    result.dashboard_url ||
+    result.composed?.dashboard_url ||
+    result.project?.dashboard_url ||
+    result.publication?.dashboard_url ||
+    result.publication?.url ||
+    result.result?.dashboard_url ||
+    ""
+  );
+}
+
+function pickSources(tool, result) {
+  const sources = [{ tool }];
+  if (result?.source) sources.push({ source: result.source });
+  if (result?.holders?.source) sources.push({ source: result.holders.source });
+  if (result?.market?.condition_id) sources.push({ condition_id: result.market.condition_id });
+  if (result?.condition_id) sources.push({ condition_id: result.condition_id });
+  return sources;
+}
 
 /**
  * Shared wrapper: confirm gate → credit charge → handler → audit.
@@ -80,10 +102,26 @@ export async function runMcpTool(actor, {
       client: actor.clientId,
       authKind: actor.authKind,
     });
+    const suggest = Array.isArray(result?.suggest_next)
+      ? result.suggest_next
+      : Array.isArray(result?.analysis?.suggest_next)
+        ? result.analysis.suggest_next
+        : Array.isArray(result?.next)
+          ? [{ note: result.next }]
+          : [];
     return textResult({
-      ...result,
-      usage: charged.snapshot,
-      credits_charged: charged.charged,
+      ...withAssistantTurn(
+        {
+          ...result,
+          usage: charged.snapshot,
+          credits_charged: charged.charged,
+        },
+        {
+          sources: pickSources(tool, result),
+          dashboard_url: pickDashboardUrl(result),
+          suggest,
+        },
+      ),
     });
   } catch (err) {
     await recordMcpAudit({

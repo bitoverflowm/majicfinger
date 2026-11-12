@@ -109,6 +109,20 @@ export const RESEARCH_FLOWS = [
     tools: ["run_recipe_trade_history", "prepare_full_pull"],
   },
   {
+    id: "calibration_postmortem",
+    title: "Calibration / Brier on settled races",
+    status: "live",
+    when: "Were 70% favorites right? Midterms, cycles, themes.",
+    steps: [
+      "search_closed_markets for the theme (winner / yes_won)",
+      "preview_prices → last YES before horizon",
+      "analyze_calibration (optionally compose_chart)",
+      "walk user through sources + Brier; ask 24h vs 7d horizon",
+      "publish_project",
+    ],
+    tools: ["search_closed_markets", "preview_prices", "analyze_calibration", "pull_and_compose", "publish_project"],
+  },
+  {
     id: "lookalike_deadlines",
     title: "Related deadlines / same-event structure",
     status: "live",
