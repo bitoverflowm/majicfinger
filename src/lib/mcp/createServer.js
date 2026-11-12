@@ -25,6 +25,7 @@ import { getFlowsCatalog, findFlow } from "@/lib/mcp/data/flowsCatalog";
 import { compareVenues } from "@/lib/mcp/data/compareVenues";
 import { runHolderAnalysisRecipe, runTradeHistoryRecipe } from "@/lib/mcp/data/recipes";
 import { catalogRealtimeFeeds, getRealtimeSnapshot } from "@/lib/mcp/data/realtime";
+import { findCrazyWorkflow, listCrazyWorkflows, pitchCrazyWorkflows } from "@/lib/mcp/data/crazyWorkflows";
 import { analyzeCalibration, analyzeHolders, analyzeTape } from "@/lib/mcp/data/stats";
 import {
   addInsightBlocks,
@@ -47,7 +48,7 @@ export function createLycheeMcpServer(actor) {
   const server = new McpServer(
     {
       name: "lychee-mcp",
-      version: "0.5.0",
+      version: "0.5.1",
     },
     {
       instructions: lycheeMcpInstructions(),
@@ -104,6 +105,7 @@ export function createLycheeMcpServer(actor) {
               `Question: ${question}`,
               "",
               "Execute as a Lychee assistant walkthrough:",
+              "0) If the question is open-ended: list_crazy_workflows → pitch 3 options, then wait (unless they said pick for me)",
               "1) Briefly restate the plan",
               "2) Orient (list_research_flows / search / closed markets as needed) — keep ids",
               "3) Pull + compose Lychee charts early; PASTE share.open_now_markdown / dashboard_url as markdown",
@@ -116,6 +118,48 @@ export function createLycheeMcpServer(actor) {
         },
       ],
     }),
+  );
+
+  server.registerPrompt(
+    "lychee_crazy_workflows",
+    {
+      description: "Pitch ambitious Lychee workflows, then run the one the user picks.",
+      argsSchema: {
+        pick: z.string().optional(),
+      },
+    },
+    ({ pick } = {}) => {
+      const chosen = pick ? findCrazyWorkflow(pick) : null;
+      return {
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: [
+                lycheeMcpInstructions(),
+                "",
+                chosen
+                  ? [
+                      `User picked crazy workflow: ${chosen.vibe} (${chosen.id})`,
+                      chosen.hook,
+                      "",
+                      "Execute that workflow now:",
+                      chosen.prompt,
+                    ].join("\n")
+                  : [
+                      "Open-ended session from the Lychee connect page.",
+                      "1) Call list_crazy_workflows",
+                      "2) Pitch 3 ambitious workflows (title + hook) — do not run them yet",
+                      "3) Ask which to run (or offer to pick)",
+                      "4) After they choose, execute with charts early + PASTE links",
+                    ].join("\n"),
+              ].join("\n"),
+            },
+          },
+        ],
+      };
+    },
   );
 
   server.registerPrompt(
@@ -252,6 +296,47 @@ export function createLycheeMcpServer(actor) {
             ...guidancePreamble(),
             datasets,
             next: "Use pull_and_compose with a live dataset id + required key (condition_id / ticker / proxy_wallet).",
+          };
+        },
+      }),
+  );
+
+  server.registerTool(
+    "list_crazy_workflows",
+    {
+      description:
+        "Ambitious copy-paste research workflows for connect-page / first-turn pitches. Call this when the user is open-ended, then pitch 3 before heavy pulls.",
+      inputSchema: {
+        workflow_id: z.string().max(80).optional(),
+        pitch_limit: z.number().int().min(1).max(8).optional(),
+      },
+    },
+    async ({ workflow_id, pitch_limit = 3 } = {}) =>
+      runMcpTool(actor, {
+        tool: "list_crazy_workflows",
+        actionClass: "orient",
+        args: { workflow_id, pitch_limit },
+        handler: async () => {
+          if (workflow_id) {
+            const detail = listCrazyWorkflows({ id: workflow_id });
+            const full = findCrazyWorkflow(workflow_id);
+            return {
+              ...guidancePreamble(),
+              ...detail,
+              prompt: full?.prompt || null,
+              next: full
+                ? "Execute this workflow now — charts early, PASTE links, ask, suggest next."
+                : "Unknown id — call list_crazy_workflows without workflow_id.",
+            };
+          }
+          return {
+            ...guidancePreamble(),
+            ...listCrazyWorkflows(),
+            pitch_now: pitchCrazyWorkflows(pitch_limit),
+            suggest_next: [
+              { note: "Pitch the 3 items in pitch_now to the user (title + hook), then wait for a pick" },
+              { tool: "get_most_active_markets", why: "If they say pick for me → start whale war room" },
+            ],
           };
         },
       }),

@@ -664,10 +664,13 @@ export function catalogCapabilities() {
     best_practices: catalog.best_practices,
     ids: catalog.ids,
     live_count: catalog.live_count,
-    flows_hint: "Call list_research_flows for full step-by-step paths; list_datasets for pullable tables.",
+    flows_hint: "Call list_research_flows for step-by-step paths; list_crazy_workflows to pitch ambitious sessions; list_datasets for pullable tables.",
+    first_turn_hint:
+      "Open-ended users: list_crazy_workflows → pitch 3 → wait for pick. Named market/wallet/theme: skip pitch and execute.",
     tools: [
       { name: "list_capabilities", stage: "orient", purpose: "Short catalog + best practices" },
       { name: "list_research_flows", stage: "orient", purpose: "Named composable research paths" },
+      { name: "list_crazy_workflows", stage: "orient", purpose: "Ambitious workflows to pitch on first turn" },
       { name: "list_datasets", stage: "orient", purpose: "Every dataset id + status (live/partial/next)" },
       { name: "list_realtime_feeds", stage: "orient", purpose: "Realtime/live feeds for bots + research" },
       { name: "get_most_active_markets", stage: "orient", purpose: "Rank Polymarket by 24h volume" },

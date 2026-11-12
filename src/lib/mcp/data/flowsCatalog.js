@@ -402,7 +402,8 @@ export const COMPOSE_PRIMITIVES = [
 ];
 
 export const BEST_PRACTICES = [
-  "Prefer named RESEARCH_FLOWS over ad-hoc scraping. Call list_research_flows when unsure.",
+  "Prefer named RESEARCH_FLOWS / crazy workflows over ad-hoc scraping. Call list_research_flows or list_crazy_workflows when unsure.",
+  "Open-ended first turn: list_crazy_workflows → pitch 3 spicy options → wait for a pick (unless they named a market/workflow).",
   "Lychee is source-of-truth: every durable finding should land as a sheet/chart in a project.",
   "Chat gets inferences + URLs; Lychee holds the numbers. Do not dump giant row sets into chat.",
   "Never scrape Polymarket/Kalshi HTML when a dataset/tool exists (even if status=next — say so).",

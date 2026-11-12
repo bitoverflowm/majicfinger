@@ -4,22 +4,24 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@/lib/hooks";
 import Login from "@/components/login";
+import { CRAZY_WORKFLOWS } from "@/lib/mcp/data/crazyWorkflows";
 
 const MCP_URL = "https://lycheedata.com/api/mcp";
 
 const STARTER_PROMPT = `Be my Lychee research assistant (walk me through it):
-1) Restate your plan in 1–2 sentences
-2) Call list_research_flows, then get_most_active_markets (or search_closed_markets if I need settled races)
-3) pull_market_bundle / preview_prices early — PASTE share.open_now_markdown / dashboard_url as a markdown link so I can click charts
-4) Analyze (holders / tape / calibration) and tell me which Lychee sources you used
-5) Ask me one question, then suggest 2–4 next pulls
-6) Offer publish_project when it's shareable — PASTE publication.url + og_image_url
+1) If I haven't named a market yet: call list_crazy_workflows and pitch 3 ambitious workflows — wait for my pick (or pick for me if I say so)
+2) Restate your plan in 1–2 sentences
+3) Orient with list_research_flows / get_most_active_markets (or search_closed_markets for settled races)
+4) pull_market_bundle / preview_prices early — PASTE share.open_now_markdown / dashboard_url as a markdown link so I can click charts
+5) Analyze (holders / tape / calibration) and tell me which Lychee sources you used
+6) Ask me one question, then suggest 2–4 next pulls (offer a wilder workflow pivot when useful)
+7) Offer publish_project when it's shareable — PASTE publication.url + og_image_url
 Never scrape Polymarket/Kalshi HTML — only Lychee tools.
 For a trading bot: list_realtime_feeds → poll get_realtime_snapshot.`;
 
 const TOOL_ROWS = [
-  ["list_capabilities / list_research_flows / list_datasets", "Orient — what you can pull and how pieces compose"],
-  ["list_realtime_feeds / get_realtime_snapshot", "Live snapshots for research + trading bots (poll)"],
+  ["list_capabilities / list_research_flows / list_crazy_workflows", "Orient + ambitious workflow pitches"],
+  ["list_datasets / list_realtime_feeds / get_realtime_snapshot", "Datasets + live bot snapshots (poll)"],
   ["get_most_active_markets / search_markets / search_closed_markets", "Find open or settled markets (+ winners)"],
   ["get_lookalike_markets / compare_venues", "Related deadlines · Kalshi↔Polymarket gaps"],
   ["preview_holders / preview_market_activity / preview_prices / preview_orderbook", "Sample pulls (prices are callable)"],
@@ -200,6 +202,41 @@ export default function McpConnectPage() {
             </section>
 
             <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
+              <h2 className="text-lg font-semibold">Try a wild workflow</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Copy a prompt into your connected chat. The agent can also call{" "}
+                <code className="rounded bg-zinc-100 px-1">list_crazy_workflows</code> and pitch three of
+                these on its own when you&apos;re open-ended.
+              </p>
+              <div className="mt-4 grid gap-3">
+                {CRAZY_WORKFLOWS.map((workflow) => (
+                  <article
+                    key={workflow.id}
+                    className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-base font-semibold text-zinc-900">{workflow.vibe}</h3>
+                        <p className="mt-1 text-sm text-zinc-600">{workflow.hook}</p>
+                        <p className="mt-2 font-mono text-[11px] text-zinc-500">
+                          {workflow.tools.slice(0, 4).join(" · ")}
+                          {workflow.tools.length > 4 ? " · …" : ""}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copy(workflow.prompt, `wf-${workflow.id}`)}
+                        className="shrink-0 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800"
+                      >
+                        {copied === `wf-${workflow.id}` ? "Copied" : "Copy prompt"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
               <h2 className="text-lg font-semibold">Available tools</h2>
               <p className="mt-2 text-sm text-zinc-600">
                 Prefer named flows over inventing scrapes. If a tool is listed here, the agent should{" "}
@@ -233,7 +270,8 @@ export default function McpConnectPage() {
                   Charts appear on a <code className="rounded bg-zinc-100 px-1">?workspace=</code> dashboard
                   while the chat continues
                 </li>
-                <li>It asks you questions and suggests next looks</li>
+                <li>Open-ended chats: it pitches 3 wild workflows, then runs the one you pick</li>
+                <li>It asks you questions and suggests next looks (including workflow pivots)</li>
                 <li>Optional publish → shareable research URL</li>
               </ul>
             </section>
