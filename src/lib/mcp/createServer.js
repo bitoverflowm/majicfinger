@@ -5,14 +5,21 @@ import { guidancePreamble, textResult } from "@/lib/mcp/toolResult";
 import {
   catalogCapabilities,
   estimatePullSize,
+  getKalshiMarket,
   getLookalikeMarkets,
   getMostActivePolymarketMarkets,
   getPolymarketHolders,
   getPolymarketMarketByCondition,
+  getPolymarketOpenInterest,
+  getPolymarketOrderbook,
+  getPolymarketPrices,
+  getPolymarketTrader,
   getPolymarketTradesPreview,
+  resolveDatasetPull,
   searchKalshi,
   searchPolymarket,
 } from "@/lib/mcp/data/providers";
+import { getFlowsCatalog, findFlow } from "@/lib/mcp/data/flowsCatalog";
 import { analyzeHolders, analyzeTape } from "@/lib/mcp/data/stats";
 import {
   addInsightBlocks,
@@ -34,7 +41,7 @@ import { getSiteUrl } from "@/lib/site";
 export function createLycheeMcpServer(actor) {
   const server = new McpServer({
     name: "lychee-mcp",
-    version: "0.2.0",
+    version: "0.3.0",
   });
 
   server.registerPrompt(
@@ -57,12 +64,12 @@ export function createLycheeMcpServer(actor) {
               `Question: ${question}`,
               "",
               "Steps:",
-              "1) list_capabilities if unsure",
-              "2) get_most_active_markets or search_markets — keep condition_id values",
+              "1) list_research_flows (or list_capabilities) if unsure",
+              "2) get_most_active_markets or search_markets — keep condition_id / ticker / proxy_wallet",
               "3) get_lookalike_markets for related deadlines",
-              "4) pull_market_bundle (preferred) OR preview_holders + preview_market_activity + add_sheet_with_chart",
-              "5) analyze_holders + analyze_tape — write inferences into add_insight_blocks",
-              "6) Return the dashboard_url (?workspace=). Offer publish_project for sharing.",
+              "4) pull_market_bundle OR pull_and_compose(dataset) OR preview_* + add_sheet_with_chart",
+              "5) analyze_holders / analyze_tape — write inferences into add_insight_blocks",
+              "6) Return dashboard_url (?workspace=). Offer publish_project for sharing.",
               "Never scrape venue HTML. Never invent empty chart shells without sheet data.",
             ].join("\n"),
           },
@@ -75,7 +82,7 @@ export function createLycheeMcpServer(actor) {
     "list_capabilities",
     {
       description:
-        "Catalog of Lychee MCP tools, ids (condition_id/ticker), and the research compose loop. Call this when unsure what you can pull.",
+        "Short catalog of Lychee MCP tools, ids, best practices, and live dataset counts. Prefer list_research_flows for step-by-step paths.",
     },
     async () =>
       textResult({
@@ -88,6 +95,60 @@ export function createLycheeMcpServer(actor) {
           handle: actor.user?.user_name || null,
           owner_unlimited_credits: actor.isOwner,
           membership: actor.hasMembership,
+        },
+      }),
+  );
+
+  server.registerTool(
+    "list_research_flows",
+    {
+      description:
+        "Named composable research paths (live/partial/next). Call this to pick a flow instead of inventing scrapes.",
+      inputSchema: {
+        status: z.enum(["live", "partial", "next"]).optional(),
+        flow_id: z.string().max(80).optional(),
+      },
+    },
+    async ({ status, flow_id } = {}) =>
+      runMcpTool(actor, {
+        tool: "list_research_flows",
+        actionClass: "orient",
+        args: { status, flow_id },
+        handler: async () => {
+          if (flow_id) {
+            const flow = findFlow(flow_id);
+            if (!flow) throw new Error(`Unknown flow_id ${flow_id}`);
+            return { ...guidancePreamble(), flow };
+          }
+          return { ...guidancePreamble(), ...getFlowsCatalog({ status }) };
+        },
+      }),
+  );
+
+  server.registerTool(
+    "list_datasets",
+    {
+      description: "Every Lychee dataset id an agent can pull (status live/partial/next) with chart_view hints.",
+      inputSchema: {
+        status: z.enum(["live", "partial", "next"]).optional(),
+        venue: z.enum(["polymarket", "kalshi", "athena", "news", "twitter"]).optional(),
+      },
+    },
+    async ({ status, venue } = {}) =>
+      runMcpTool(actor, {
+        tool: "list_datasets",
+        actionClass: "orient",
+        args: { status, venue },
+        handler: async () => {
+          const catalog = getFlowsCatalog({ status });
+          const datasets = venue
+            ? catalog.datasets.filter((d) => d.venue === venue)
+            : catalog.datasets;
+          return {
+            ...guidancePreamble(),
+            datasets,
+            next: "Use pull_and_compose with a live dataset id + required key (condition_id / ticker / proxy_wallet).",
+          };
         },
       }),
   );
@@ -302,6 +363,114 @@ export function createLycheeMcpServer(actor) {
             starter_insight: analyzeTape(trades.rows),
           };
         },
+      }),
+  );
+
+  server.registerTool(
+    "preview_prices",
+    {
+      description: "Pull Polymarket CLOB price history for a condition_id (uses clob_token_ids). Errors if empty — do not scrape.",
+      inputSchema: {
+        condition_id: z.string().min(8).max(120),
+        limit: z.number().int().min(10).max(500).optional(),
+        interval: z.string().max(20).optional(),
+      },
+    },
+    async ({ condition_id, limit = 200, interval = "1d" }) =>
+      runMcpTool(actor, {
+        tool: "preview_prices",
+        actionClass: "sample",
+        args: { condition_id, limit, interval },
+        summary: `Preview prices for ${condition_id}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await getPolymarketPrices(condition_id, { limit, interval })),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "preview_orderbook",
+    {
+      description: "Pull Polymarket CLOB order book levels for a condition_id.",
+      inputSchema: {
+        condition_id: z.string().min(8).max(120),
+      },
+    },
+    async ({ condition_id }) =>
+      runMcpTool(actor, {
+        tool: "preview_orderbook",
+        actionClass: "sample",
+        args: { condition_id },
+        summary: `Preview order book for ${condition_id}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await getPolymarketOrderbook(condition_id)),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "preview_open_interest",
+    {
+      description: "Pull Polymarket open interest for a condition_id.",
+      inputSchema: {
+        condition_id: z.string().min(8).max(120),
+      },
+    },
+    async ({ condition_id }) =>
+      runMcpTool(actor, {
+        tool: "preview_open_interest",
+        actionClass: "sample",
+        args: { condition_id },
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await getPolymarketOpenInterest(condition_id)),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "preview_trader",
+    {
+      description:
+        "Pull Polymarket trader positions + activity + PnL for a proxy_wallet (0x…). Prefer this over scraping profiles.",
+      inputSchema: {
+        proxy_wallet: z.string().min(40).max(64),
+        limit: z.number().int().min(10).max(200).optional(),
+      },
+    },
+    async ({ proxy_wallet, limit = 50 }) =>
+      runMcpTool(actor, {
+        tool: "preview_trader",
+        actionClass: "sample",
+        args: { proxy_wallet, limit },
+        summary: `Preview trader ${proxy_wallet}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await getPolymarketTrader(proxy_wallet, { limit })),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "preview_kalshi_market",
+    {
+      description: "Pull a Kalshi live market snapshot by ticker.",
+      inputSchema: {
+        ticker: z.string().min(2).max(80),
+      },
+    },
+    async ({ ticker }) =>
+      runMcpTool(actor, {
+        tool: "preview_kalshi_market",
+        actionClass: "sample",
+        args: { ticker },
+        summary: `Preview Kalshi ${ticker}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await getKalshiMarket(ticker)),
+        }),
       }),
   );
 
@@ -562,6 +731,66 @@ export function createLycheeMcpServer(actor) {
             tape_analysis: tapeAnalysis,
             composed,
             next: "Share composed.dashboard_url with the user. Optionally get_lookalike_markets, then publish_project.",
+          };
+        },
+      }),
+  );
+
+  server.registerTool(
+    "pull_and_compose",
+    {
+      description:
+        "Generic compose: pull any live dataset id into a Lychee project as sheet+chart. Prefer pull_market_bundle for holders+trades one-shot.",
+      inputSchema: {
+        dataset: z.string().min(3).max(80),
+        project_id: z.string().min(8).max(40).optional(),
+        project_name: z.string().max(120).optional(),
+        condition_id: z.string().min(8).max(120).optional(),
+        proxy_wallet: z.string().min(40).max(64).optional(),
+        ticker: z.string().min(2).max(80).optional(),
+        limit: z.number().int().min(10).max(500).optional(),
+        interval: z.string().max(20).optional(),
+        chart_view: z.string().max(40).optional(),
+      },
+    },
+    async (args) =>
+      runMcpTool(actor, {
+        tool: "pull_and_compose",
+        actionClass: "sample",
+        args: {
+          dataset: args.dataset,
+          condition_id: args.condition_id,
+          proxy_wallet: args.proxy_wallet,
+          ticker: args.ticker,
+        },
+        rows: args.limit || 50,
+        summary: `Compose ${args.dataset}`,
+        handler: async () => {
+          const pulled = await resolveDatasetPull(args.dataset, args);
+          let projectId = args.project_id || "";
+          let dashboardUrl = "";
+          if (!projectId) {
+            const created = await createResearchProject(actor.userId, {
+              name: args.project_name || pulled.title,
+              question: pulled.title,
+            });
+            projectId = created.project_id;
+            dashboardUrl = created.dashboard_url;
+          }
+          const composed = await addSheetWithChart(actor.userId, projectId, {
+            title: pulled.title,
+            rows: pulled.rows,
+            preferredColumns: pulled.preferredColumns,
+            chartView: args.chart_view || pulled.meta.chart_view || "bars",
+            table: pulled.meta.table,
+            integrationId: pulled.meta.venue === "kalshi" ? "kalshi-live" : "polymarket",
+          });
+          return {
+            ...guidancePreamble(),
+            dataset: pulled.meta,
+            row_count: pulled.rows.length,
+            composed: { ...composed, dashboard_url: composed.dashboard_url || dashboardUrl },
+            next: "analyze_* if relevant, then add_insight_blocks, then publish_project for sharing.",
           };
         },
       }),

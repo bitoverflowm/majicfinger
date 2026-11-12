@@ -6,12 +6,13 @@ import { useUser } from "@/lib/hooks";
 import Login from "@/components/login";
 
 const MCP_URL = "https://lycheedata.com/api/mcp";
-const STARTER_PROMPT = `Using Lychee only (do not scrape Polymarket HTML):
-1) Call get_most_active_markets
-2) pick #1, call pull_market_bundle with its condition_id
-3) call get_lookalike_markets for that market
-4) summarize holder concentration + risk, and give me the dashboard_url (?workspace=)
-5) offer to publish_project so I can share it`;
+const STARTER_PROMPT = `Using Lychee only (do not scrape Polymarket/Kalshi HTML):
+1) Call list_research_flows (or list_capabilities) so you know the compose paths
+2) Call get_most_active_markets, pick #1
+3) pull_market_bundle with its condition_id (real Lychee sheets+charts)
+4) get_lookalike_markets; optionally preview_prices / preview_orderbook / preview_trader
+5) summarize risk + trade hypotheses; give dashboard_url (?workspace=)
+6) offer publish_project so I can share the research`;
 
 export default function McpConnectPage() {
   const user = useUser();

@@ -1,7 +1,7 @@
 # Lychee MCP — Locked Design
 
 Working design for exposing Lychee to Claude, ChatGPT, Cursor, and similar agents.
-Status: **Research-partner v0.2** on `cursor/mcp-research-partner-678e` (base Phase 1–2 merged to main).
+Status: **Research-partner v0.3** on `cursor/mcp-research-partner-678e` (base Phase 1–2 merged to main).
 Design remains locked; placeholder credit numbers are in code for owner ChatGPT testing.
 
 Last updated: Nov 12, 2026 (Asia/Katmandu).
@@ -16,18 +16,26 @@ Last updated: Nov 12, 2026 (Asia/Katmandu).
 6. Credits for the owner account are **unlimited** but still ledgered for billing tests.
 7. Optional: PAT on `/mcp` for Cursor (`Authorization: Bearer lychee_pat_…`).
 
-### Research-partner compose loop (v0.2 tools)
+### Research-partner compose loop (v0.3)
+
+**Best practice:** do **not** expose one MCP tool per Lychee API endpoint. Expose:
+
+1. **Named flows** (`list_research_flows`) — how a data engineer+analyst would work
+2. **Dataset catalog** (`list_datasets`) — every pullable table with `live|partial|next`
+3. **Primitives** — search / preview_* / analyze_* / compose / publish
+4. **Generic escape hatch** — `pull_and_compose(dataset, keys)` for any live dataset
+5. **Opinionated bundles** — `pull_market_bundle` for the common market deep-dive
 
 | Stage | Tools |
 |---|---|
-| Orient | `list_capabilities`, `get_most_active_markets`, `search_markets`, `get_lookalike_markets` |
-| Ingest | `preview_holders`, `preview_market_activity`, **`pull_market_bundle`** (preferred) |
-| Analyze | `analyze_holders`, `analyze_tape` (concentration, risk, trade hypotheses) |
-| Compose | `add_sheet_with_chart`, `add_insight_blocks` (real Lychee sheets + chart presets) |
+| Orient | `list_capabilities`, `list_research_flows`, `list_datasets`, `get_most_active_markets`, `search_markets`, `get_lookalike_markets` |
+| Ingest | `preview_holders`, `preview_market_activity`, `preview_prices`, `preview_orderbook`, `preview_open_interest`, `preview_trader`, `preview_kalshi_market`, **`pull_market_bundle`**, **`pull_and_compose`** |
+| Analyze | `analyze_holders`, `analyze_tape` |
+| Compose | `add_sheet_with_chart`, `add_insight_blocks` |
 | Publish | `publish_project` → shareable URL |
 
-Hard rules for agents: never scrape venue HTML when Lychee tools exist; always return
-`dashboard_url` with `?workspace=`; prefer Lychee charts over homemade chart shells.
+Hard rules: never scrape venue HTML; land findings as Lychee sheets/charts; chat gets
+inferences + `?workspace=` URLs; publish for shareable research.
 
 ---
 

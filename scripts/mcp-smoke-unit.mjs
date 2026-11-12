@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import { flattenPolymarketHoldersV2 } from "../src/lib/mcp/data/holdersFlatten.js";
 import { analyzeHolders, analyzeTape } from "../src/lib/mcp/data/stats.js";
 import { guidancePreamble } from "../src/lib/mcp/toolResult.js";
+import { getFlowsCatalog, findDataset, findFlow } from "../src/lib/mcp/data/flowsCatalog.js";
 
 const COSTS = {
   orient: 1,
@@ -83,6 +84,13 @@ assert.ok(tape.inferences.length >= 1);
 const preamble = guidancePreamble();
 assert.match(preamble.identity, /source-of-truth/);
 assert.ok(preamble.hard_rules.some((r) => /Never scrape/i.test(r)));
-assert.ok(preamble.compose_loop.some((s) => /pull_market_bundle/.test(s)));
+assert.ok(preamble.compose_loop.some((s) => /pull_market_bundle|pull_and_compose/.test(s)));
+
+const catalog = getFlowsCatalog();
+assert.ok(catalog.flows.some((f) => f.id === "active_market_deep_dive" && f.status === "live"));
+assert.ok(catalog.datasets.some((d) => d.id === "polymarket.holders" && d.status === "live"));
+assert.equal(findDataset("polymarket.prices")?.chart_view, "price");
+assert.ok(findFlow("trader_deep_dive")?.tools.includes("preview_trader"));
+assert.ok(catalog.best_practices.length >= 5);
 
 console.log("mcp-smoke-unit: ok");
