@@ -2,18 +2,11 @@ import { recordMcpAudit } from "@/lib/mcp/audit";
 import { chargeCredits, quoteCredits } from "@/lib/mcp/credits";
 import { gateConfirmation } from "@/lib/mcp/confirm";
 import { textResult, withAssistantTurn } from "@/lib/mcp/toolResult";
+import { sharePayloadFromResult } from "@/lib/mcp/shareLinks";
 
 function pickDashboardUrl(result) {
   if (!result || typeof result !== "object") return "";
-  return (
-    result.dashboard_url ||
-    result.composed?.dashboard_url ||
-    result.project?.dashboard_url ||
-    result.publication?.dashboard_url ||
-    result.publication?.url ||
-    result.result?.dashboard_url ||
-    ""
-  );
+  return sharePayloadFromResult(result).dashboard_url || "";
 }
 
 function pickSources(tool, result) {
@@ -109,20 +102,19 @@ export async function runMcpTool(actor, {
         : Array.isArray(result?.next)
           ? [{ note: result.next }]
           : [];
-    return textResult({
-      ...withAssistantTurn(
-        {
-          ...result,
-          usage: charged.snapshot,
-          credits_charged: charged.charged,
-        },
-        {
-          sources: pickSources(tool, result),
-          dashboard_url: pickDashboardUrl(result),
-          suggest,
-        },
-      ),
-    });
+    const wrapped = withAssistantTurn(
+      {
+        ...result,
+        usage: charged.snapshot,
+        credits_charged: charged.charged,
+      },
+      {
+        sources: pickSources(tool, result),
+        dashboard_url: pickDashboardUrl(result),
+        suggest,
+      },
+    );
+    return textResult(wrapped, { share: wrapped.share });
   } catch (err) {
     await recordMcpAudit({
       userId: actor.userId,

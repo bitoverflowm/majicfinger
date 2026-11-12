@@ -6,9 +6,10 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { flattenPolymarketHoldersV2 } from "../src/lib/mcp/data/holdersFlatten.js";
 import { analyzeCalibration, analyzeHolders, analyzeTape } from "../src/lib/mcp/data/stats.js";
-import { guidancePreamble } from "../src/lib/mcp/toolResult.js";
+import { guidancePreamble, textResult } from "../src/lib/mcp/toolResult.js";
 import { getFlowsCatalog, findDataset, findFlow } from "../src/lib/mcp/data/flowsCatalog.js";
 import { lycheeMcpInstructions } from "../src/lib/mcp/instructions.js";
+import { buildOpenNowMarkdown, sharePayloadFromResult } from "../src/lib/mcp/shareLinks.js";
 
 const COSTS = {
   orient: 1,
@@ -112,5 +113,32 @@ assert.ok(cal.reliability.length >= 1);
 assert.ok(cal.chart_rows.length >= 1);
 assert.match(lycheeMcpInstructions(), /walkthrough/i);
 assert.ok(guidancePreamble().walkthrough?.length >= 4);
+assert.ok(guidancePreamble().compose_loop.some((s) => /list_realtime_feeds|get_realtime_snapshot/.test(s)));
+assert.match(lycheeMcpInstructions(), /list_realtime_feeds/);
+
+const share = sharePayloadFromResult({
+  composed: { dashboard_url: "https://lycheedata.com/dashboard?workspace=abc", title: "Test mkt" },
+  publication: {
+    url: "https://lycheedata.com/alice/test-mkt",
+    og_image_url: "https://lycheedata.com/alice/test-mkt/image?kind=og",
+    title: "Test mkt",
+  },
+});
+assert.ok(share.open_now_markdown.includes("](https://lycheedata.com/dashboard?workspace=abc)"));
+assert.ok(share.open_now_markdown.includes("](https://lycheedata.com/alice/test-mkt)"));
+assert.ok(share.open_now_markdown.includes("![Test mkt preview]("));
+assert.equal(share.og_image_url, "https://lycheedata.com/alice/test-mkt/image?kind=og");
+assert.match(buildOpenNowMarkdown({ dashboard_url: "https://x/y" }), /Open charts now/);
+
+const led = textResult({ hello: 1 }, { share });
+assert.ok(led.content[0].text.includes("Open charts now"));
+assert.ok(led.content.some((c) => c.type === "resource_link" && c.name === "lychee-workspace"));
+assert.ok(led.content.some((c) => c.type === "resource_link" && c.name === "lychee-preview"));
+
+assert.ok(findFlow("bot_realtime_poll")?.tools.includes("get_realtime_snapshot"));
+assert.ok(findFlow("bot_realtime_poll")?.tools.includes("list_realtime_feeds"));
+assert.equal(findFlow("realtime_webhook_push")?.status, "next");
+assert.ok(catalog.best_practices.some((p) => /get_realtime_snapshot/.test(p)));
+assert.ok(catalog.best_practices.some((p) => /open_now_markdown|PASTE publication\.url/.test(p)));
 
 console.log("mcp-smoke-unit: ok");
