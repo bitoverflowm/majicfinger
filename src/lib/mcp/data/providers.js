@@ -539,7 +539,7 @@ async function fetchTraderJson(url) {
   return body;
 }
 
-export async function getPolymarketTrader(wallet, { limit = 50 } = {}) {
+export async function getPolymarketTrader(wallet, { limit = 50, includeClosed = false } = {}) {
   const { pnlSheetRows } = await import("@/lib/polymarketLive/traderPnlCompose");
   const { positionSheetRow } = await import("@/lib/polymarketLive/traderPositionsCompose");
   const { activitySheetRow } = await import("@/lib/polymarketLive/traderActivityCompose");
@@ -548,6 +548,7 @@ export async function getPolymarketTrader(wallet, { limit = 50 } = {}) {
   if (!/^0x[a-fA-F0-9]{40}$/.test(user)) throw new Error("proxy_wallet must be 0x…40 hex");
 
   const lim = Math.min(200, Math.max(10, limit));
+  const closedLim = Math.min(200, Math.max(10, limit));
   const settled = await Promise.allSettled([
     fetchTraderJson(`${DATA_API_BASE}/v2/positions?user=${encodeURIComponent(user)}&limit=${lim}`),
     fetchTraderJson(`${DATA_API_BASE}/v2/activity?user=${encodeURIComponent(user)}&limit=${lim}`),
@@ -555,9 +556,14 @@ export async function getPolymarketTrader(wallet, { limit = 50 } = {}) {
       `${DATA_API_BASE}/v2/user-pnl?user=${encodeURIComponent(user)}&interval=max&fidelity=1d`,
     ),
     fetchTraderJson(`${DATA_API_BASE}/v2/value?user=${encodeURIComponent(user)}`),
+    includeClosed
+      ? fetchTraderJson(
+          `${DATA_API_BASE}/v2/positions?user=${encodeURIComponent(user)}&status=closed&limit=${closedLim}&sort_by=TIMESTAMP&sort_direction=DESC`,
+        )
+      : Promise.resolve(null),
   ]);
 
-  const [positionsRes, activityRes, pnlRes, valueRes] = settled;
+  const [positionsRes, activityRes, pnlRes, valueRes, closedRes] = settled;
   const hardFail = [positionsRes, activityRes].find(
     (r) => r.status === "rejected" && /protocol contract|invalid_request/i.test(r.reason?.message || ""),
   );
@@ -567,24 +573,23 @@ export async function getPolymarketTrader(wallet, { limit = 50 } = {}) {
     );
   }
 
-  const positionsRaw =
-    positionsRes.status === "fulfilled"
-      ? Array.isArray(positionsRes.value?.data)
-        ? positionsRes.value.data
-        : Array.isArray(positionsRes.value)
-          ? positionsRes.value
-          : []
-      : [];
-  const activityRaw =
-    activityRes.status === "fulfilled"
-      ? Array.isArray(activityRes.value?.data)
-        ? activityRes.value.data
-        : Array.isArray(activityRes.value)
-          ? activityRes.value
+  const asRows = (res) =>
+    res?.status === "fulfilled"
+      ? Array.isArray(res.value?.data)
+        ? res.value.data
+        : Array.isArray(res.value)
+          ? res.value
           : []
       : [];
 
+  const positionsRaw = asRows(positionsRes);
+  const activityRaw = asRows(activityRes);
+  const closedRaw = includeClosed ? asRows(closedRes) : [];
+
   const positions = positionsRaw
+    .filter((row) => row && typeof row === "object")
+    .map((row) => positionSheetRow(row, user));
+  const closed_positions = closedRaw
     .filter((row) => row && typeof row === "object")
     .map((row) => positionSheetRow(row, user));
   const activity = activityRaw
@@ -594,7 +599,7 @@ export async function getPolymarketTrader(wallet, { limit = 50 } = {}) {
     pnlRes.status === "fulfilled" ? pnlSheetRows(pnlRes.value, user) : [];
   const valueBody = valueRes.status === "fulfilled" ? valueRes.value : null;
 
-  if (!positions.length && !activity.length && !pnl.length) {
+  if (!positions.length && !activity.length && !pnl.length && !closed_positions.length) {
     const detail =
       positionsRes.status === "rejected"
         ? positionsRes.reason?.message
@@ -620,16 +625,21 @@ export async function getPolymarketTrader(wallet, { limit = 50 } = {}) {
         }
       : null,
     positions,
+    closed_positions,
     activity,
     pnl,
     preview: {
       positions: positions.slice(0, 20),
+      closed_positions: closed_positions.slice(0, 20),
       activity: activity.slice(0, 20),
       pnl: pnl.slice(-20),
     },
     analysis_ready: true,
+    note:
+      "These are full wallet records (positions/activity/pnl), not metadata stubs. preferredColumns only affect sheet display. For Skill Score call get_lychee_skill_score; for theme hit-rates call analyze_trader_theme.",
     chart_hints: {
       positions: "treemap",
+      closed_positions: "treemap",
       activity: "activity",
       pnl: "portfolio",
     },
@@ -637,8 +647,9 @@ export async function getPolymarketTrader(wallet, { limit = 50 } = {}) {
       compose: "pull_trader_bundle",
       alt_compose: "pull_and_compose",
       datasets: ["polymarket.trader_positions", "polymarket.trader_activity", "polymarket.trader_pnl"],
-      analyze: "analyze_trader_theme",
-      note: "Use exact dataset ids polymarket.trader_*. For Fed/macro history: analyze_trader_theme with theme keywords. Never ask the user for email magic-link.",
+      analyze: ["get_lychee_skill_score", "analyze_trader_theme"],
+      platform: "explain_lychee_platform",
+      note: "Use exact dataset ids polymarket.trader_*. Never ask for email magic-link. Never substitute lesson snapshots for a failed pull.",
     },
   };
 }
@@ -767,7 +778,8 @@ export function catalogCapabilities() {
     first_turn_hint:
       "Open-ended users: list_crazy_workflows → pitch 3 → wait for pick. Named market/wallet/theme: skip pitch and execute.",
     tools: [
-      { name: "list_capabilities", stage: "orient", purpose: "Short catalog + best practices" },
+      { name: "list_capabilities", stage: "orient", purpose: "Short catalog + best practices (+ action=platform)" },
+      { name: "explain_lychee_platform", stage: "orient", purpose: "Attributes, filters, joins, Skill Score, news archive" },
       { name: "list_research_flows", stage: "orient", purpose: "Named composable research paths" },
       { name: "list_crazy_workflows", stage: "orient", purpose: "Ambitious workflows to pitch on first turn" },
       { name: "jarvis_on", stage: "orient", purpose: "Power-up Jarvis proactive mode (+ animation)" },
@@ -786,10 +798,11 @@ export function catalogCapabilities() {
       { name: "preview_prices", stage: "sample", purpose: "CLOB price history (callable — use it)" },
       { name: "preview_orderbook", stage: "sample", purpose: "CLOB book levels" },
       { name: "preview_open_interest", stage: "sample", purpose: "Open interest" },
-      { name: "preview_trader", stage: "sample", purpose: "Positions + activity + PnL for a wallet" },
-      { name: "pull_trader_bundle", stage: "ingest+compose", purpose: "Trader positions/activity/PnL → Lychee sheets+charts" },
+      { name: "preview_trader", stage: "sample", purpose: "Full wallet records (open/closed/activity/PnL)" },
+      { name: "pull_trader_bundle", stage: "ingest+compose", purpose: "Trader open+closed+activity+PnL → sheets+charts" },
+      { name: "get_lychee_skill_score", stage: "analyze", purpose: "Lychee Skill Score −100…100 on finished positions" },
       { name: "analyze_trader_theme", stage: "analyze", purpose: "Theme hit-rate (Fed etc.) on settled markets" },
-      { name: "search_news", stage: "sample", purpose: "Lychee news headlines for overlays" },
+      { name: "search_news", stage: "sample", purpose: "News archive / Google / GDELT headlines for overlays" },
       { name: "preview_kalshi_market", stage: "sample", purpose: "Kalshi live market snapshot" },
       { name: "get_realtime_snapshot", stage: "sample", purpose: "Pollable live snapshot for trading bots" },
       { name: "pull_market_bundle", stage: "ingest+compose", purpose: "Prices+holders+trades → Lychee sheets+charts" },

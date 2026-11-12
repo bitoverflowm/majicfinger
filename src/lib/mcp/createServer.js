@@ -35,6 +35,8 @@ import {
 import { analyzeCalibration, analyzeHolders, analyzeTape } from "@/lib/mcp/data/stats";
 import { analyzeTraderTheme } from "@/lib/mcp/data/traderTheme";
 import { searchNewsHeadlines } from "@/lib/mcp/data/news";
+import { lycheePlatformGuide } from "@/lib/mcp/data/platformGuide";
+import { getLycheeSkillScore } from "@/lib/mcp/data/traderScoreMcp";
 import {
   addInsightBlocks,
   addSheetWithChart,
@@ -57,7 +59,7 @@ export function createLycheeMcpServer(actor) {
   const server = new McpServer(
     {
       name: "lychee-mcp",
-      version: "0.8.0",
+      version: "0.8.1",
     },
     {
       instructions: lycheeMcpInstructions(),
@@ -310,13 +312,20 @@ export function createLycheeMcpServer(actor) {
     "list_capabilities",
     {
       description:
-        "Short catalog of Lychee MCP tools + best practices. ALSO the Jarvis escape hatch: pass action=jarvis_on or action=jarvis_pulse if dedicated jarvis_* tools are missing from this chat's tool list. Never claim Jarvis is unavailable — use this action path.",
+        "Short catalog of Lychee MCP tools + best practices. ALSO: action=platform for Lychee platform nuances (attributes, filters, joins, Skill Score, news archive). ALSO Jarvis escape hatch: action=jarvis_on / jarvis_pulse if dedicated tools are missing from this chat's tool list.",
       inputSchema: {
-        action: z.enum(["catalog", "jarvis_on", "jarvis_pulse"]).optional(),
+        action: z.enum(["catalog", "platform", "jarvis_on", "jarvis_pulse"]).optional(),
         limit: z.number().int().min(3).max(15).optional(),
       },
     },
     async ({ action = "catalog", limit = 8 } = {}) => {
+      if (action === "platform") {
+        return textResult({
+          ...guidancePreamble(),
+          via: "list_capabilities.action=platform",
+          ...lycheePlatformGuide(),
+        });
+      }
       if (action === "jarvis_on") {
         return runMcpTool(actor, {
           tool: "list_capabilities",
@@ -357,6 +366,25 @@ export function createLycheeMcpServer(actor) {
         },
       });
     },
+  );
+
+  server.registerTool(
+    "explain_lychee_platform",
+    {
+      description:
+        "How Lychee really works for agents: pull attributes vs display columns, filters (OPEN/CLOSED), joins/buckets/aggs, wallet depth, Lychee Skill Score, news archive. Call when a pull looks like 'metadata only' or before deep wallet research — never invent lesson snapshots.",
+      inputSchema: {},
+    },
+    async () =>
+      runMcpTool(actor, {
+        tool: "explain_lychee_platform",
+        actionClass: "orient",
+        args: {},
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...lycheePlatformGuide(),
+        }),
+      }),
   );
 
   server.registerTool(
@@ -963,21 +991,25 @@ export function createLycheeMcpServer(actor) {
     "preview_trader",
     {
       description:
-        "Pull Polymarket trader positions + activity + PnL equity curve for a proxy_wallet (0x…). Uses Lychee normalizers (current_size, economic_pnl). Prefer pull_trader_bundle to land charts. Never magic-link login.",
+        "Pull FULL Polymarket wallet records (not metadata): open positions + activity + PnL equity curve. Set include_closed=true for finished/CLOSED positions. Prefer pull_trader_bundle to land charts. Never magic-link login; never substitute lesson snapshots.",
       inputSchema: {
         proxy_wallet: z.string().min(40).max(64),
         limit: z.number().int().min(10).max(200).optional(),
+        include_closed: z.boolean().optional(),
       },
     },
-    async ({ proxy_wallet, limit = 50 }) =>
+    async ({ proxy_wallet, limit = 50, include_closed = false }) =>
       runMcpTool(actor, {
         tool: "preview_trader",
         actionClass: "sample",
-        args: { proxy_wallet, limit },
+        args: { proxy_wallet, limit, include_closed },
         summary: `Preview trader ${proxy_wallet}`,
         handler: async () => ({
           ...guidancePreamble(),
-          ...(await getPolymarketTrader(proxy_wallet, { limit })),
+          ...(await getPolymarketTrader(proxy_wallet, {
+            limit,
+            includeClosed: !!include_closed,
+          })),
         }),
       }),
   );
@@ -986,13 +1018,14 @@ export function createLycheeMcpServer(actor) {
     "pull_trader_bundle",
     {
       description:
-        "One-shot trader compose: positions (treemap) + activity + PnL portfolio sheets with Lychee-styled chat chart snapshots. Use after preview_trader or with proxy_wallet alone.",
+        "One-shot trader compose: open positions + optional CLOSED history + activity + PnL portfolio sheets with Lychee-styled chat charts. Full wallet records land as sheets — not metadata stubs.",
       inputSchema: {
         proxy_wallet: z.string().min(40).max(64),
         project_id: z.string().min(8).max(40).optional(),
         project_name: z.string().max(120).optional(),
         label: z.string().max(80).optional(),
         limit: z.number().int().min(10).max(200).optional(),
+        include_closed: z.boolean().optional(),
       },
     },
     async (args) =>
@@ -1002,17 +1035,22 @@ export function createLycheeMcpServer(actor) {
         args,
         summary: `Trader bundle ${args.proxy_wallet}`,
         handler: async () => {
-          const trader = await getPolymarketTrader(args.proxy_wallet, { limit: args.limit || 80 });
+          const includeClosed = args.include_closed !== false;
+          const trader = await getPolymarketTrader(args.proxy_wallet, {
+            limit: args.limit || 80,
+            includeClosed,
+          });
           const composed = await pullTraderBundleIntoProject(actor.userId, {
             projectId: args.project_id || "",
             projectName: args.project_name || "",
             proxyWallet: args.proxy_wallet,
             label: args.label || "",
             positions: trader.positions,
+            closedPositions: trader.closed_positions || [],
             activity: trader.activity,
             pnl: trader.pnl,
             analysisMarkdown: trader.pnl_summary
-              ? `## ${args.label || args.proxy_wallet}\n\n- Economic PnL (last): **${trader.pnl_summary.economic_pnl}**\n- PnL points: ${trader.pnl_summary.points}\n- Positions: ${trader.positions.length} · Activity: ${trader.activity.length}`
+              ? `## ${args.label || args.proxy_wallet}\n\n- Economic PnL (last): **${trader.pnl_summary.economic_pnl}**\n- PnL points: ${trader.pnl_summary.points}\n- Open: ${trader.positions.length} · Closed: ${(trader.closed_positions || []).length} · Activity: ${trader.activity.length}`
               : "",
           });
           return {
@@ -1021,14 +1059,40 @@ export function createLycheeMcpServer(actor) {
               proxy_wallet: trader.proxy_wallet,
               pnl_summary: trader.pnl_summary,
               positions: trader.positions.length,
+              closed_positions: (trader.closed_positions || []).length,
               activity: trader.activity.length,
               pnl_points: trader.pnl.length,
             },
             composed,
             chart_images: composed.chart_images || [],
-            next: "SHOW chart images. For Fed/macro hit-rates call analyze_trader_theme. Overlay search_news. Prefer publish_project over asking users to log in.",
+            next: "SHOW chart images. Call get_lychee_skill_score + analyze_trader_theme + search_news. Prefer publish_project — never magic-link or lesson snapshots.",
           };
         },
+      }),
+  );
+
+  server.registerTool(
+    "get_lychee_skill_score",
+    {
+      description:
+        "Lychee Skill Score (−100…100) for a proxy_wallet from finished (CLOSED + redeemable) positions. ±20 ≈ two-sigma. Use for 'is this whale skilled?' — not open-book size alone.",
+      inputSchema: {
+        proxy_wallet: z.string().min(40).max(64),
+        exclude_condition_id: z.string().min(8).max(120).optional(),
+      },
+    },
+    async (args) =>
+      runMcpTool(actor, {
+        tool: "get_lychee_skill_score",
+        actionClass: "analyze",
+        args,
+        summary: `Skill Score ${args.proxy_wallet}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await getLycheeSkillScore(args.proxy_wallet, {
+            exclude_condition_id: args.exclude_condition_id || "",
+          })),
+        }),
       }),
   );
 
@@ -1065,12 +1129,13 @@ export function createLycheeMcpServer(actor) {
     "search_news",
     {
       description:
-        "Lychee news headlines (Google News via Lychee) for theme overlays — Fed, FOMC, etc. Pair with analyze_trader_theme timestamps. Do not scrape random sites.",
+        "Lychee news headlines for overlays. Prefers news archive (Athena gdelt_news_articles) when configured; else Google News / GDELT. Pair with analyze_trader_theme timestamps. source=auto|archive|google|gdelt.",
       inputSchema: {
         terms: z.array(z.string()).optional(),
         query: z.string().max(200).optional(),
         days: z.number().int().min(1).max(90).optional(),
         limit: z.number().int().min(5).max(80).optional(),
+        source: z.enum(["auto", "archive", "google", "gdelt"]).optional(),
       },
     },
     async (args) =>

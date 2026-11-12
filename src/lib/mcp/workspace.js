@@ -435,6 +435,7 @@ export async function pullTraderBundleIntoProject(
     proxyWallet,
     label = "",
     positions = [],
+    closedPositions = [],
     activity = [],
     pnl = [],
     analysisMarkdown = "",
@@ -467,6 +468,26 @@ export async function pullTraderBundleIntoProject(
           "current_value",
           "unrealized_pnl",
           "realized_pnl",
+          "avg_price",
+          "condition_id",
+        ],
+        chartView: "treemap",
+        table: "getTraderPositions",
+      }),
+    );
+  }
+  if (closedPositions?.length) {
+    sheets.push(
+      await addSheetWithChart(userId, project.project_id, {
+        title: `${tag} · closed`,
+        rows: closedPositions,
+        preferredColumns: [
+          "title",
+          "outcome",
+          "status",
+          "total_size",
+          "realized_pnl",
+          "total_pnl",
           "avg_price",
           "condition_id",
         ],
