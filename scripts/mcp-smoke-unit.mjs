@@ -10,6 +10,12 @@ import { guidancePreamble, textResult } from "../src/lib/mcp/toolResult.js";
 import { getFlowsCatalog, findDataset, findFlow } from "../src/lib/mcp/data/flowsCatalog.js";
 import { lycheeMcpInstructions } from "../src/lib/mcp/instructions.js";
 import { buildOpenNowMarkdown, sharePayloadFromResult } from "../src/lib/mcp/shareLinks.js";
+import {
+  CRAZY_WORKFLOWS,
+  findCrazyWorkflow,
+  listCrazyWorkflows,
+  pitchCrazyWorkflows,
+} from "../src/lib/mcp/data/crazyWorkflows.js";
 
 const COSTS = {
   orient: 1,
@@ -140,5 +146,55 @@ assert.ok(findFlow("bot_realtime_poll")?.tools.includes("list_realtime_feeds"));
 assert.equal(findFlow("realtime_webhook_push")?.status, "next");
 assert.ok(catalog.best_practices.some((p) => /get_realtime_snapshot/.test(p)));
 assert.ok(catalog.best_practices.some((p) => /open_now_markdown|PASTE publication\.url/.test(p)));
+assert.ok(catalog.best_practices.some((p) => /list_crazy_workflows/.test(p)));
+
+assert.ok(CRAZY_WORKFLOWS.length >= 6);
+assert.ok(findCrazyWorkflow("whale_war_room")?.prompt.includes("get_most_active_markets"));
+assert.ok(findCrazyWorkflow("jarvis_always_on")?.tools.includes("jarvis_on"));
+assert.equal(listCrazyWorkflows().count, CRAZY_WORKFLOWS.length);
+assert.equal(pitchCrazyWorkflows(3).length, 3);
+assert.equal(pitchCrazyWorkflows(3)[0].vibe, "Whale war room");
+assert.match(lycheeMcpInstructions(), /list_crazy_workflows/);
+assert.match(lycheeMcpInstructions(), /Jarvis mode/i);
+assert.ok(guidancePreamble().walkthrough.some((s) => /Jarvis/i.test(s)));
+assert.ok(findFlow("jarvis_proactive")?.tools.includes("jarvis_pulse"));
+
+import {
+  jarvisPowerUpImage,
+  imageMarkdown,
+  renderBarsSvg,
+  renderLineSvg,
+  snapshotForSheet,
+  collectChartImages,
+} from "../src/lib/mcp/chartSnapshots.js";
+
+assert.ok(renderBarsSvg([{ name: "A", amount: 10 }, { name: "B", amount: 4 }])?.includes("<svg"));
+assert.ok(
+  renderLineSvg([
+    { timestamp: "1", price: 0.2 },
+    { timestamp: "2", price: 0.4 },
+    { timestamp: "3", price: 0.3 },
+  ])?.includes("path"),
+);
+const snap = snapshotForSheet({
+  title: "Trades chart",
+  chartView: "trade-price",
+  rows: [
+    { timestamp: "1", price: 0.1 },
+    { timestamp: "2", price: 0.2 },
+  ],
+});
+assert.ok(snap?.image?.data);
+assert.equal(snap.image.mimeType, "image/svg+xml");
+const powerImg = jarvisPowerUpImage();
+assert.ok(powerImg.data.length > 20);
+assert.ok(imageMarkdown(powerImg, "Jarvis powering up").includes("![Jarvis powering up]"));
+const withCharts = textResult({
+  composed: { dashboard_url: "https://lycheedata.com/dashboard?workspace=x" },
+  chart_images: [snap],
+});
+assert.ok(withCharts.content.some((c) => c.type === "image"));
+assert.ok(withCharts.content[0].text.includes("![Trades chart]"));
+assert.equal(collectChartImages({ sheets: [{ chart_snapshot: snap }] }).length, 1);
 
 console.log("mcp-smoke-unit: ok");

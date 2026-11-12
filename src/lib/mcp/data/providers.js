@@ -322,12 +322,12 @@ export async function getLookalikeMarkets({ conditionId = "", eventSlug = "", li
   };
 }
 
-export async function getPolymarketHolders(conditionId, { limit = 50, includePnl = false } = {}) {
+export async function getPolymarketHolders(conditionId, { limit = 500, includePnl = false } = {}) {
   const condition = String(conditionId || "").trim();
   if (!condition) throw new Error("condition_id required");
   const params = new URLSearchParams();
   params.set("condition", condition);
-  params.set("limit", String(Math.min(includePnl ? 100 : 500, Math.max(1, limit))));
+  params.set("limit", String(Math.min(includePnl ? 500 : 2000, Math.max(1, limit))));
   if (includePnl) params.set("include_pnl", "true");
   const body = await fetchJson(`${DATA_API_BASE}/v2/holders?${params}`);
   const rows = flattenPolymarketHoldersV2(body, { conditionId: condition });
@@ -345,21 +345,24 @@ export async function getPolymarketHolders(conditionId, { limit = 50, includePnl
     yes_count: yes.length,
     no_count: no.length,
     rows,
-    preview: rows.slice(0, Math.min(40, limit)),
+    // Full rows for analysis/charting — preview is a short glance only.
+    preview: rows.slice(0, Math.min(25, limit)),
+    analysis_ready: true,
     next: {
       compose: "add_sheet_with_chart",
       sheet_kind: "holders",
       analyze: "analyze_holders",
+      note: "Use rows (full pull) for analyze_holders / compose — not just preview.",
     },
   };
 }
 
-export async function getPolymarketTradesPreview(conditionId, { limit = 50 } = {}) {
+export async function getPolymarketTradesPreview(conditionId, { limit = 500 } = {}) {
   const condition = String(conditionId || "").trim();
   if (!condition) throw new Error("condition_id required");
   const params = new URLSearchParams();
   params.set("condition", condition);
-  params.set("limit", String(Math.min(500, Math.max(1, limit))));
+  params.set("limit", String(Math.min(2000, Math.max(1, limit))));
   const body = await fetchJson(`${DATA_API_BASE}/v2/trades?${params}`);
   const rowsRaw = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
   const rows = rowsRaw.map((row) => ({
@@ -387,11 +390,13 @@ export async function getPolymarketTradesPreview(conditionId, { limit = 50 } = {
     avg_price: avg,
     size_sum: vol,
     rows,
-    preview: rows.slice(0, Math.min(40, limit)),
+    preview: rows.slice(0, Math.min(25, limit)),
+    analysis_ready: true,
     next: {
       compose: "add_sheet_with_chart",
       sheet_kind: "trades",
       analyze: "analyze_tape",
+      note: "Use rows (full pull) for analyze_tape / compose — not just preview.",
     },
   };
 }
@@ -403,9 +408,9 @@ export async function estimatePullSize({ venue, query, rowsRequested = 5000 }) {
     query: query || "",
     estimated_rows: rows,
     recommendation:
-      rows > 500
-        ? "Prefer pull_market_bundle (holders+trades+charts) first; full lake materialize only if the user insists."
-        : "Sample size looks reasonable for a first pass.",
+      rows > 50_000
+        ? "Huge Athena-style dump — use prepare_full_pull (confirm). For analysis/charts prefer pull_market_bundle with full live rows."
+        : "Live analysis/chart pulls are fine at this size — only gate raw historical lake downloads.",
   };
 }
 
@@ -664,10 +669,15 @@ export function catalogCapabilities() {
     best_practices: catalog.best_practices,
     ids: catalog.ids,
     live_count: catalog.live_count,
-    flows_hint: "Call list_research_flows for full step-by-step paths; list_datasets for pullable tables.",
+    flows_hint: "Call list_research_flows for step-by-step paths; list_crazy_workflows to pitch ambitious sessions; list_datasets for pullable tables.",
+    first_turn_hint:
+      "Open-ended users: list_crazy_workflows → pitch 3 → wait for pick. Named market/wallet/theme: skip pitch and execute.",
     tools: [
       { name: "list_capabilities", stage: "orient", purpose: "Short catalog + best practices" },
       { name: "list_research_flows", stage: "orient", purpose: "Named composable research paths" },
+      { name: "list_crazy_workflows", stage: "orient", purpose: "Ambitious workflows to pitch on first turn" },
+      { name: "jarvis_on", stage: "orient", purpose: "Power-up Jarvis proactive mode (+ animation)" },
+      { name: "jarvis_pulse", stage: "orient", purpose: "Unprompted interesting-market brief while Jarvis is on" },
       { name: "list_datasets", stage: "orient", purpose: "Every dataset id + status (live/partial/next)" },
       { name: "list_realtime_feeds", stage: "orient", purpose: "Realtime/live feeds for bots + research" },
       { name: "get_most_active_markets", stage: "orient", purpose: "Rank Polymarket by 24h volume" },

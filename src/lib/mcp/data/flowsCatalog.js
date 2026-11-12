@@ -156,6 +156,19 @@ export const RESEARCH_FLOWS = [
     tools: ["list_realtime_feeds", "get_realtime_snapshot", "pull_and_compose"],
   },
   {
+    id: "jarvis_proactive",
+    title: "Jarvis mode — proactive market briefs",
+    status: "live",
+    when: "User wants the agent to surface interesting markets/trades without being asked every time.",
+    steps: [
+      "Ask: Would you like to turn Jarvis mode on?",
+      "jarvis_on (power-up animation) → jarvis_pulse",
+      "Narrate 1–3 alerts unprompted; deep-dive with pull_market_bundle when they bite",
+      "Call jarvis_pulse at the start of every later turn while Jarvis stays on",
+    ],
+    tools: ["jarvis_on", "jarvis_pulse", "pull_market_bundle", "get_realtime_snapshot"],
+  },
+  {
     id: "athena_lake_materialize",
     title: "Full historical lake dump",
     status: "partial",
@@ -402,11 +415,15 @@ export const COMPOSE_PRIMITIVES = [
 ];
 
 export const BEST_PRACTICES = [
-  "Prefer named RESEARCH_FLOWS over ad-hoc scraping. Call list_research_flows when unsure.",
+  "Prefer named RESEARCH_FLOWS / crazy workflows over ad-hoc scraping. Call list_research_flows or list_crazy_workflows when unsure.",
+  "Session start: ask Jarvis on? → jarvis_on + jarvis_pulse. Then list_crazy_workflows if still open-ended.",
+  "Open-ended first turn: list_crazy_workflows → pitch 3 spicy options → wait for a pick (unless they named a market/workflow).",
   "Lychee is source-of-truth: every durable finding should land as a sheet/chart in a project.",
-  "Chat gets inferences + URLs; Lychee holds the numbers. Do not dump giant row sets into chat.",
+  "Chat gets inferences + inline chart images + URLs; Lychee holds interactive charts. Do not dump giant row sets into chat.",
   "Never scrape Polymarket/Kalshi HTML when a dataset/tool exists (even if status=next — say so).",
-  "Compose with Lychee chart presets (bars, trade-price, price, treemap, order-book) — not homemade charts.",
+  "Compose with Lychee chart presets (trade-price, treemap, price, order-book, liveline) — not homemade blue bars.",
+  "When mentioning Chart N, show chart_snapshot / MCP image content inline (not only a workspace link).",
+  "Analysis may use full live rows; only prepare_full_pull / Athena dumps need confirm for raw historical downloads.",
   "Always return dashboard_url with ?workspace=; PASTE share.open_now_markdown as a clickable link in chat.",
   "After publish_project, PASTE publication.url and og_image_url (markdown image) so friends can open/preview.",
   "Bots: list_realtime_feeds → poll get_realtime_snapshot (MCP cannot hold vendor websockets).",

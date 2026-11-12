@@ -14,6 +14,7 @@ import {
 import { getSiteUrl } from "@/lib/site";
 import { layoutRunSheets, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
 import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts";
+import { snapshotForSheet } from "@/lib/mcp/chartSnapshots";
 
 /** Must match WORKSPACE_PROJECT_PARAM in workspaceProjectContext (`workspace`, not `project`). */
 function dashboardPathForProject(id) {
@@ -180,7 +181,8 @@ export async function addSheetWithChart(
   const existing = Array.isArray(blocks[tabId]) ? [...blocks[tabId]] : [];
   const originY = existing.reduce((max, b) => Math.max(max, (b.y || 0) + (b.h || 0)), 40) + 24;
 
-  const listRows = Array.isArray(rows) ? rows.slice(0, 500) : [];
+  // Analysis/charting: land large live pulls. Athena lake dumps stay on prepare_full_pull.
+  const listRows = Array.isArray(rows) ? rows.slice(0, 5000) : [];
   if (!listRows.length) throw new Error("rows required to build a Lychee sheet");
 
   const columns = columnsFromRows(listRows, preferredColumns);
@@ -189,7 +191,7 @@ export async function addSheetWithChart(
     title: String(title || "Sheet").slice(0, 120),
     columns,
     rows: listRows,
-    keepAllRows: listRows.length <= 200,
+    keepAllRows: listRows.length <= 2000,
     rowCount: listRows.length,
     integrationId,
     table,
@@ -213,13 +215,24 @@ export async function addSheetWithChart(
   doc.last_opened_at = new Date();
   await doc.save();
 
+  const chart_snapshot = snapshotForSheet({
+    title: String(title || "Sheet").slice(0, 120),
+    rows: listRows,
+    chartView: chartView || charts[0]?.chartView || "bars",
+  });
+
   return {
     project_id: String(doc._id),
     tab_id: tabId,
     sheet_id: sheetBlock.id,
     chart_ids: charts.map((c) => c.id),
+    chart_views: charts.map((c) => c.chartView).filter(Boolean),
+    chart_snapshot,
+    chart_images: chart_snapshot ? [chart_snapshot] : [],
     row_count: listRows.length,
     dashboard_url: absoluteDashboardUrl(doc._id),
+    show_in_chat:
+      "Tool result includes an inline chart image — mention Chart title and keep the image visible in your reply (not only a link).",
   };
 }
 
@@ -338,7 +351,7 @@ export async function pullMarketBundleIntoProject(
           "verified",
         ],
         sheetId: `holders-${outcome}-${String(market?.condition_id || "").slice(0, 14)}`,
-        chartView: "bars",
+        chartView: "treemap",
         table: "getHoldersByMarkets",
       });
       results.sheets.push(sheet);
@@ -365,6 +378,9 @@ export async function pullMarketBundleIntoProject(
   }
 
   results.dashboard_url = absoluteDashboardUrl(project.project_id);
+  results.chart_images = results.sheets.flatMap((s) => s.chart_images || []).filter(Boolean);
+  results.show_in_chat =
+    "Each sheet includes chart_snapshot / inline images — show Chart 1, Chart 2… in the reply as they land.";
   return results;
 }
 
