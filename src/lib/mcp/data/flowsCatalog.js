@@ -1,0 +1,411 @@
+/**
+ * Declarative map of Lychee research capabilities for MCP agents.
+ * Status: live = tool wired now; partial = preview/orient only; next = catalogued for wiring.
+ */
+
+export const FLOW_STATUSES = ["live", "partial", "next"];
+
+/** Named research flows agents should prefer over inventing scrapes. */
+export const RESEARCH_FLOWS = [
+  {
+    id: "active_market_deep_dive",
+    title: "Active market → holders + tape → charts → publish",
+    status: "live",
+    when: "User asks what's hot, or wants a dashboard for a specific Polymarket market.",
+    steps: [
+      "get_most_active_markets OR search_markets",
+      "get_lookalike_markets (same event deadlines)",
+      "pull_market_bundle (preferred one-shot) OR preview_holders + preview_market_activity + add_sheet_with_chart",
+      "analyze_holders + analyze_tape → add_insight_blocks",
+      "publish_project when they want to share",
+    ],
+    tools: [
+      "get_most_active_markets",
+      "search_markets",
+      "get_lookalike_markets",
+      "pull_market_bundle",
+      "analyze_holders",
+      "analyze_tape",
+      "publish_project",
+    ],
+  },
+  {
+    id: "holder_concentration",
+    title: "Holder concentration & risk",
+    status: "live",
+    when: "Who owns this market? Whale risk? Both-sides?",
+    steps: [
+      "Resolve condition_id via search_markets / get_most_active_markets",
+      "preview_holders or pull_market_bundle",
+      "analyze_holders → write risk + trade hypotheses into add_insight_blocks",
+    ],
+    tools: ["preview_holders", "analyze_holders", "pull_market_bundle", "add_insight_blocks"],
+  },
+  {
+    id: "trader_deep_dive",
+    title: "Trader / wallet deep dive",
+    status: "live",
+    when: "User names a wallet, trader handle, or wants follow-the-smart-money.",
+    steps: [
+      "preview_trader with proxy_wallet (0x…)",
+      "pull_and_compose dataset=trader_positions / trader_activity / trader_pnl",
+      "add_insight_blocks with risk notes",
+      "optional publish_project",
+    ],
+    tools: ["preview_trader", "pull_and_compose", "add_insight_blocks", "publish_project"],
+  },
+  {
+    id: "price_and_book",
+    title: "Price history + order book",
+    status: "live",
+    when: "Volatility, levels, microstructure around a market.",
+    steps: [
+      "search_markets → keep condition_id + clob_token_ids",
+      "preview_prices + preview_orderbook",
+      "pull_and_compose into Lychee charts",
+      "analyze_tape if trades also pulled",
+    ],
+    tools: ["preview_prices", "preview_orderbook", "pull_and_compose", "analyze_tape"],
+  },
+  {
+    id: "kalshi_market_snapshot",
+    title: "Kalshi market snapshot",
+    status: "live",
+    when: "Kalshi ticker / event; cross-check vs Polymarket.",
+    steps: [
+      "search_markets venue=kalshi",
+      "preview_kalshi_market",
+      "optional search_markets venue=polymarket for same theme → compare_venues_hint",
+      "pull_and_compose + publish",
+    ],
+    tools: ["search_markets", "preview_kalshi_market", "pull_and_compose", "publish_project"],
+  },
+  {
+    id: "cross_venue_gap",
+    title: "Kalshi ↔ Polymarket gap scan",
+    status: "live",
+    when: "Are there gaps between venues right now?",
+    steps: [
+      "compare_venues with query, Kalshi ticker, or Polymarket condition_id",
+      "preview_kalshi_market + pull_market_bundle on matched hits",
+      "add_insight_blocks comparing prices/liquidity",
+    ],
+    tools: ["compare_venues", "preview_kalshi_market", "pull_market_bundle", "add_insight_blocks"],
+  },
+  {
+    id: "recipe_holder_analysis",
+    title: "Recipe: Polymarket holder analysis",
+    status: "live",
+    when: "Flagship UI recipe — holders + tape + top trader drill-downs in one project.",
+    steps: ["run_recipe_holder_analysis with condition_id", "optional publish_project"],
+    tools: ["run_recipe_holder_analysis", "publish_project"],
+  },
+  {
+    id: "recipe_trade_history",
+    title: "Recipe: trade history (live tape)",
+    status: "live",
+    when: "Recent prints + chart. Lake-scale Athena history still uses prepare_full_pull.",
+    steps: ["run_recipe_trade_history with condition_id", "prepare_full_pull only if user insists on full lake dump"],
+    tools: ["run_recipe_trade_history", "prepare_full_pull"],
+  },
+  {
+    id: "lookalike_deadlines",
+    title: "Related deadlines / same-event structure",
+    status: "live",
+    when: "Timing mispricing across contracts in one event.",
+    steps: ["get_lookalike_markets", "pull_market_bundle on 2–3 condition_ids", "compare holder/price inferences"],
+    tools: ["get_lookalike_markets", "pull_market_bundle", "analyze_holders"],
+  },
+  {
+    id: "shareable_research",
+    title: "Publish shareable research",
+    status: "live",
+    when: "End goal — friends can open the same Lychee research.",
+    steps: [
+      "Ensure project has sheets+charts+insights",
+      "publish_project (confirm unless delegated)",
+      "Return publication.url + dashboard_url (?workspace=)",
+    ],
+    tools: ["list_recent_projects", "publish_project"],
+  },
+  {
+    id: "athena_lake_materialize",
+    title: "Full historical lake dump",
+    status: "partial",
+    when: "User insists on huge historical dumps.",
+    steps: ["estimate_pull", "prepare_full_pull (confirm + expensive)", "prefer pull_market_bundle first"],
+    tools: ["estimate_pull", "prepare_full_pull"],
+  },
+  {
+    id: "news_and_social_context",
+    title: "News / Twitter context around an event",
+    status: "next",
+    when: "Narrative + social confirmation after market structure.",
+    steps: ["Wire search_news / search_tweets (quota-aware) after market compose"],
+    tools: [],
+  },
+];
+
+/** Dataset keys agents can ask for via pull_and_compose / list_datasets. */
+export const DATASETS = [
+  {
+    id: "polymarket.holders",
+    venue: "polymarket",
+    table: "getHoldersByMarkets",
+    status: "live",
+    key: "condition_id",
+    chart_view: "bars",
+    tools: ["preview_holders", "pull_market_bundle", "pull_and_compose"],
+  },
+  {
+    id: "polymarket.trades",
+    venue: "polymarket",
+    table: "getTradesByMarket",
+    status: "live",
+    key: "condition_id",
+    chart_view: "trade-price",
+    tools: ["preview_market_activity", "pull_market_bundle", "pull_and_compose"],
+  },
+  {
+    id: "polymarket.prices",
+    venue: "polymarket",
+    table: "getBatchPricesHistory",
+    status: "live",
+    key: "token_id (from clob_token_ids)",
+    chart_view: "price",
+    tools: ["preview_prices", "pull_and_compose"],
+  },
+  {
+    id: "polymarket.orderbook",
+    venue: "polymarket",
+    table: "getOrderbooks",
+    status: "live",
+    key: "token_id",
+    chart_view: "order-book",
+    tools: ["preview_orderbook", "pull_and_compose"],
+  },
+  {
+    id: "polymarket.open_interest",
+    venue: "polymarket",
+    table: "getOpenInterestCompose",
+    status: "live",
+    key: "condition_id",
+    chart_view: "metric",
+    tools: ["preview_open_interest", "pull_and_compose"],
+  },
+  {
+    id: "polymarket.trader_positions",
+    venue: "polymarket",
+    table: "getTraderPositions",
+    status: "live",
+    key: "proxy_wallet",
+    chart_view: "treemap",
+    tools: ["preview_trader", "pull_and_compose"],
+  },
+  {
+    id: "polymarket.trader_activity",
+    venue: "polymarket",
+    table: "getTraderActivity",
+    status: "live",
+    key: "proxy_wallet",
+    chart_view: "activity",
+    tools: ["preview_trader", "pull_and_compose"],
+  },
+  {
+    id: "polymarket.trader_pnl",
+    venue: "polymarket",
+    table: "getTraderPnlSeries",
+    status: "live",
+    key: "proxy_wallet",
+    chart_view: "price",
+    tools: ["preview_trader", "pull_and_compose"],
+  },
+  {
+    id: "polymarket.leaderboard",
+    venue: "polymarket",
+    table: "getTraderLeaderboard",
+    status: "next",
+    key: "none",
+    chart_view: "bars",
+    tools: [],
+  },
+  {
+    id: "polymarket.biggest_wins",
+    venue: "polymarket",
+    table: "getBiggestWinners",
+    status: "next",
+    key: "none",
+    chart_view: "bars",
+    tools: [],
+  },
+  {
+    id: "polymarket.midpoints",
+    venue: "polymarket",
+    table: "getMidpointPrices",
+    status: "next",
+    key: "token_id",
+    chart_view: "stat-cards",
+    tools: [],
+  },
+  {
+    id: "kalshi.market",
+    venue: "kalshi",
+    table: "markets",
+    status: "live",
+    key: "ticker",
+    chart_view: "stat-cards",
+    tools: ["preview_kalshi_market", "pull_and_compose"],
+  },
+  {
+    id: "kalshi.trades",
+    venue: "kalshi",
+    table: "trades",
+    status: "next",
+    key: "ticker",
+    chart_view: "trade-price",
+    tools: [],
+  },
+  {
+    id: "kalshi.orderbook",
+    venue: "kalshi",
+    table: "orderbook",
+    status: "next",
+    key: "ticker",
+    chart_view: "order-book",
+    tools: [],
+  },
+  {
+    id: "kalshi.candlesticks",
+    venue: "kalshi",
+    table: "candlesticks",
+    status: "next",
+    key: "ticker",
+    chart_view: "price",
+    tools: [],
+  },
+  {
+    id: "kalshi.leaderboard",
+    venue: "kalshi",
+    table: "leaderboard",
+    status: "next",
+    key: "none",
+    chart_view: "bars",
+    tools: [],
+  },
+  {
+    id: "lake.athena_polymarket_trades",
+    venue: "athena",
+    table: "polymarket.trades",
+    status: "partial",
+    key: "query filters",
+    chart_view: "trade-price",
+    tools: ["prepare_full_pull"],
+  },
+  {
+    id: "lake.athena_kalshi_trades",
+    venue: "athena",
+    table: "kalshi.trades",
+    status: "partial",
+    key: "query filters",
+    chart_view: "trade-price",
+    tools: ["prepare_full_pull"],
+  },
+  {
+    id: "lake.athena_markets",
+    venue: "athena",
+    table: "markets",
+    status: "partial",
+    key: "query filters",
+    chart_view: "treemap",
+    tools: ["prepare_full_pull"],
+  },
+  {
+    id: "news.archive",
+    venue: "news",
+    table: "articles",
+    status: "next",
+    key: "query",
+    chart_view: "table",
+    tools: [],
+  },
+  {
+    id: "twitter.search",
+    venue: "twitter",
+    table: "tweets",
+    status: "next",
+    key: "query",
+    chart_view: "table",
+    tools: [],
+  },
+  {
+    id: "price_stream.chainlink",
+    venue: "price_stream",
+    table: "chainlink",
+    status: "next",
+    key: "pair",
+    chart_view: "liveline",
+    tools: [],
+  },
+  {
+    id: "price_stream.binance",
+    venue: "price_stream",
+    table: "binance",
+    status: "next",
+    key: "pair",
+    chart_view: "liveline",
+    tools: [],
+  },
+];
+
+export const COMPOSE_PRIMITIVES = [
+  { name: "create_research_project", purpose: "New Lychee project; returns ?workspace= URL" },
+  { name: "open_project", purpose: "Continue an existing project" },
+  { name: "add_sheet_with_chart", purpose: "Land any rows as Lychee sheet + chart preset" },
+  { name: "add_insight_blocks", purpose: "Narrative conclusions (shareable research text)" },
+  { name: "pull_and_compose", purpose: "Generic: dataset id + keys → sheet+chart in project" },
+  { name: "publish_project", purpose: "Shareable published URL" },
+];
+
+export const BEST_PRACTICES = [
+  "Prefer named RESEARCH_FLOWS over ad-hoc scraping. Call list_research_flows when unsure.",
+  "Lychee is source-of-truth: every durable finding should land as a sheet/chart in a project.",
+  "Chat gets inferences + URLs; Lychee holds the numbers. Do not dump giant row sets into chat.",
+  "Never scrape Polymarket/Kalshi HTML when a dataset/tool exists (even if status=next — say so).",
+  "Compose with Lychee chart presets (bars, trade-price, price, treemap, order-book) — not homemade charts.",
+  "Always return dashboard_url with ?workspace=; offer publish_project for shareable research.",
+  "Use pull hints on every search hit (tool + ids). Keep condition_id / ticker / proxy_wallet.",
+  "Analyze server-side (analyze_holders / analyze_tape); write conclusions via add_insight_blocks.",
+  "Materialize (Athena dumps) only after sample+compose, or when the user insists + confirms.",
+];
+
+export function getFlowsCatalog({ status } = {}) {
+  const flows = status ? RESEARCH_FLOWS.filter((f) => f.status === status) : RESEARCH_FLOWS;
+  const datasets = status ? DATASETS.filter((d) => d.status === status) : DATASETS;
+  return {
+    role: "Lychee MCP = data engineer + analyst using Lychee as the artifact layer.",
+    best_practices: BEST_PRACTICES,
+    flows,
+    datasets,
+    compose_primitives: COMPOSE_PRIMITIVES,
+    ids: {
+      polymarket_market: "condition_id (0x…64 hex)",
+      polymarket_token: "clob_token_ids from market",
+      polymarket_trader: "proxy_wallet (0x…40 hex)",
+      kalshi_market: "ticker",
+    },
+    live_count: {
+      flows: RESEARCH_FLOWS.filter((f) => f.status === "live").length,
+      datasets: DATASETS.filter((d) => d.status === "live").length,
+    },
+  };
+}
+
+export function findDataset(datasetId) {
+  const id = String(datasetId || "").trim();
+  return DATASETS.find((d) => d.id === id || d.table === id) || null;
+}
+
+export function findFlow(flowId) {
+  const id = String(flowId || "").trim();
+  return RESEARCH_FLOWS.find((f) => f.id === id) || null;
+}

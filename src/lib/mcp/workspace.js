@@ -12,9 +12,72 @@ import {
   PUBLISH_VISIBILITY,
 } from "@/lib/workspacePublish";
 import { getSiteUrl } from "@/lib/site";
+import { layoutRunSheets, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
+import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts";
+
+/** Must match WORKSPACE_PROJECT_PARAM in workspaceProjectContext (`workspace`, not `project`). */
+function dashboardPathForProject(id) {
+  return id ? `/dashboard?workspace=${encodeURIComponent(String(id))}` : "/dashboard";
+}
 
 function newBlockId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function absoluteDashboardUrl(projectId) {
+  return `${getSiteUrl()}${dashboardPathForProject(projectId)}`;
+}
+
+function columnsFromRows(rows, preferred = []) {
+  const keys = new Set(preferred);
+  for (const row of rows || []) {
+    if (!row || typeof row !== "object") continue;
+    for (const key of Object.keys(row)) keys.add(key);
+  }
+  const order = preferred.length
+    ? [...preferred.filter((k) => keys.has(k)), ...[...keys].filter((k) => !preferred.includes(k))]
+    : [...keys];
+  return order.slice(0, 24).map((id) => {
+    const sample = (rows || []).find((r) => r && r[id] != null)?.[id];
+    const type = typeof sample === "number" ? "number" : typeof sample === "boolean" ? "boolean" : "string";
+    return { id, title: id.replace(/_/g, " "), type };
+  });
+}
+
+function chartBlocksForSheet(sheetBlock, originY) {
+  const specs = chartSpecsForSheet(sheetBlock);
+  if (specs.length) {
+    return specs.map((spec, index) => ({
+      id: `chart-${sheetBlock.id}-${spec.chartView || "view"}`,
+      type: "chart",
+      source: "sheet-chart",
+      sourceSheetId: sheetBlock.id,
+      chartView: spec.chartView,
+      title: spec.title,
+      x: sheetBlock.x || 28,
+      y: (originY || (sheetBlock.y || 88) + (sheetBlock.h || 360) + 16) + index * ((spec.h || 360) + 16),
+      w: spec.w || 540,
+      h: spec.h || 360,
+      body: "",
+    }));
+  }
+  // Fallback: force Lychee bars when preset registry would leave table-only sheets chartless.
+  return [
+    {
+      id: `chart-${sheetBlock.id}-bars`,
+      type: "chart",
+      source: "sheet-chart",
+      sourceSheetId: sheetBlock.id,
+      chartView: "bars",
+      title: `${sheetBlock.title || "Sheet"} chart`,
+      x: sheetBlock.x || 28,
+      y: (sheetBlock.y || 88) + (sheetBlock.h || 360) + 16,
+      w: 540,
+      h: 360,
+      body: "",
+      pull: { chartView: "bars" },
+    },
+  ];
 }
 
 export async function listRecentProjects(userId, { limit = 8 } = {}) {
@@ -27,6 +90,7 @@ export async function listRecentProjects(userId, { limit = 8 } = {}) {
   return docs.map((doc) => ({
     ...projectListItem(doc),
     tab_count: Array.isArray(doc.tabs) ? doc.tabs.length : 0,
+    dashboard_url: absoluteDashboardUrl(doc._id),
   }));
 }
 
@@ -45,6 +109,10 @@ export async function createResearchProject(userId, { name, question = "" } = {}
           id: newBlockId("text"),
           type: "text",
           title: "Research brief",
+          x: 28,
+          y: 24,
+          w: 540,
+          h: 160,
           body: question
             ? `Question: ${String(question).slice(0, 1500)}`
             : "Research started via Lychee MCP.",
@@ -65,7 +133,7 @@ export async function createResearchProject(userId, { name, question = "" } = {}
   return {
     project_id: String(created._id),
     name: created.name,
-    dashboard_url: `${getSiteUrl()}/dashboard?project=${created._id}`,
+    dashboard_url: absoluteDashboardUrl(created._id),
   };
 }
 
@@ -83,13 +151,78 @@ export async function openProject(userId, projectId) {
     name: doc.name,
     updated_at: doc.updatedAt,
     tabs: (doc.tabs || []).map((t) => ({ id: t.id, name: t.name })),
-    dashboard_url: `${getSiteUrl()}/dashboard?project=${doc._id}`,
+    dashboard_url: absoluteDashboardUrl(doc._id),
   };
 }
 
 /**
- * Add insight text + optional simple bar/line snapshot chart into the research tab.
+ * Add a real Lychee sheet (+ chart blocks) from row objects.
  */
+export async function addSheetWithChart(
+  userId,
+  projectId,
+  {
+    title,
+    rows,
+    preferredColumns = [],
+    sheetId,
+    chartView = "",
+    integrationId = "polymarket",
+    table = "mcp",
+  } = {},
+) {
+  await dbConnect();
+  const doc = await WorkspaceDashboard.findOne({ _id: projectId, user_id: String(userId) });
+  if (!doc) throw new Error("Project not found");
+
+  const tabId = doc.active_tab_id || (Array.isArray(doc.tabs) && doc.tabs[0]?.id) || "research";
+  const blocks = doc.blocks && typeof doc.blocks === "object" ? { ...doc.blocks } : {};
+  const existing = Array.isArray(blocks[tabId]) ? [...blocks[tabId]] : [];
+  const originY = existing.reduce((max, b) => Math.max(max, (b.y || 0) + (b.h || 0)), 40) + 24;
+
+  const listRows = Array.isArray(rows) ? rows.slice(0, 500) : [];
+  if (!listRows.length) throw new Error("rows required to build a Lychee sheet");
+
+  const columns = columnsFromRows(listRows, preferredColumns);
+  const sheetSpec = {
+    id: String(sheetId || newBlockId("sheet")).slice(0, 180),
+    title: String(title || "Sheet").slice(0, 120),
+    columns,
+    rows: listRows,
+    keepAllRows: listRows.length <= 200,
+    rowCount: listRows.length,
+    integrationId,
+    table,
+    pull: chartView ? { chartView } : undefined,
+    provenance: { via: "lychee-mcp", at: new Date().toISOString() },
+  };
+
+  const [sheetBlock] = layoutRunSheets([sheetSpec], { originY });
+  // Ensure records exist for chart rendering.
+  if (!sheetBlock.records?.length) {
+    sheetBlock.records = recordsFromRows(columns, listRows);
+  }
+  if (chartView) {
+    sheetBlock.pull = { ...(sheetBlock.pull || {}), chartView };
+  }
+
+  const charts = chartBlocksForSheet(sheetBlock, (sheetBlock.y || originY) + (sheetBlock.h || 360) + 16);
+  blocks[tabId] = [...existing, sheetBlock, ...charts];
+  doc.blocks = blocks;
+  doc.markModified("blocks");
+  doc.last_opened_at = new Date();
+  await doc.save();
+
+  return {
+    project_id: String(doc._id),
+    tab_id: tabId,
+    sheet_id: sheetBlock.id,
+    chart_ids: charts.map((c) => c.id),
+    row_count: listRows.length,
+    dashboard_url: absoluteDashboardUrl(doc._id),
+  };
+}
+
 export async function addInsightBlocks(userId, projectId, { title, markdown, chart } = {}) {
   await dbConnect();
   const doc = await WorkspaceDashboard.findOne({ _id: projectId, user_id: String(userId) });
@@ -98,34 +231,41 @@ export async function addInsightBlocks(userId, projectId, { title, markdown, cha
   const tabId = doc.active_tab_id || (Array.isArray(doc.tabs) && doc.tabs[0]?.id) || "research";
   const blocks = doc.blocks && typeof doc.blocks === "object" ? { ...doc.blocks } : {};
   const list = Array.isArray(blocks[tabId]) ? [...blocks[tabId]] : [];
+  const originY = list.reduce((max, b) => Math.max(max, (b.y || 0) + (b.h || 0)), 40) + 24;
 
   if (markdown || title) {
     list.push({
       id: newBlockId("text"),
       type: "text",
       title: String(title || "Insight").slice(0, 120),
+      x: 28,
+      y: originY,
+      w: 540,
+      h: 220,
       body: String(markdown || "").slice(0, 8000),
     });
   }
 
+  // If agent still sends inline chart points, materialize as a sheet+chart instead of a dead chart shell.
   if (chart && Array.isArray(chart.points) && chart.points.length) {
-    const points = chart.points.slice(0, 40).map((p) => ({
+    const rows = chart.points.slice(0, 40).map((p) => ({
       label: String(p.label ?? p.name ?? "").slice(0, 80),
       value: Number(p.value),
     })).filter((p) => p.label && Number.isFinite(p.value));
-    if (points.length) {
-      list.push({
-        id: newBlockId("chart"),
-        type: "chart",
-        title: String(chart.title || "Chart").slice(0, 120),
-        chart: {
-          kind: "sheet-series",
-          seriesKind: chart.seriesKind === "line" ? "line" : "bar",
-          points,
-          valueTitle: String(chart.valueTitle || "Value").slice(0, 120),
-          labelTitle: String(chart.labelTitle || "Label").slice(0, 120),
-        },
+    if (rows.length) {
+      const built = await addSheetWithChart(userId, projectId, {
+        title: String(chart.title || title || "Chart data").slice(0, 120),
+        rows,
+        preferredColumns: ["label", "value"],
+        chartView: chart.seriesKind === "line" ? "line" : "bars",
+        table: "mcp_insight_chart",
       });
+      return {
+        project_id: String(doc._id),
+        tab_id: tabId,
+        via: "sheet_with_chart",
+        ...built,
+      };
     }
   }
 
@@ -139,8 +279,93 @@ export async function addInsightBlocks(userId, projectId, { title, markdown, cha
     project_id: String(doc._id),
     tab_id: tabId,
     block_count: list.length,
-    dashboard_url: `${getSiteUrl()}/dashboard?project=${doc._id}`,
+    dashboard_url: absoluteDashboardUrl(doc._id),
   };
+}
+
+/**
+ * One-shot: create or reuse project, add holders + trades sheets/charts, insight text.
+ */
+export async function pullMarketBundleIntoProject(
+  userId,
+  {
+    projectId = "",
+    projectName = "",
+    question = "",
+    market,
+    holdersRows = [],
+    tradesRows = [],
+    analysisMarkdown = "",
+  } = {},
+) {
+  let project =
+    projectId
+      ? await openProject(userId, projectId)
+      : await createResearchProject(userId, {
+          name: projectName || market?.title || "Market research",
+          question: question || market?.title || "",
+        });
+  if (!project?.project_id) throw new Error("Could not create or open project");
+
+  const results = { project_id: project.project_id, dashboard_url: project.dashboard_url, sheets: [] };
+
+  const marketTitle = market?.title || "Market";
+
+  if (holdersRows?.length) {
+    const byOutcome = new Map();
+    for (const row of holdersRows) {
+      const key = row.outcome || (row.outcome_index === 1 ? "NO" : row.outcome_index === 0 ? "YES" : "HOLDERS");
+      if (!byOutcome.has(key)) byOutcome.set(key, []);
+      byOutcome.get(key).push({
+        ...row,
+        market_title: marketTitle,
+        outcome: row.outcome || key,
+        name: row.name || row.pseudonym || row.proxy_wallet || "wallet",
+      });
+    }
+    for (const [outcome, rows] of byOutcome) {
+      const sheet = await addSheetWithChart(userId, project.project_id, {
+        title: `${marketTitle} · ${outcome} holders`,
+        rows,
+        preferredColumns: [
+          "market_title",
+          "outcome",
+          "name",
+          "pseudonym",
+          "amount",
+          "proxy_wallet",
+          "outcome_index",
+          "verified",
+        ],
+        sheetId: `holders-${outcome}-${String(market?.condition_id || "").slice(0, 14)}`,
+        chartView: "bars",
+        table: "getHoldersByMarkets",
+      });
+      results.sheets.push(sheet);
+    }
+  }
+
+  if (tradesRows?.length) {
+    const sheet = await addSheetWithChart(userId, project.project_id, {
+      title: `${marketTitle} · trades`,
+      rows: tradesRows.map((row) => ({ ...row, market_title: marketTitle })),
+      preferredColumns: ["timestamp", "side", "price", "size", "outcome", "proxy_wallet", "market_title"],
+      sheetId: `trades-${String(market?.condition_id || "").slice(0, 18)}`,
+      chartView: "trade-price",
+      table: "getTradesByMarket",
+    });
+    results.sheets.push(sheet);
+  }
+
+  if (analysisMarkdown) {
+    await addInsightBlocks(userId, project.project_id, {
+      title: "Analysis",
+      markdown: analysisMarkdown,
+    });
+  }
+
+  results.dashboard_url = absoluteDashboardUrl(project.project_id);
+  return results;
 }
 
 export async function publishProject(userId, projectId, { slug, title, description = "", visibility = "unlisted" } = {}) {
@@ -211,5 +436,6 @@ export async function publishProject(userId, projectId, { slug, title, descripti
     visibility: vis,
     path,
     url: `${getSiteUrl()}${path}`,
+    dashboard_url: absoluteDashboardUrl(projectId),
   };
 }

@@ -5,15 +5,25 @@ import Link from "next/link";
 import { useUser } from "@/lib/hooks";
 import Login from "@/components/login";
 
+const MCP_URL = "https://lycheedata.com/api/mcp";
+const STARTER_PROMPT = `Using Lychee only (do not scrape Polymarket/Kalshi HTML):
+1) Call list_research_flows (or list_capabilities) so you know the compose paths
+2) Call get_most_active_markets, pick #1
+3) pull_market_bundle with its condition_id (real Lychee sheets+charts)
+4) get_lookalike_markets; optionally preview_prices / preview_orderbook / preview_trader
+5) summarize risk + trade hypotheses; give dashboard_url (?workspace=)
+6) offer publish_project so I can share the research`;
+
 export default function McpConnectPage() {
   const user = useUser();
   const [loading, setLoading] = useState(true);
   const [usage, setUsage] = useState(null);
   const [tokenMeta, setTokenMeta] = useState(null);
   const [freshToken, setFreshToken] = useState("");
-  const [resource, setResource] = useState("https://lycheedata.com/api/mcp");
+  const [resource, setResource] = useState(MCP_URL);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState("");
 
   async function refresh() {
     setError("");
@@ -41,6 +51,16 @@ export default function McpConnectPage() {
     }
     refresh();
   }, [user]);
+
+  async function copy(text, key) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(""), 1500);
+    } catch {
+      setError("Could not copy — select the text manually.");
+    }
+  }
 
   async function createToken() {
     setBusy(true);
@@ -75,7 +95,7 @@ export default function McpConnectPage() {
         <div className="mx-auto max-w-lg px-4 py-10">
           <h1 className="text-3xl font-semibold tracking-tight">Lychee MCP</h1>
           <p className="mt-2 text-sm text-zinc-600">
-            Sign in to connect ChatGPT / Claude / Cursor as a research partner on your Lychee account.
+            Sign in to connect ChatGPT as a Lychee research partner.
           </p>
         </div>
         <Login fromHome redirectTo="/mcp" />
@@ -83,26 +103,22 @@ export default function McpConnectPage() {
     );
   }
 
-  const chatgptBlurb = `Add a remote MCP connector pointing at:\n${resource}\n\nChatGPT will open Lychee to sign in with OAuth (rikesh@bitoverflow.org for your owner account).`;
-
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ed,_#fafafa_45%,_#f4f4f5)] text-zinc-900">
       <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-12">
         <header className="space-y-3">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-orange-700/80">Lychee MCP</p>
-          <h1 className="text-4xl font-semibold tracking-tight">Connect your research partner</h1>
+          <h1 className="text-4xl font-semibold tracking-tight">Add Lychee to ChatGPT</h1>
           <p className="max-w-2xl text-base text-zinc-600">
-            Ask ChatGPT questions; it uses Lychee tools to sample markets, build dashboards, and publish
-            insight. Signed in as <span className="font-medium text-zinc-900">{user.email}</span>
-            {user.user_name ? ` (@${user.user_name})` : ""}.
+            Signed in as <span className="font-medium text-zinc-900">{user.email}</span>
+            {user.user_name ? ` (@${user.user_name})` : ""}. Use the{" "}
+            <strong>Plugins → MCPs</strong> path (same place as custom plugins like Higgsfield) — not
+            Coding → Connections (that is Mac remote control).
           </p>
           <div className="flex flex-wrap gap-3 text-sm">
             <Link href="/dashboard" className="underline underline-offset-4">
               Open dashboard
             </Link>
-            <a href={resource} className="underline underline-offset-4">
-              MCP endpoint
-            </a>
           </div>
         </header>
 
@@ -111,28 +127,61 @@ export default function McpConnectPage() {
         ) : (
           <>
             <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
-              <h2 className="text-lg font-semibold">1. Install in ChatGPT</h2>
+              <h2 className="text-lg font-semibold">1. Create the ChatGPT plugin (3 fields)</h2>
               <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-zinc-700">
-                <li>Open ChatGPT settings → Apps / Connectors / Advanced → add remote MCP server.</li>
+                <li>ChatGPT → search settings for <strong>MCP servers</strong> → <strong>Plugins</strong></li>
                 <li>
-                  Paste the MCP URL: <code className="rounded bg-zinc-100 px-1.5 py-0.5">{resource}</code>
+                  Add custom MCP → name <code className="rounded bg-zinc-100 px-1">lychee</code>
                 </li>
-                <li>Approve Lychee in the browser when prompted (OAuth).</li>
                 <li>
-                  Try: “Using Lychee, research holders and activity for a Polymarket market about Fed rates and
-                  build me a dashboard.”
+                  Connection: <strong>Server URL</strong> (or Streamable HTTP) — not STDIO / not Tunnel
+                </li>
+                <li>
+                  URL: <code className="rounded bg-zinc-100 px-1.5 py-0.5">{resource}</code>
+                </li>
+                <li>Auth: <strong>OAuth</strong> · leave advanced OAuth alone · create · approve Lychee</li>
+                <li>
+                  Start a <strong>new chat</strong> and enable the <strong>lychee</strong> plugin for that chat
                 </li>
               </ol>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => copy(resource, "url")}
+                  className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
+                >
+                  {copied === "url" ? "Copied URL" : "Copy MCP URL"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copy(STARTER_PROMPT, "prompt")}
+                  className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium"
+                >
+                  {copied === "prompt" ? "Copied prompt" : "Copy starter prompt"}
+                </button>
+              </div>
               <pre className="mt-4 overflow-x-auto rounded-xl bg-zinc-950 p-4 text-xs text-zinc-100 whitespace-pre-wrap">
-                {chatgptBlurb}
+                {STARTER_PROMPT}
               </pre>
             </section>
 
             <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
-              <h2 className="text-lg font-semibold">2. Credits</h2>
+              <h2 className="text-lg font-semibold">2. What “working” looks like</h2>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-zinc-700">
+                <li>ChatGPT calls Lychee tools (holders/trades) — not random Polymarket scraping</li>
+                <li>
+                  Dashboard link uses <code className="rounded bg-zinc-100 px-1">?workspace=</code> and opens
+                  the new project
+                </li>
+                <li>Sheets + Lychee charts appear (not empty chart shells)</li>
+                <li>Optional: publish for a shareable research URL</li>
+              </ul>
+            </section>
+
+            <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
+              <h2 className="text-lg font-semibold">3. Credits</h2>
               <p className="mt-2 text-sm text-zinc-600">
-                Your owner account has unlimited credits, but every tool still writes a ledger entry so we can
-                test billing.
+                Owner accounts are unlimited; every call still lands in the ledger for billing tests.
               </p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 <div className="rounded-xl bg-zinc-50 p-4">
@@ -173,10 +222,10 @@ export default function McpConnectPage() {
             </section>
 
             <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
-              <h2 className="text-lg font-semibold">3. Personal access token (Cursor / debugging)</h2>
+              <h2 className="text-lg font-semibold">4. Personal access token (Cursor only)</h2>
               <p className="mt-2 text-sm text-zinc-600">
-                ChatGPT should use OAuth. For Cursor, you can send{" "}
-                <code className="rounded bg-zinc-100 px-1">Authorization: Bearer lychee_pat_…</code>.
+                ChatGPT should use OAuth. For Cursor, Bearer{" "}
+                <code className="rounded bg-zinc-100 px-1">lychee_pat_…</code>.
               </p>
               {tokenMeta ? (
                 <p className="mt-3 text-sm">
