@@ -1589,7 +1589,31 @@ export default async function handler(req, res) {
         if (!market) return res.status(400).json({ message: "Missing required parameter: market (condition IDs from list markets)" });
         const limit = req.query.limit || "20";
         const minBalance = req.query.minBalance || "1";
-        data = await fetchJson(`${DATA_API_BASE}/holders?market=${encodeURIComponent(market)}&limit=${limit}&minBalance=${minBalance}`);
+        // Data API v1 /holders is retired; v2 nests wallets under data[].holders.
+        const conditionIds = String(market)
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean)
+          .slice(0, 20);
+        const groups = [];
+        for (const conditionId of conditionIds) {
+          const params = new URLSearchParams({
+            condition: conditionId,
+            limit: String(limit),
+          });
+          if (minBalance !== "" && minBalance != null) params.set("min_balance", String(minBalance));
+          const body = await fetchJson(`${DATA_API_BASE}/v2/holders?${params.toString()}`);
+          const chunk = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
+          for (const item of chunk) {
+            if (!item || typeof item !== "object") continue;
+            groups.push({
+              token: item.token_id || item.token || "",
+              conditionId,
+              holders: Array.isArray(item.holders) ? item.holders : [],
+            });
+          }
+        }
+        data = groups;
         break;
       }
       case "getPublicProfile": {
