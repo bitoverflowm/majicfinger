@@ -156,7 +156,9 @@ assert.equal(pitchCrazyWorkflows(3).length, 3);
 assert.equal(pitchCrazyWorkflows(3)[0].vibe, "Whale war room");
 assert.match(lycheeMcpInstructions(), /list_crazy_workflows/);
 assert.match(lycheeMcpInstructions(), /Jarvis mode/i);
+assert.match(lycheeMcpInstructions(), /list_capabilities with action=jarvis_on/);
 assert.ok(guidancePreamble().walkthrough.some((s) => /Jarvis/i.test(s)));
+assert.ok(guidancePreamble().hard_rules.some((r) => /action=jarvis_on/i.test(r)));
 assert.ok(findFlow("jarvis_proactive")?.tools.includes("jarvis_pulse"));
 
 import {

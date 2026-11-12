@@ -22,11 +22,12 @@ Never scrape Polymarket/Kalshi HTML — only Lychee tools.
 For a trading bot: list_realtime_feeds → poll get_realtime_snapshot.`;
 
 const JARVIS_PROMPT = `Turn Jarvis mode on.
-1) Call jarvis_on and show the power-up animation
-2) Call jarvis_pulse — tell me 1–3 interesting markets/trades without me asking
-3) Keep pulsing at the start of every later message while Jarvis stays on
-4) When I bite: pull_market_bundle, SHOW charts inline, analyze full rows
-Only Lychee tools.`;
+1) Call jarvis_on (or list_capabilities with action=jarvis_on if jarvis_on is missing) and show the power-up animation
+2) Call jarvis_pulse (or list_capabilities action=jarvis_pulse) — tell me 1–3 interesting markets/trades without me asking
+3) Never say Jarvis tools are "not exposed" — use the list_capabilities action escape hatch
+4) Keep pulsing at the start of every later message while Jarvis stays on
+5) When I bite: pull_market_bundle, SHOW charts inline, analyze full rows
+Only Lychee tools. Start a new chat if your tool list looks stale.`;
 
 const TOOL_ROWS = [
   ["list_capabilities / list_research_flows / list_crazy_workflows", "Orient + ambitious workflow pitches"],
@@ -316,8 +317,11 @@ export default function McpConnectPage() {
               <h2 className="text-lg font-semibold">Troubleshooting</h2>
               <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-zinc-700">
                 <li>
-                  <strong>Tools look stale / “not exposed”</strong> — start a new chat and re-enable the
-                  lychee plugin (clients cache tool schemas).
+                  <strong>Tools look stale / “not exposed” / Jarvis missing</strong> — start a{" "}
+                  <strong>new chat</strong> and re-enable the lychee plugin (ChatGPT caches tool schemas).
+                  Until refreshed, the agent can still run Jarvis via{" "}
+                  <code className="rounded bg-zinc-100 px-1">list_capabilities</code> with{" "}
+                  <code className="rounded bg-zinc-100 px-1">action=jarvis_on</code>.
                 </li>
                 <li>
                   <strong>Wrong Connections panel</strong> — ChatGPT Coding → Connections is Mac remote
