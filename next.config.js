@@ -66,6 +66,10 @@ const nextConfig = {
   transpilePackages: ["@nivo", "@duckdb/duckdb-wasm", "apache-arrow", "react-tweet"],
   experimental: {
     esmExternals: 'loose',
+    // The marketing nav reads content/ at request time; Vercel functions only ship traced files.
+    outputFileTracingIncludes: {
+      '/**': ['./content/**/*'],
+    },
   },
   webpack: (config, { isServer, dev }) => {
     // Dev-only: mitigate intermittent ChunkLoadError on first open (layout chunk requested

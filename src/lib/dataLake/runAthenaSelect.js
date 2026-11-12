@@ -41,6 +41,16 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * Athena hands back a stored result for an identical query run within this many minutes,
+ * without scanning again. The default 50-row previews are the same for every visitor.
+ */
+function resultReuse() {
+  const minutes = parseInt(process.env.DATA_LAKE_ATHENA_RESULT_REUSE_MINUTES || "60", 10);
+  if (!Number.isFinite(minutes) || minutes <= 0) return {};
+  return { ResultReuseConfiguration: { ResultReuseByAgeConfiguration: { Enabled: true, MaxAgeInMinutes: minutes } } };
+}
+
 function assertAthenaConfig() {
   const output = normalizeOutputUri(process.env.DATA_LAKE_ATHENA_OUTPUT_S3_URI || "");
   if (!output) {
@@ -330,6 +340,7 @@ export async function startAthenaBoundedQuery({
         WorkGroup: workGroup,
         ResultConfiguration: { OutputLocation: output },
         QueryExecutionContext: { Catalog: catalog, Database: db },
+        ...(sampleSizeParsed == null ? resultReuse() : {}),
       }),
     );
     let fetchRowLimit = sampleSizeParsed != null ? sampleSizeParsed : sqlLimit;
@@ -359,6 +370,7 @@ export async function startAthenaBoundedQuery({
       WorkGroup: workGroup,
       ResultConfiguration: { OutputLocation: output },
       QueryExecutionContext: { Catalog: catalog, Database: db },
+      ...resultReuse(),
     }),
   );
 

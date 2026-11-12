@@ -472,15 +472,7 @@ async function getJson(url) {
   return json;
 }
 
-async function postAthena(body) {
-  const res = await fetch("/api/data-lake/athena-query", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    body: JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || "Pull failed");
+function athenaRowObjects(json) {
   const columns = json.columns || [];
   return (json.rows || []).map((cells) => {
     const row = {};
@@ -489,6 +481,12 @@ async function postAthena(body) {
     });
     return row;
   });
+}
+
+/** The unfiltered opening preview is the same for every visitor, so it comes from an edge-cached GET. */
+async function openingLakePreview({ lake, table, queryType, limit, compose }) {
+  const q = JSON.stringify({ lake, table, queryType, limit, compose });
+  return athenaRowObjects(await getJson(`/api/integrations/preview-sample?q=${encodeURIComponent(q)}`));
 }
 
 function lakeHistoricalCompose({ lake, table, columns, predicates, sortKeys, fallback }) {
@@ -553,7 +551,7 @@ function kalshiHistoricalMarketsCompose(predicates, sortKeys) {
 
 async function kalshiHistoricalMarkets() {
   const { columns, request } = kalshiHistoricalMarketsCompose();
-  const rows = await postAthena(request);
+  const rows = await openingLakePreview(request);
   return {
     columns,
     rows: rows.slice(0, PREVIEW_ROW_CAP),
@@ -962,7 +960,7 @@ export function loadKalshiHistoricalMarketsPreview(predicates, sortKeys) {
 
 async function kalshiHistoricalTrades() {
   const { columns, request } = kalshiHistoricalCompose("trades");
-  const rows = await postAthena(request);
+  const rows = await openingLakePreview(request);
   return {
     columns,
     rows: rows.slice(0, PREVIEW_ROW_CAP),
@@ -1249,7 +1247,7 @@ async function kalshiLiveEndpoint(endpointId) {
 
 async function polymarketHistoricalTable(table) {
   const { columns, request } = polymarketHistoricalCompose(table);
-  const rows = await postAthena(request);
+  const rows = await openingLakePreview(request);
   return {
     columns,
     rows: rows.slice(0, PREVIEW_ROW_CAP),
@@ -2138,9 +2136,12 @@ export function loadBuildUniverseCount(integrationId, tableId, filter) {
               ? { and: [{ column, kind: "string", op: "contains", value }], or: [] }
               : null,
         };
+    const pending = body.filters
+      ? fetchAthenaLakeSample(body, { maxWaitMs: 180000, pollIntervalMs: 800 })
+      : getJson(`/api/integrations/preview-sample?q=${encodeURIComponent(JSON.stringify(body))}`);
     countCache.set(
       key,
-      fetchAthenaLakeSample(body, { maxWaitMs: 180000, pollIntervalMs: 800 })
+      pending
         .then((result) => {
           const total = Number(result.rows?.[0]?.[0]);
           if (!Number.isFinite(total)) throw new Error("Count missing");

@@ -3,11 +3,14 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
-import { SCENES, subjectView } from "@/components/holderLanding/demo/demoScript";
+import { FEATURED_MARKET, SCENES, subjectView } from "@/components/holderLanding/demo/demoScript";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { HOLDER_PATHS, holderTerminalHref } from "@/lib/holderLanding/pages";
+import { useUser } from "@/lib/hooks";
+import { userHasDashboardAccess } from "@/lib/membershipAccess";
 import { retryImport } from "@/lib/retryImport";
 import { cn } from "@/lib/utils";
 import holderBackdrop from "../../../../public/landing/holder-hero-backdrop.jpg";
@@ -70,6 +73,8 @@ const HeroDemo = dynamic(() => retryImport(() => import("@/components/holderLand
   ssr: false,
   loading: DemoPlaceholder,
 });
+
+const HolderTryDemo = dynamic(() => retryImport(() => import("@/components/holderLanding/holderTryDemo")), { ssr: false });
 
 /** Plays `SEQUENCE` in order while `running`, in the shape `HeroDemo` expects from its clock. */
 function useActionClock(running: boolean) {
@@ -146,7 +151,15 @@ export function HolderTerminalShowcase() {
   const reduced = useReducedMotion();
   const [ready, setReady] = useState(false);
   const [paused, setPaused] = useState(false);
-  const playing = ready && visible && !paused && !reduced;
+  const [trying, setTrying] = useState(false);
+  const router = useRouter();
+  const isMember = userHasDashboardAccess(useUser());
+  const openTerminal = () => {
+    if (isMember) router.push(holderTerminalHref(FEATURED_MARKET));
+    else setTrying(true);
+  };
+  const closeTry = useCallback(() => setTrying(false), []);
+  const playing = ready && visible && !paused && !reduced && !trying;
   const { clock, action, progress, goToAction } = useActionClock(playing);
   const onReady = useCallback(() => setReady(true), []);
   useEffect(() => {
@@ -242,14 +255,15 @@ export function HolderTerminalShowcase() {
         </ol>
 
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <Link href={holderTerminalHref()} className={PRIMARY_BUTTON}>
+          <button type="button" onClick={openTerminal} className={PRIMARY_BUTTON}>
             Open the terminal →
-          </Link>
+          </button>
           <Link href={HOLDER_PATHS.flagship} className="text-sm text-secondary transition-colors hover:text-primary">
             See how it works →
           </Link>
         </div>
       </div>
+      {trying ? <HolderTryDemo subject={FEATURED_MARKET} onClose={closeTry} /> : null}
     </article>
   );
 }

@@ -24,6 +24,11 @@ export function DemoBackdrop({ className, children, ...props }: HTMLAttributes<H
         className="pointer-events-none select-none object-cover"
         style={{ maskImage: FADE_IN, WebkitMaskImage: FADE_IN }}
       />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/90"
+        style={{ maskImage: FADE_IN, WebkitMaskImage: FADE_IN }}
+      />
       {children}
     </div>
   );
