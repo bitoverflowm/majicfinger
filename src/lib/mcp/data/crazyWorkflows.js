@@ -121,7 +121,20 @@ Only Lychee tools.`,
 1) Call list_crazy_workflows (or list_research_flows)
 2) Pitch 3 ambitious workflows from the catalog — spicy titles, why they'd be cool, which tools
 3) Do NOT pull heavy data until I pick one (or say "just pick for me")
-4) After I pick: execute that workflow — charts early, PASTE links, analyze, ask, suggest next, offer publish
+4) After I pick: execute that workflow — charts early, SHOW inline chart images, PASTE links, analyze full rows, ask, suggest next, offer publish
+Never scrape venue HTML.`,
+  },
+  {
+    id: "jarvis_always_on",
+    vibe: "Turn Jarvis mode on",
+    hook: "Power-up animation, then unprompted briefs on interesting markets/trades every turn.",
+    flow_ids: ["jarvis_proactive", "active_market_deep_dive"],
+    tools: ["jarvis_on", "jarvis_pulse", "pull_market_bundle"],
+    prompt: `Turn Jarvis mode on.
+1) Call jarvis_on and show the power-up animation in your reply
+2) Call jarvis_pulse and tell me 1–3 interesting things without me asking (\"hey — something interesting is happening on …\")
+3) When I bite on an alert: pull_market_bundle — SHOW Chart 1/2 inline, analyze FULL rows, PASTE workspace links
+4) At the start of every later message while Jarvis is on, pulse again before answering
 Never scrape venue HTML.`,
   },
 ];

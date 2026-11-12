@@ -26,6 +26,7 @@ import { compareVenues } from "@/lib/mcp/data/compareVenues";
 import { runHolderAnalysisRecipe, runTradeHistoryRecipe } from "@/lib/mcp/data/recipes";
 import { catalogRealtimeFeeds, getRealtimeSnapshot } from "@/lib/mcp/data/realtime";
 import { findCrazyWorkflow, listCrazyWorkflows, pitchCrazyWorkflows } from "@/lib/mcp/data/crazyWorkflows";
+import { jarvisPowerUpPayload, jarvisPulse } from "@/lib/mcp/data/jarvis";
 import { analyzeCalibration, analyzeHolders, analyzeTape } from "@/lib/mcp/data/stats";
 import {
   addInsightBlocks,
@@ -48,7 +49,7 @@ export function createLycheeMcpServer(actor) {
   const server = new McpServer(
     {
       name: "lychee-mcp",
-      version: "0.5.1",
+      version: "0.6.0",
     },
     {
       instructions: lycheeMcpInstructions(),
@@ -105,14 +106,45 @@ export function createLycheeMcpServer(actor) {
               `Question: ${question}`,
               "",
               "Execute as a Lychee assistant walkthrough:",
-              "0) If the question is open-ended: list_crazy_workflows → pitch 3 options, then wait (unless they said pick for me)",
-              "1) Briefly restate the plan",
-              "2) Orient (list_research_flows / search / closed markets as needed) — keep ids",
-              "3) Pull + compose Lychee charts early; PASTE share.open_now_markdown / dashboard_url as markdown",
-              "4) Analyze (holders/tape/calibration or your own math on Lychee rows)",
-              "5) Narrate sources used; ask one steering question; suggest next pulls",
-              "6) Offer publish_project when shareable — PASTE publication.url + og_image_url",
+              "0) Ask: Would you like to turn Jarvis mode on? If yes → jarvis_on + jarvis_pulse",
+              "1) If still open-ended: list_crazy_workflows → pitch 3 options, then wait (unless they said pick for me)",
+              "2) Briefly restate the plan",
+              "3) Orient (list_research_flows / search / closed markets as needed) — keep ids",
+              "4) Pull + compose Lychee charts early; SHOW inline chart images; PASTE share.open_now_markdown",
+              "5) Analyze on FULL rows (holders/tape/calibration) — not tiny previews",
+              "6) Narrate sources used; ask one steering question; suggest next pulls",
+              "7) Offer publish_project when shareable — PASTE publication.url + og_image_url",
               "Never scrape venue HTML. Never invent empty chart shells.",
+            ].join("\n"),
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    "lychee_jarvis",
+    {
+      description: "Turn on Jarvis proactive mode: power-up animation + ongoing interesting-market pulses.",
+      argsSchema: {
+        focus: z.string().optional(),
+      },
+    },
+    ({ focus } = {}) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: [
+              lycheeMcpInstructions(),
+              "",
+              "Turn Jarvis mode ON now.",
+              "1) Call jarvis_on and show the power-up animation in your reply",
+              "2) Call jarvis_pulse and narrate 1–3 alerts like \"hey — something interesting is happening on …\"",
+              focus ? `3) Prefer focus: ${focus}` : "3) Cover both Polymarket and Kalshi when possible",
+              "4) Keep calling jarvis_pulse at the start of every later turn while Jarvis stays on",
+              "5) When I pick an alert: pull_market_bundle with inline charts + full-row analysis",
             ].join("\n"),
           },
         },
@@ -339,6 +371,45 @@ export function createLycheeMcpServer(actor) {
             ],
           };
         },
+      }),
+  );
+
+  server.registerTool(
+    "jarvis_on",
+    {
+      description:
+        "Turn Jarvis proactive mode on. Returns a Jarvis power-up animation (inline image). Ask the user first: Would you like to turn Jarvis mode on?",
+    },
+    async () =>
+      runMcpTool(actor, {
+        tool: "jarvis_on",
+        actionClass: "orient",
+        args: {},
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...jarvisPowerUpPayload(),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "jarvis_pulse",
+    {
+      description:
+        "While Jarvis is on: scan Lychee for interesting Polymarket/Kalshi action and return unprompted alerts. Call at the start of every turn in Jarvis mode.",
+      inputSchema: {
+        limit: z.number().int().min(3).max(15).optional(),
+      },
+    },
+    async ({ limit = 8 } = {}) =>
+      runMcpTool(actor, {
+        tool: "jarvis_pulse",
+        actionClass: "orient",
+        args: { limit },
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await jarvisPulse({ limit })),
+        }),
       }),
   );
 
@@ -619,14 +690,15 @@ export function createLycheeMcpServer(actor) {
         "Pull Polymarket holders via Lychee (Data API v2, flattened). Requires condition_id. Errors if empty — do not scrape.",
       inputSchema: {
         condition_id: z.string().min(8).max(120),
-        limit: z.number().int().min(1).max(200).optional(),
+        limit: z.number().int().min(1).max(2000).optional(),
       },
     },
-    async ({ condition_id, limit = 50 }) =>
+    async ({ condition_id, limit = 500 }) =>
       runMcpTool(actor, {
         tool: "preview_holders",
         actionClass: "sample",
         args: { condition_id, limit },
+        rows: limit,
         summary: `Preview holders for ${condition_id}`,
         handler: async () => {
           const holders = await getPolymarketHolders(condition_id, { limit, includePnl: false });
@@ -642,17 +714,19 @@ export function createLycheeMcpServer(actor) {
   server.registerTool(
     "preview_market_activity",
     {
-      description: "Pull recent Polymarket trades via Lychee. Requires condition_id. Errors if empty — do not scrape.",
+      description:
+        "Pull recent Polymarket trades via Lychee (full analysis rows). Requires condition_id. Errors if empty — do not scrape.",
       inputSchema: {
         condition_id: z.string().min(8).max(120),
-        limit: z.number().int().min(1).max(200).optional(),
+        limit: z.number().int().min(1).max(2000).optional(),
       },
     },
-    async ({ condition_id, limit = 50 }) =>
+    async ({ condition_id, limit = 500 }) =>
       runMcpTool(actor, {
         tool: "preview_market_activity",
         actionClass: "sample",
         args: { condition_id, limit },
+        rows: limit,
         summary: `Preview activity for ${condition_id}`,
         handler: async () => {
           const trades = await getPolymarketTradesPreview(condition_id, { limit });
@@ -943,7 +1017,7 @@ export function createLycheeMcpServer(actor) {
       inputSchema: {
         project_id: z.string().min(8).max(40),
         title: z.string().max(120),
-        rows: z.array(z.record(z.any())).min(1).max(500),
+        rows: z.array(z.record(z.any())).min(1).max(5000),
         preferred_columns: z.array(z.string()).optional(),
         chart_view: z.string().max(40).optional(),
         table: z.string().max(80).optional(),
@@ -954,6 +1028,7 @@ export function createLycheeMcpServer(actor) {
         tool: "add_sheet_with_chart",
         actionClass: "compose",
         args: { project_id: args.project_id, title: args.title, rows: args.rows?.length },
+        rows: args.rows?.length || 0,
         summary: `Add sheet ${args.title}`,
         handler: async () => ({
           ...guidancePreamble(),
@@ -1002,14 +1077,14 @@ export function createLycheeMcpServer(actor) {
     "pull_market_bundle",
     {
       description:
-        "Preferred one-shot: resolve market, pull holders+trades from Lychee, create/open project, add real sheets+charts, optional analysis text. Returns dashboard_url (?workspace=).",
+        "Preferred one-shot: resolve market, pull FULL holders+trades from Lychee, create/open project, add real sheets+charts (+ inline chat snapshots), optional analysis. Returns dashboard_url (?workspace=).",
       inputSchema: {
         condition_id: z.string().min(8).max(120),
         project_id: z.string().min(8).max(40).optional(),
         project_name: z.string().max(120).optional(),
         question: z.string().max(2000).optional(),
-        holders_limit: z.number().int().min(10).max(200).optional(),
-        trades_limit: z.number().int().min(10).max(200).optional(),
+        holders_limit: z.number().int().min(10).max(2000).optional(),
+        trades_limit: z.number().int().min(10).max(2000).optional(),
         include_analysis: z.boolean().optional(),
       },
     },
@@ -1018,13 +1093,13 @@ export function createLycheeMcpServer(actor) {
         tool: "pull_market_bundle",
         actionClass: "sample",
         args,
-        rows: (args.holders_limit || 50) + (args.trades_limit || 50),
+        rows: (args.holders_limit || 500) + (args.trades_limit || 500),
         summary: `Bundle pull ${args.condition_id}`,
         handler: async () => {
           const market = await getPolymarketMarketByCondition(args.condition_id);
           const [holders, trades] = await Promise.all([
-            getPolymarketHolders(args.condition_id, { limit: args.holders_limit || 50 }),
-            getPolymarketTradesPreview(args.condition_id, { limit: args.trades_limit || 50 }),
+            getPolymarketHolders(args.condition_id, { limit: args.holders_limit || 500 }),
+            getPolymarketTradesPreview(args.condition_id, { limit: args.trades_limit || 500 }),
           ]);
           const prices = Array.isArray(market.outcome_prices) ? market.outcome_prices.map(Number) : [];
           const holderAnalysis = analyzeHolders(holders.rows, {
@@ -1072,7 +1147,10 @@ export function createLycheeMcpServer(actor) {
             holder_analysis: holderAnalysis,
             tape_analysis: tapeAnalysis,
             composed,
-            next: "Share composed.dashboard_url with the user. Optionally get_lookalike_markets, then publish_project.",
+            chart_images: composed.chart_images || [],
+            sheets: composed.sheets,
+            next: "SHOW each chart_snapshot inline as Chart 1/2… then PASTE composed.dashboard_url. Optionally get_lookalike_markets, then publish_project.",
+            show_in_chat: composed.show_in_chat,
           };
         },
       }),
@@ -1088,8 +1166,8 @@ export function createLycheeMcpServer(actor) {
         project_id: z.string().min(8).max(40).optional(),
         project_name: z.string().max(120).optional(),
         top_traders: z.number().int().min(1).max(5).optional(),
-        holders_limit: z.number().int().min(20).max(200).optional(),
-        trades_limit: z.number().int().min(20).max(200).optional(),
+        holders_limit: z.number().int().min(20).max(2000).optional(),
+        trades_limit: z.number().int().min(20).max(2000).optional(),
       },
     },
     async (args) =>

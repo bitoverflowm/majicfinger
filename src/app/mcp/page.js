@@ -9,24 +9,34 @@ import { CRAZY_WORKFLOWS } from "@/lib/mcp/data/crazyWorkflows";
 const MCP_URL = "https://lycheedata.com/api/mcp";
 
 const STARTER_PROMPT = `Be my Lychee research assistant (walk me through it):
-1) If I haven't named a market yet: call list_crazy_workflows and pitch 3 ambitious workflows — wait for my pick (or pick for me if I say so)
-2) Restate your plan in 1–2 sentences
-3) Orient with list_research_flows / get_most_active_markets (or search_closed_markets for settled races)
-4) pull_market_bundle / preview_prices early — PASTE share.open_now_markdown / dashboard_url as a markdown link so I can click charts
-5) Analyze (holders / tape / calibration) and tell me which Lychee sources you used
-6) Ask me one question, then suggest 2–4 next pulls (offer a wilder workflow pivot when useful)
-7) Offer publish_project when it's shareable — PASTE publication.url + og_image_url
+1) Ask me: Would you like to turn Jarvis mode on? If yes → jarvis_on (show power-up) + jarvis_pulse and tell me interesting things without waiting
+2) If I haven't named a market yet: call list_crazy_workflows and pitch 3 ambitious workflows — wait for my pick (or pick for me if I say so)
+3) Restate your plan in 1–2 sentences
+4) Orient with list_research_flows / get_most_active_markets (or search_closed_markets for settled races)
+5) pull_market_bundle / preview_prices early — SHOW Chart 1/2 inline (not only links) and PASTE share.open_now_markdown
+6) Analyze on FULL Lychee rows (holders / tape / calibration) — don't stop at tiny previews
+7) Ask me one question, then suggest 2–4 next pulls (offer a wilder workflow pivot when useful)
+8) Offer publish_project when it's shareable — PASTE publication.url + og_image_url
+While Jarvis is on: pulse at the start of every turn.
 Never scrape Polymarket/Kalshi HTML — only Lychee tools.
 For a trading bot: list_realtime_feeds → poll get_realtime_snapshot.`;
 
+const JARVIS_PROMPT = `Turn Jarvis mode on.
+1) Call jarvis_on and show the power-up animation
+2) Call jarvis_pulse — tell me 1–3 interesting markets/trades without me asking
+3) Keep pulsing at the start of every later message while Jarvis stays on
+4) When I bite: pull_market_bundle, SHOW charts inline, analyze full rows
+Only Lychee tools.`;
+
 const TOOL_ROWS = [
   ["list_capabilities / list_research_flows / list_crazy_workflows", "Orient + ambitious workflow pitches"],
+  ["jarvis_on / jarvis_pulse", "Proactive briefs + power-up (ask first)"],
   ["list_datasets / list_realtime_feeds / get_realtime_snapshot", "Datasets + live bot snapshots (poll)"],
   ["get_most_active_markets / search_markets / search_closed_markets", "Find open or settled markets (+ winners)"],
   ["get_lookalike_markets / compare_venues", "Related deadlines · Kalshi↔Polymarket gaps"],
-  ["preview_holders / preview_market_activity / preview_prices / preview_orderbook", "Sample pulls (prices are callable)"],
+  ["preview_holders / preview_market_activity / preview_prices / preview_orderbook", "Full analysis pulls (not tiny previews)"],
   ["preview_trader / preview_kalshi_market / preview_open_interest", "Trader + Kalshi + OI samples"],
-  ["pull_market_bundle / pull_and_compose / run_recipe_*", "Land real Lychee sheets + charts"],
+  ["pull_market_bundle / pull_and_compose / run_recipe_*", "Land Lychee sheets + inline chart images"],
   ["analyze_holders / analyze_tape / analyze_calibration", "Risk, tape, Brier / reliability"],
   ["add_sheet_with_chart / add_insight_blocks / publish_project", "Compose + shareable URL + OG preview"],
 ];
@@ -192,6 +202,13 @@ export default function McpConnectPage() {
                 >
                   {copied === "prompt" ? "Copied prompt" : "Copy walkthrough prompt"}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => copy(JARVIS_PROMPT, "jarvis")}
+                  className="rounded-full border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-950"
+                >
+                  {copied === "jarvis" ? "Copied" : "Turn Jarvis mode on"}
+                </button>
               </div>
               <p className="mt-3 break-all rounded-xl bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-100">
                 {resource}
@@ -199,6 +216,23 @@ export default function McpConnectPage() {
               <pre className="mt-3 overflow-x-auto rounded-xl bg-zinc-950 p-4 text-xs text-zinc-100 whitespace-pre-wrap">
                 {STARTER_PROMPT}
               </pre>
+            </section>
+
+            <section className="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-zinc-50 p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-sky-950">Jarvis mode</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                On session start the agent should ask: <em>Would you like to turn Jarvis mode on?</em>{" "}
+                If yes, it plays a power-up animation and starts surfacing interesting markets/trades
+                without you fishing for updates. (Chat hosts can&apos;t push with zero messages — Jarvis
+                pulses each turn / when you say &quot;pulse&quot;.)
+              </p>
+              <button
+                type="button"
+                onClick={() => copy(JARVIS_PROMPT, "jarvis-card")}
+                className="mt-4 rounded-full bg-sky-700 px-4 py-2 text-sm font-medium text-white"
+              >
+                {copied === "jarvis-card" ? "Copied Jarvis prompt" : "Copy · Turn Jarvis mode on"}
+              </button>
             </section>
 
             <section className="rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur">
@@ -270,8 +304,10 @@ export default function McpConnectPage() {
                   Charts appear on a <code className="rounded bg-zinc-100 px-1">?workspace=</code> dashboard
                   while the chat continues
                 </li>
-                <li>Open-ended chats: it pitches 3 wild workflows, then runs the one you pick</li>
-                <li>It asks you questions and suggests next looks (including workflow pivots)</li>
+                <li>Asks to turn Jarvis on → power-up → unprompted interesting-market briefs</li>
+                <li>Open-ended chats: pitches 3 wild workflows, then runs the one you pick</li>
+                <li>When it says Chart 1 / Chart 2, the chart image shows inline (plus a workspace link)</li>
+                <li>Analysis uses full live rows; only huge historical dumps stay gated</li>
                 <li>Optional publish → shareable research URL</li>
               </ul>
             </section>
