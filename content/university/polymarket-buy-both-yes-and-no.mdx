@@ -1,0 +1,85 @@
+---
+title: "Why Do Some Traders Buy Both YES and NO on Polymarket?"
+seoTitle: "Why Do Some Traders Buy Both YES and NO on Polymarket?"
+description: "A wallet holds 100 YES and 60 NO. Which side is it betting on? Learn how Polymarket traders hedge, what matched shares are worth, and how to read the trades."
+publishedAt: "2026-11-12"
+author: "misterrpink"
+topics: ["Polymarket", "wallet analysis", "hedging", "market making"]
+integration: []
+coverImage: "/images/university/polymarket-buy-both-yes-and-no/main.jpg"
+ogImage: "https://lycheedata.com/images/university/polymarket-buy-both-yes-and-no/main.jpg"
+featured: false
+lesson: 5
+cluster: polymarket-holder-analysis
+slug: "polymarket-buy-both-yes-and-no"
+readingTime: "3 min"
+keywords: ["can you bet on both sides on Polymarket", "Polymarket YES and NO shares", "Polymarket hedging", "Polymarket merge shares"]
+canonical: "https://lycheedata.com/university/polymarket-buy-both-yes-and-no"
+ogTitle: "100 YES. 60 NO. Which side is this Polymarket wallet betting on?"
+ogDescription: "Follow one wallet through two trades to see what it locked in and how much still depends on the outcome."
+twitterCard: "summary_large_image"
+---
+
+# Why Do Some Traders Buy Both YES and NO on Polymarket?
+
+**Lychee University · Lesson 5**
+
+Imagine you're following a Polymarket trader. Yesterday they bought 100 YES shares. Today they bought 60 NO shares on the same question. Did they change their mind?
+
+<TwoTradesAnimation />
+
+**They're still 40 shares on YES.** You can buy both sides on Polymarket and keep the original shares. A trader might do that to reduce a bet, lock in a gain after a price move, or keep shares on hand to sell. The balances tell you which outcome still matters to the wallet. To see whether the trades paid off, you also need the prices.
+
+## How much of the bet is still on YES?
+
+In a binary Polymarket market, one YES share and one NO share on the **same question** form a complete pair. The holder can merge that pair for $1 in collateral before the outcome is known. Owning the pair and actually merging it are separate steps. [Polymarket’s guide to managing positions](https://docs.polymarket.com/trading/positions/manage)
+
+Pair up the shares in our example. All 60 NO shares have a YES partner. That gives the trader **60 pairs worth $60**, plus **40 YES shares** left over.
+
+<PairUpSharesAnimation />
+
+You can check that by playing out the result. If the trader holds everything through resolution and YES wins, the shares pay $100. If NO wins, they pay $60. The $40 difference is the part of the payout that still rides on YES. Buying NO cut the trader's exposure from 100 shares to 40. That's a partial hedge.
+
+<OutcomePayoutExplorer />
+
+## Did buying both sides lock in a profit?
+
+Say the trader paid **40¢ per YES share** yesterday. Here's what changes depending on the price they paid for NO today.
+
+- **NO fills at 55¢.** Each matched pair cost 95¢. The 60 pairs cost $57 and can merge for $60, locking in a **$3 gain before fees**.
+- **NO fills at 65¢.** Each pair cost $1.05. The 60 pairs cost $63 and can still merge for $60, locking in a **$3 loss before fees**.
+
+<SameHoldingsAnimation />
+
+Both wallets would look identical in a holders table: 100 YES, 60 NO. Even in the first example, the $3 belongs only to the paired shares. The trader also spent $16 on the remaining 40 YES. If NO wins, those shares expire worthless and the whole position finishes **$13 down before fees**.
+
+<PairCostExplorer />
+
+Timing matters here. Yesterday, when the trader bought YES, they still faced the full risk of that trade. The 95¢ cost per pair became available to this wallet only once its NO order filled at 55¢.
+
+## Why might a market maker hold equal amounts of YES and NO?
+
+Buying each side is one way to end up with a pair. A market maker can also **split** $100 of collateral into 100 YES and 100 NO shares. Now they have inventory ready for a buyer of either outcome. If someone buys 30 YES from them, their wallet has 70 YES and 100 NO left. Seventy pairs still match, and the remaining 30 shares now lean NO. [Polymarket’s market-making guide](https://docs.polymarket.com/trading/market-making)
+
+<SplitInventoryAnimation />
+
+That's why a snapshot can tell you the wallet's exposure even when its motive is unclear. Someone looking only at those 30 extra NO shares could easily miss the YES sale that produced them.
+
+## How to read a wallet that holds both sides
+
+In Lychee Holder Terminal, open a market and look for the **Holds YES and NO** flag in the holders table or heatmap. Pick a flagged wallet, then follow three clues:
+
+<ReadAWalletAnimation />
+
+1. **Count the shares on each side.** The smaller balance tells you how many complete pairs the wallet holds. Subtract it from the larger balance to see which shares still depend on the outcome.
+2. **Open the wallet's trades in that market.** Check the order of its buys and sells and the prices that actually filled. A NO purchase and a YES sale can both leave a trader with less YES exposure.
+3. **Check what the wallet has realized.** Compare the market's cumulative realized P&L with the position still open. A pair the wallet *could* merge and a merge it *already completed* answer different questions about its record.
+
+Try it on one wallet. Before opening the trade history, see if you can answer the first question from the balances alone: **which outcome would pay this holder more, and by how much?** [Explore Polymarket market holders in Lychee](/polymarket-market-holders)
+
+---
+
+### Sources
+
+- [Polymarket: Manage positions (split, merge and redeem)](https://docs.polymarket.com/trading/positions/manage)
+- [Polymarket: Market making](https://docs.polymarket.com/trading/market-making)

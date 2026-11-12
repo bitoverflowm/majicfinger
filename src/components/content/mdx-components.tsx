@@ -81,6 +81,15 @@ import {
   TwoLinesExplorer,
   WhySquareAnimation,
 } from "@/components/university/linear-regression-animations";
+import {
+  OutcomePayoutExplorer,
+  PairCostExplorer,
+  PairUpSharesAnimation,
+  ReadAWalletAnimation,
+  SameHoldingsAnimation,
+  SplitInventoryAnimation,
+  TwoTradesAnimation,
+} from "@/components/university/both-sides-animations";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -196,6 +205,8 @@ function MdxHr() {
  * - Linear regression lesson: `<ByEyeLinesAnimation />`, `<EquationAnatomyAnimation />`, `<RegressionLineExplorer />`,
  *   `<InterceptZoomAnimation />`, `<ResidualExplorer />`, `<WhySquareAnimation />`, `<LeastSquaresExplorer />`,
  *   `<TwoLinesAnimation />`, `<TwoLinesExplorer />`, `<SpreadExplorer />`, `<NewSeasonAnimation />`, `<TableScatterLineAnimation />`
+ * - Buy both YES and NO lesson: `<TwoTradesAnimation />`, `<PairUpSharesAnimation />`, `<OutcomePayoutExplorer />`,
+ *   `<PairCostExplorer />`, `<SameHoldingsAnimation />`, `<SplitInventoryAnimation />`, `<ReadAWalletAnimation />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -290,6 +301,13 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     SpreadExplorer,
     NewSeasonAnimation,
     TableScatterLineAnimation,
+    TwoTradesAnimation,
+    PairUpSharesAnimation,
+    OutcomePayoutExplorer,
+    PairCostExplorer,
+    SameHoldingsAnimation,
+    SplitInventoryAnimation,
+    ReadAWalletAnimation,
     ...components,
   };
 }
