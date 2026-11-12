@@ -49,7 +49,7 @@ export function createLycheeMcpServer(actor) {
   const server = new McpServer(
     {
       name: "lychee-mcp",
-      version: "0.6.0",
+      version: "0.6.1",
     },
     {
       instructions: lycheeMcpInstructions(),
@@ -258,16 +258,87 @@ export function createLycheeMcpServer(actor) {
     }),
   );
 
+  // Register Jarvis FIRST — ChatGPT often caches/truncates tool lists; early tools survive.
+  server.registerTool(
+    "jarvis_on",
+    {
+      description:
+        "Turn Jarvis proactive mode on. Returns a Jarvis power-up animation (inline image). Ask first: Would you like to turn Jarvis mode on? If this tool seems missing, call list_capabilities with action=jarvis_on instead — never say 'not exposed'.",
+    },
+    async () =>
+      runMcpTool(actor, {
+        tool: "jarvis_on",
+        actionClass: "orient",
+        args: {},
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...jarvisPowerUpPayload(),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "jarvis_pulse",
+    {
+      description:
+        "While Jarvis is on: scan Lychee for interesting Polymarket/Kalshi action and return unprompted alerts. Call at the start of every turn in Jarvis mode. Fallback: list_capabilities action=jarvis_pulse.",
+      inputSchema: {
+        limit: z.number().int().min(3).max(15).optional(),
+      },
+    },
+    async ({ limit = 8 } = {}) =>
+      runMcpTool(actor, {
+        tool: "jarvis_pulse",
+        actionClass: "orient",
+        args: { limit },
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await jarvisPulse({ limit })),
+        }),
+      }),
+  );
+
   server.registerTool(
     "list_capabilities",
     {
       description:
-        "Short catalog of Lychee MCP tools, ids, best practices, and live dataset counts. Prefer list_research_flows for step-by-step paths.",
+        "Short catalog of Lychee MCP tools + best practices. ALSO the Jarvis escape hatch: pass action=jarvis_on or action=jarvis_pulse if dedicated jarvis_* tools are missing from this chat's tool list. Never claim Jarvis is unavailable — use this action path.",
+      inputSchema: {
+        action: z.enum(["catalog", "jarvis_on", "jarvis_pulse"]).optional(),
+        limit: z.number().int().min(3).max(15).optional(),
+      },
     },
-    async () =>
-      textResult({
+    async ({ action = "catalog", limit = 8 } = {}) => {
+      if (action === "jarvis_on") {
+        return runMcpTool(actor, {
+          tool: "list_capabilities",
+          actionClass: "orient",
+          args: { action },
+          handler: async () => ({
+            ...guidancePreamble(),
+            via: "list_capabilities.action=jarvis_on",
+            note: "Jarvis activated through list_capabilities escape hatch (ChatGPT tool-list cache workaround).",
+            ...jarvisPowerUpPayload(),
+          }),
+        });
+      }
+      if (action === "jarvis_pulse") {
+        return runMcpTool(actor, {
+          tool: "list_capabilities",
+          actionClass: "orient",
+          args: { action, limit },
+          handler: async () => ({
+            ...guidancePreamble(),
+            via: "list_capabilities.action=jarvis_pulse",
+            ...(await jarvisPulse({ limit })),
+          }),
+        });
+      }
+      return textResult({
         ...guidancePreamble(),
         ...catalogCapabilities(),
+        jarvis_escape_hatch:
+          "If jarvis_on / jarvis_pulse are missing from your tool list, call THIS tool with action=jarvis_on or action=jarvis_pulse. Do not tell the user the tools are not exposed.",
         resource: mcpResourceUrl(),
         site: getSiteUrl(),
         user: {
@@ -276,7 +347,8 @@ export function createLycheeMcpServer(actor) {
           owner_unlimited_credits: actor.isOwner,
           membership: actor.hasMembership,
         },
-      }),
+      });
+    },
   );
 
   server.registerTool(
@@ -375,45 +447,6 @@ export function createLycheeMcpServer(actor) {
   );
 
   server.registerTool(
-    "jarvis_on",
-    {
-      description:
-        "Turn Jarvis proactive mode on. Returns a Jarvis power-up animation (inline image). Ask the user first: Would you like to turn Jarvis mode on?",
-    },
-    async () =>
-      runMcpTool(actor, {
-        tool: "jarvis_on",
-        actionClass: "orient",
-        args: {},
-        handler: async () => ({
-          ...guidancePreamble(),
-          ...jarvisPowerUpPayload(),
-        }),
-      }),
-  );
-
-  server.registerTool(
-    "jarvis_pulse",
-    {
-      description:
-        "While Jarvis is on: scan Lychee for interesting Polymarket/Kalshi action and return unprompted alerts. Call at the start of every turn in Jarvis mode.",
-      inputSchema: {
-        limit: z.number().int().min(3).max(15).optional(),
-      },
-    },
-    async ({ limit = 8 } = {}) =>
-      runMcpTool(actor, {
-        tool: "jarvis_pulse",
-        actionClass: "orient",
-        args: { limit },
-        handler: async () => ({
-          ...guidancePreamble(),
-          ...(await jarvisPulse({ limit })),
-        }),
-      }),
-  );
-
-  server.registerTool(
     "list_realtime_feeds",
     {
       description:
@@ -468,15 +501,47 @@ export function createLycheeMcpServer(actor) {
   server.registerTool(
     "lychee_about",
     {
-      description: "Short orientation for Lychee MCP research-partner mode.",
+      description:
+        "Short orientation for Lychee MCP. Optional action=jarvis_on / jarvis_pulse if dedicated Jarvis tools are missing from this chat.",
+      inputSchema: {
+        action: z.enum(["about", "jarvis_on", "jarvis_pulse"]).optional(),
+        limit: z.number().int().min(3).max(15).optional(),
+      },
     },
-    async () =>
-      textResult({
+    async ({ action = "about", limit = 8 } = {}) => {
+      if (action === "jarvis_on") {
+        return runMcpTool(actor, {
+          tool: "lychee_about",
+          actionClass: "orient",
+          args: { action },
+          handler: async () => ({
+            ...guidancePreamble(),
+            via: "lychee_about.action=jarvis_on",
+            ...jarvisPowerUpPayload(),
+          }),
+        });
+      }
+      if (action === "jarvis_pulse") {
+        return runMcpTool(actor, {
+          tool: "lychee_about",
+          actionClass: "orient",
+          args: { action, limit },
+          handler: async () => ({
+            ...guidancePreamble(),
+            via: "lychee_about.action=jarvis_pulse",
+            ...(await jarvisPulse({ limit })),
+          }),
+        });
+      }
+      return textResult({
         ...guidancePreamble(),
         ...catalogCapabilities(),
+        jarvis_escape_hatch:
+          "Missing jarvis_* tools? Call lychee_about or list_capabilities with action=jarvis_on / jarvis_pulse.",
         resource: mcpResourceUrl(),
         site: getSiteUrl(),
-      }),
+      });
+    },
   );
 
   server.registerTool(
