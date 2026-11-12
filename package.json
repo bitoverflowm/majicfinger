@@ -14,7 +14,8 @@
     "athena:smoke": "node scripts/athena-smoke-test.js",
     "test:workspace": "node --import ./scripts/register-alias.mjs ./scripts/run-workspace-unit-tests.mjs",
     "backfill:chart-bundles": "node --import ./scripts/register-alias.mjs ./scripts/backfill-published-chart-bundles.mjs",
-    "stripe:reconcile": "node scripts/reconcile-stripe-entitlements.cjs"
+    "stripe:reconcile": "node scripts/reconcile-stripe-entitlements.cjs",
+    "test:mcp-unit": "node scripts/mcp-smoke-unit.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-athena": "^3.826.0",
@@ -29,6 +30,7 @@
     "@headlessui/react": "^1.7.11",
     "@hello-pangea/dnd": "^16.6.0",
     "@magic-sdk/admin": "^1.8.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@motionone/utils": "^10.17.0",
     "@next/third-parties": "^14.1.0",
     "@number-flow/react": "^0.6.0",
@@ -139,7 +141,8 @@
     "vaul": "^0.9.0",
     "xlsx": "^0.18.5",
     "y-prosemirror": "^1.3.7",
-    "yjs": "^13.6.29"
+    "yjs": "^13.6.29",
+    "zod": "^4.6.7"
   },
   "overrides": {
     "yjs": "^13.6.29"
