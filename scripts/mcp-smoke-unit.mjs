@@ -157,9 +157,56 @@ assert.equal(pitchCrazyWorkflows(3)[0].vibe, "Whale war room");
 assert.match(lycheeMcpInstructions(), /list_crazy_workflows/);
 assert.match(lycheeMcpInstructions(), /Jarvis mode/i);
 assert.match(lycheeMcpInstructions(), /list_capabilities with action=jarvis_on/);
+assert.match(lycheeMcpInstructions(), /approve_pending/);
+assert.match(lycheeMcpInstructions(), /say approve/i);
+assert.match(lycheeMcpInstructions(), /analyze_trader_theme/);
+assert.match(lycheeMcpInstructions(), /search_news/);
+assert.match(lycheeMcpInstructions(), /magic-link/i);
+assert.match(lycheeMcpInstructions(), /polymarket\.trader_positions/);
+assert.match(lycheeMcpInstructions(), /explain_lychee_platform/);
+assert.match(lycheeMcpInstructions(), /get_lychee_skill_score/);
+assert.match(lycheeMcpInstructions(), /lesson snapshots/i);
+assert.ok(findFlow("trader_deep_dive")?.tools.includes("pull_trader_bundle"));
+assert.ok(findFlow("trader_deep_dive")?.tools.includes("analyze_trader_theme"));
+assert.ok(findFlow("trader_deep_dive")?.tools.includes("get_lychee_skill_score"));
+assert.ok(findFlow("trader_deep_dive")?.tools.includes("explain_lychee_platform"));
+assert.equal(findFlow("news_and_social_context")?.status, "live");
+assert.ok(findFlow("news_and_social_context")?.tools.includes("search_news"));
+
+import { lycheePlatformGuide } from "../src/lib/mcp/data/platformGuide.js";
+const guide = lycheePlatformGuide();
+assert.ok(guide.attributes_and_columns?.principle);
+assert.ok(guide.wallet_depth?.layers?.length >= 5);
+assert.equal(guide.lychee_skill_score?.tool, "get_lychee_skill_score");
+assert.ok(guide.anti_patterns.some((p) => /lesson/i.test(p)));
 assert.ok(guidancePreamble().walkthrough.some((s) => /Jarvis/i.test(s)));
 assert.ok(guidancePreamble().hard_rules.some((r) => /action=jarvis_on/i.test(r)));
 assert.ok(findFlow("jarvis_proactive")?.tools.includes("jarvis_pulse"));
+
+import { parseMentionIntent } from "../src/lib/mcp/xJarvis/intent.js";
+import { isKnownCheckoutQuery } from "../src/lib/stripe/checkoutPlanQuery.js";
+
+const holdersIntent = parseMentionIntent({
+  text: "@lychee_data holders on this",
+  parent_text: "Will BTC hit 150k?",
+  author_handle: "trader",
+});
+assert.equal(holdersIntent.mode, "holders");
+assert.ok(holdersIntent.subject.parent_excerpt);
+
+const pulseIntent = parseMentionIntent({
+  text: "@lychee_data what's hot right now",
+  author_handle: "a",
+});
+assert.equal(pulseIntent.mode, "pulse");
+
+const clarifyIntent = parseMentionIntent({ text: "@lychee_data", author_handle: "a" });
+assert.equal(clarifyIntent.mode, "clarify");
+assert.ok(clarifyIntent.ask_user);
+
+assert.equal(isKnownCheckoutQuery("mcp_prereg"), true);
+assert.equal(isKnownCheckoutQuery("jarvis"), true);
+assert.equal(isKnownCheckoutQuery("mcp-prereg"), true);
 
 import {
   jarvisPowerUpImage,
@@ -188,6 +235,31 @@ const snap = snapshotForSheet({
 });
 assert.ok(snap?.image?.data);
 assert.equal(snap.image.mimeType, "image/svg+xml");
+assert.ok(String(Buffer.from(snap.image.data, "base64")).includes("#fb923c"));
+
+const pnlSnap = snapshotForSheet({
+  title: "PnL",
+  chartView: "portfolio",
+  rows: [
+    { timestamp: 1, economic_pnl: -10 },
+    { timestamp: 2, economic_pnl: 5 },
+    { timestamp: 3, economic_pnl: 12 },
+  ],
+});
+assert.ok(pnlSnap?.image?.data);
+
+const holderSnap = snapshotForSheet({
+  title: "Holders",
+  chartView: "treemap",
+  rows: [
+    { outcome: "YES", name: "Alpha", amount: 100 },
+    { outcome: "YES", name: "Beta", amount: 40 },
+    { outcome: "NO", name: "Gamma", amount: 200 },
+  ],
+});
+assert.ok(holderSnap?.image?.data);
+assert.ok(String(Buffer.from(holderSnap.image.data, "base64")).includes("YES"));
+
 const powerImg = jarvisPowerUpImage();
 assert.ok(powerImg.data.length > 20);
 assert.ok(imageMarkdown(powerImg, "Jarvis powering up").includes("![Jarvis powering up]"));
@@ -198,5 +270,18 @@ const withCharts = textResult({
 assert.ok(withCharts.content.some((c) => c.type === "image"));
 assert.ok(withCharts.content[0].text.includes("![Trades chart]"));
 assert.equal(collectChartImages({ sheets: [{ chart_snapshot: snap }] }).length, 1);
+
+// Live API shape that used to empty MCP PnL (points nested under data, not data[]).
+const fakePnlEnvelope = {
+  data: {
+    proxy_wallet: "0x24ded84d901a743cfee095f8082b0f9f647183cb",
+    points: [
+      { timestamp: 1, economic_pnl: 1.5 },
+      { timestamp: 2, economic_pnl: 2.5 },
+    ],
+  },
+};
+assert.ok(Array.isArray(fakePnlEnvelope.data.points));
+assert.equal(Array.isArray(fakePnlEnvelope.data), false);
 
 console.log("mcp-smoke-unit: ok");

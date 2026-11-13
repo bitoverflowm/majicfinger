@@ -51,11 +51,25 @@ export const CHECKOUT_PLANS = [
     href: landingPageV2Config.lifetimeAccess?.href || "",
     priceId: "price_1T68YMILjX7EMe6x0N5glBuL",
   },
+  {
+    key: "mcp_prereg",
+    tier: "mcp",
+    cycle: "prereg",
+    mode: "payment",
+    amount: 4900,
+    interval: null,
+    label: "Lychee MCP + Jarvis prereg",
+    href: landingPageV2Config.mcpPrereg?.href || "",
+    priceId: "",
+  },
 ];
 
 export function planFromQuery(plan, cycle) {
   const name = String(plan || "").trim().toLowerCase();
   if (name === "lifetime") return CHECKOUT_PLANS.find((item) => item.key === "lifetime") || null;
+  if (name === "mcp_prereg" || name === "mcp-prereg" || name === "jarvis") {
+    return CHECKOUT_PLANS.find((item) => item.key === "mcp_prereg") || null;
+  }
   const normalizedCycle = normalizeCheckoutCycle(cycle);
   return CHECKOUT_PLANS.find((item) => item.tier === name && item.cycle === normalizedCycle) || null;
 }

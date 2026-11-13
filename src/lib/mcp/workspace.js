@@ -308,6 +308,7 @@ export async function pullMarketBundleIntoProject(
     market,
     holdersRows = [],
     tradesRows = [],
+    pricesRows = [],
     analysisMarkdown = "",
   } = {},
 ) {
@@ -324,20 +325,56 @@ export async function pullMarketBundleIntoProject(
 
   const marketTitle = market?.title || "Market";
 
+  if (pricesRows?.length) {
+    const sheet = await addSheetWithChart(userId, project.project_id, {
+      title: `${marketTitle} · prices`,
+      rows: pricesRows.map((row) => ({ ...row, market_title: marketTitle })),
+      preferredColumns: ["t", "p", "token_id", "market_title"],
+      sheetId: `prices-${String(market?.condition_id || "").slice(0, 18)}`,
+      chartView: "price",
+      table: "getBatchPricesHistory",
+    });
+    results.sheets.push(sheet);
+  }
+
   if (holdersRows?.length) {
-    const byOutcome = new Map();
-    for (const row of holdersRows) {
+    // One combined holders sheet (YES+NO) so chat gets a split chart like the holder terminal.
+    const combined = holdersRows.map((row) => {
       const key = row.outcome || (row.outcome_index === 1 ? "NO" : row.outcome_index === 0 ? "YES" : "HOLDERS");
-      if (!byOutcome.has(key)) byOutcome.set(key, []);
-      byOutcome.get(key).push({
+      return {
         ...row,
         market_title: marketTitle,
         outcome: row.outcome || key,
         name: row.name || row.pseudonym || row.proxy_wallet || "wallet",
-      });
+      };
+    });
+    const sheet = await addSheetWithChart(userId, project.project_id, {
+      title: `${marketTitle} · holders`,
+      rows: combined,
+      preferredColumns: [
+        "market_title",
+        "outcome",
+        "name",
+        "pseudonym",
+        "amount",
+        "proxy_wallet",
+        "outcome_index",
+        "verified",
+      ],
+      sheetId: `holders-${String(market?.condition_id || "").slice(0, 14)}`,
+      chartView: "treemap",
+      table: "getHoldersByMarkets",
+    });
+    results.sheets.push(sheet);
+
+    const byOutcome = new Map();
+    for (const row of combined) {
+      const key = row.outcome || "HOLDERS";
+      if (!byOutcome.has(key)) byOutcome.set(key, []);
+      byOutcome.get(key).push(row);
     }
     for (const [outcome, rows] of byOutcome) {
-      const sheet = await addSheetWithChart(userId, project.project_id, {
+      const side = await addSheetWithChart(userId, project.project_id, {
         title: `${marketTitle} · ${outcome} holders`,
         rows,
         preferredColumns: [
@@ -354,7 +391,7 @@ export async function pullMarketBundleIntoProject(
         chartView: "treemap",
         table: "getHoldersByMarkets",
       });
-      results.sheets.push(sheet);
+      results.sheets.push(side);
     }
   }
 
@@ -380,8 +417,126 @@ export async function pullMarketBundleIntoProject(
   results.dashboard_url = absoluteDashboardUrl(project.project_id);
   results.chart_images = results.sheets.flatMap((s) => s.chart_images || []).filter(Boolean);
   results.show_in_chat =
-    "Each sheet includes chart_snapshot / inline images — show Chart 1, Chart 2… in the reply as they land.";
+    "SHOW each chart_snapshot inline (Lychee-styled). Prefer publish_project for shareable viewing — dashboard_url is the owner's editor, not a magic-link for chat guests.";
+  results.next = {
+    publish: "publish_project",
+    traders: "preview_trader / pull_trader_bundle / analyze_trader_theme on top wallets",
+    news: "search_news for headline overlay",
+  };
   return results;
+}
+
+/** Positions + activity + PnL sheets for one wallet (holder-terminal style tables). */
+export async function pullTraderBundleIntoProject(
+  userId,
+  {
+    projectId = "",
+    projectName = "",
+    proxyWallet,
+    label = "",
+    positions = [],
+    closedPositions = [],
+    activity = [],
+    pnl = [],
+    analysisMarkdown = "",
+  } = {},
+) {
+  const wallet = String(proxyWallet || "").trim();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) throw new Error("proxy_wallet required");
+
+  let project =
+    projectId
+      ? await openProject(userId, projectId)
+      : await createResearchProject(userId, {
+          name: projectName || `${label || "Trader"} · ${wallet.slice(0, 10)}`,
+          question: `Trader deep dive ${wallet}`,
+        });
+  if (!project?.project_id) throw new Error("Could not create or open project");
+
+  const tag = (label || wallet.slice(0, 10)).slice(0, 40);
+  const sheets = [];
+
+  if (positions?.length) {
+    sheets.push(
+      await addSheetWithChart(userId, project.project_id, {
+        title: `${tag} · positions`,
+        rows: positions,
+        preferredColumns: [
+          "title",
+          "outcome",
+          "current_size",
+          "current_value",
+          "unrealized_pnl",
+          "realized_pnl",
+          "avg_price",
+          "condition_id",
+        ],
+        chartView: "treemap",
+        table: "getTraderPositions",
+      }),
+    );
+  }
+  if (closedPositions?.length) {
+    sheets.push(
+      await addSheetWithChart(userId, project.project_id, {
+        title: `${tag} · closed`,
+        rows: closedPositions,
+        preferredColumns: [
+          "title",
+          "outcome",
+          "status",
+          "total_size",
+          "realized_pnl",
+          "total_pnl",
+          "avg_price",
+          "condition_id",
+        ],
+        chartView: "treemap",
+        table: "getTraderPositions",
+      }),
+    );
+  }
+  if (activity?.length) {
+    sheets.push(
+      await addSheetWithChart(userId, project.project_id, {
+        title: `${tag} · activity`,
+        rows: activity,
+        preferredColumns: ["timestamp", "type", "side", "price", "size", "usdc_size", "title", "condition_id"],
+        chartView: "activity",
+        table: "getTraderActivity",
+      }),
+    );
+  }
+  if (pnl?.length) {
+    sheets.push(
+      await addSheetWithChart(userId, project.project_id, {
+        title: `${tag} · PnL`,
+        rows: pnl,
+        preferredColumns: ["timestamp", "economic_pnl", "realized_pnl", "unrealized_pnl", "trade_count"],
+        chartView: "portfolio",
+        table: "getTraderPnlSeries",
+      }),
+    );
+  }
+
+  if (analysisMarkdown) {
+    await addInsightBlocks(userId, project.project_id, {
+      title: `${tag} · notes`,
+      markdown: analysisMarkdown,
+    });
+  }
+
+  if (!sheets.length) throw new Error("No trader rows to compose — call preview_trader first.");
+
+  return {
+    project_id: project.project_id,
+    dashboard_url: absoluteDashboardUrl(project.project_id),
+    proxy_wallet: wallet,
+    sheets,
+    chart_images: sheets.flatMap((s) => s.chart_images || []).filter(Boolean),
+    show_in_chat:
+      "SHOW PnL + positions chart images inline. For theme hit-rates use analyze_trader_theme. publish_project to share.",
+  };
 }
 
 export async function publishProject(userId, projectId, { slug, title, description = "", visibility = "unlisted" } = {}) {

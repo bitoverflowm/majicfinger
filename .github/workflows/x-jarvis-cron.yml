@@ -1,0 +1,46 @@
+# External tick for @lychee_data Jarvis (works even when Vercel Hobby limits cron frequency).
+# Required repo secrets:
+#   X_JARVIS_CRON_SECRET — same value as Vercel X_JARVIS_CRON_SECRET / CRON_SECRET
+# Optional:
+#   X_JARVIS_CRON_URL — default https://lycheedata.com/api/x-jarvis/cron
+name: X Jarvis cron tick
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      live:
+        description: "Request live replies (still needs X_JARVIS_LIVE=1 on the app)"
+        required: false
+        default: "1"
+      max:
+        description: "Max mentions to process"
+        required: false
+        default: "10"
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Hit /api/x-jarvis/cron
+        env:
+          SECRET: ${{ secrets.X_JARVIS_CRON_SECRET }}
+          BASE: ${{ secrets.X_JARVIS_CRON_URL }}
+          LIVE: ${{ github.event.inputs.live || '1' }}
+          MAX: ${{ github.event.inputs.max || '10' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SECRET:-}" ]; then
+            echo "Missing repo secret X_JARVIS_CRON_SECRET — skipping tick"
+            exit 0
+          fi
+          URL="${BASE:-https://lycheedata.com/api/x-jarvis/cron}"
+          echo "POST $URL live=$LIVE max=$MAX"
+          curl -fsS -X POST "$URL?live=${LIVE}&max=${MAX}" \
+            -H "Authorization: Bearer ${SECRET}" \
+            -H "Content-Type: application/json" \
+            -d "{\"live\":${LIVE},\"max\":${MAX}}" \
+            | tee /tmp/x-jarvis-cron.json
+          node -e "const j=require('/tmp/x-jarvis-cron.json'); if(j.success===false) process.exit(1)"

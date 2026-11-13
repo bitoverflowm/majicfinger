@@ -94,7 +94,15 @@ export async function runHolderAnalysisRecipe(
         await addSheetWithChart(userId, composed.project_id, {
           title: `${trader.label} · positions`,
           rows: trader.positions,
-          preferredColumns: ["title", "outcome", "size", "current_value", "cash_pnl"],
+          preferredColumns: [
+            "title",
+            "outcome",
+            "current_size",
+            "current_value",
+            "unrealized_pnl",
+            "realized_pnl",
+            "avg_price",
+          ],
           chartView: "treemap",
           table: "getTraderPositions",
         }),
@@ -105,9 +113,20 @@ export async function runHolderAnalysisRecipe(
         await addSheetWithChart(userId, composed.project_id, {
           title: `${trader.label} · activity`,
           rows: trader.activity,
-          preferredColumns: ["timestamp", "type", "side", "price", "size", "title"],
+          preferredColumns: ["timestamp", "type", "side", "price", "size", "usdc_size", "title"],
           chartView: "activity",
           table: "getTraderActivity",
+        }),
+      );
+    }
+    if (trader.pnl?.length) {
+      sheets.push(
+        await addSheetWithChart(userId, composed.project_id, {
+          title: `${trader.label} · PnL`,
+          rows: trader.pnl,
+          preferredColumns: ["timestamp", "economic_pnl", "realized_pnl", "unrealized_pnl"],
+          chartView: "portfolio",
+          table: "getTraderPnlSeries",
         }),
       );
     }
@@ -121,8 +140,9 @@ export async function runHolderAnalysisRecipe(
     tape_analysis: tapeAnalysis,
     top_traders: top,
     traders_expanded: traderBundles.length,
+    trader_errors: top.length - traderBundles.length,
     composed: { ...composed, sheets },
-    next: "Share composed.dashboard_url. Optionally compare_venues or publish_project.",
+    next: "SHOW chart images. For Fed/history hit-rates: analyze_trader_theme on each wallet. Prefer publish_project — never magic-link login.",
   };
 }
 

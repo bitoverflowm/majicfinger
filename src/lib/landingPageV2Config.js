@@ -284,6 +284,27 @@ export const landingPageV2Config = {
       "Directly supports ongoing development",
     ],
   },
+  /** $49 one-time MCP + Jarvis prereg — amount must match PLAN_MAP 4900:one-time. */
+  mcpPrereg: {
+    href: "/checkout?plan=mcp_prereg",
+    landingPath: "/jarvis",
+    title: "MCP + Jarvis prereg",
+    badge: "Founding access",
+    price: "$49",
+    priceNote: "one-time",
+    headline: "Preregister for Lychee MCP & Jarvis",
+    description:
+      "Lock founding access to Lychee MCP, Jarvis mode, and X @mention research — single payment, early credits, priority onboarding.",
+    buttonText: "Preregister · $49",
+    checkoutPlan: "mcp_prereg",
+    features: [
+      "Lychee MCP in ChatGPT / Claude / Cursor",
+      "Jarvis proactive mode + crazy workflows",
+      "Chat-side approve (say “approve”)",
+      "Early X @lychee_data mention packs",
+      "Founding MCP credit grant on purchase",
+    ],
+  },
   faqs: [
     {
       question: "What is Lychee?",

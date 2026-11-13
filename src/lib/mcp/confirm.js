@@ -124,16 +124,46 @@ export async function gateConfirmation({
     payload: {
       status: "needs_confirmation",
       message:
-        "This action needs your approval in Lychee (publish / large pull / expensive materialize). Open the link, approve once, or choose Always allow.",
+        "This action needs your approval (publish / large pull / expensive materialize). In chat, say \"approve\" (or \"always allow\") and I will call approve_pending — or open the Lychee link.",
       approve_url: approveUrl,
       confirmation_token: token,
       action_class: actionClass,
       credit_quote: creditQuote,
       summary,
+      chat_approve: {
+        say: "approve",
+        tool: "approve_pending",
+        always_allow_say: "always allow",
+        deny_say: "deny",
+      },
       next_step:
-        "After approving, call the same tool again with confirmation_token set to the token above.",
+        "Preferred: user says approve → call approve_pending (no token needed; uses latest pending), then retry this tool with confirmation_token. Or open approve_url.",
     },
   };
+}
+
+/** Latest open confirmation for chat-side approve / deny. */
+export async function getLatestPendingConfirmation(userId) {
+  await dbConnect();
+  return McpPendingConfirmation.findOne({
+    user_id: String(userId),
+    status: "pending",
+    expires_at: { $gt: new Date() },
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+}
+
+export async function listPendingConfirmations(userId, { limit = 5 } = {}) {
+  await dbConnect();
+  return McpPendingConfirmation.find({
+    user_id: String(userId),
+    status: "pending",
+    expires_at: { $gt: new Date() },
+  })
+    .sort({ createdAt: -1 })
+    .limit(Math.min(20, Math.max(1, limit)))
+    .lean();
 }
 
 export async function getPendingConfirmation(token) {

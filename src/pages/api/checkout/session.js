@@ -125,7 +125,12 @@ export default async function handler(req, res) {
     if (member) {
       const { session: login, user, state } = member;
       const renewalFailing = ["past_due", "unpaid"].includes(String(user?.subscriptionStatus || "").toLowerCase());
-      if (login && (ALREADY_BILLED_REASONS.has(state.reason) || renewalFailing)) {
+      // MCP/Jarvis prereg is a separate one-time product — allow even if already a member.
+      if (
+        plan.key !== "mcp_prereg" &&
+        login &&
+        (ALREADY_BILLED_REASONS.has(state.reason) || renewalFailing)
+      ) {
         return res.status(409).json({
           code: "ALREADY_MEMBER",
           reason: state.reason,

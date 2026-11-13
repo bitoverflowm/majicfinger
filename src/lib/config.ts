@@ -144,6 +144,7 @@ export const siteConfig = {
         { id: 2, title: "Pricing", url: "#pricing" },
         { id: 3, title: "Dashboard", url: "/dashboard" },
         { id: 4, title: "Charts", url: "/charts" },
+        { id: 26, title: "MCP + Jarvis", url: "/jarvis" },
         { id: 20, title: "Kalshi vs Polymarket", url: "/kalshi-vs-polymarket-odds" },
         { id: 25, title: "News archive", url: "/news-archive" },
       ],

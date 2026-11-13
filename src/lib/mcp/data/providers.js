@@ -516,62 +516,140 @@ export async function getPolymarketOpenInterest(conditionId) {
   };
 }
 
-export async function getPolymarketTrader(wallet, { limit = 50 } = {}) {
+async function fetchTraderJson(url) {
+  const res = await fetch(url, { headers: { accept: "application/json" } });
+  const text = await res.text().catch(() => "");
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = null;
+  }
+  if (!res.ok) {
+    const msg =
+      body?.error ||
+      body?.message ||
+      text ||
+      `Request failed (${res.status})`;
+    const err = new Error(String(msg));
+    err.status = res.status;
+    err.code = body?.code || null;
+    throw err;
+  }
+  return body;
+}
+
+export async function getPolymarketTrader(wallet, { limit = 50, includeClosed = false } = {}) {
+  const { pnlSheetRows } = await import("@/lib/polymarketLive/traderPnlCompose");
+  const { positionSheetRow } = await import("@/lib/polymarketLive/traderPositionsCompose");
+  const { activitySheetRow } = await import("@/lib/polymarketLive/traderActivityCompose");
+
   const user = String(wallet || "").trim();
   if (!/^0x[a-fA-F0-9]{40}$/.test(user)) throw new Error("proxy_wallet must be 0x…40 hex");
-  const [positionsBody, activityBody, pnlBody, valueBody] = await Promise.all([
-    fetchJson(`${DATA_API_BASE}/v2/positions?user=${encodeURIComponent(user)}&limit=${Math.min(200, limit)}`),
-    fetchJson(`${DATA_API_BASE}/v2/activity?user=${encodeURIComponent(user)}&limit=${Math.min(200, limit)}`),
-    fetchJson(`${DATA_API_BASE}/v2/user-pnl?user=${encodeURIComponent(user)}&interval=max&fidelity=1d`).catch(() => null),
-    fetchJson(`${DATA_API_BASE}/v2/value?user=${encodeURIComponent(user)}`).catch(() => null),
+
+  const lim = Math.min(200, Math.max(10, limit));
+  const closedLim = Math.min(200, Math.max(10, limit));
+  const settled = await Promise.allSettled([
+    fetchTraderJson(`${DATA_API_BASE}/v2/positions?user=${encodeURIComponent(user)}&limit=${lim}`),
+    fetchTraderJson(`${DATA_API_BASE}/v2/activity?user=${encodeURIComponent(user)}&limit=${lim}`),
+    fetchTraderJson(
+      `${DATA_API_BASE}/v2/user-pnl?user=${encodeURIComponent(user)}&interval=max&fidelity=1d`,
+    ),
+    fetchTraderJson(`${DATA_API_BASE}/v2/value?user=${encodeURIComponent(user)}`),
+    includeClosed
+      ? fetchTraderJson(
+          `${DATA_API_BASE}/v2/positions?user=${encodeURIComponent(user)}&status=closed&limit=${closedLim}&sort_by=TIMESTAMP&sort_direction=DESC`,
+        )
+      : Promise.resolve(null),
   ]);
-  const positionsRaw = Array.isArray(positionsBody?.data) ? positionsBody.data : Array.isArray(positionsBody) ? positionsBody : [];
-  const activityRaw = Array.isArray(activityBody?.data) ? activityBody.data : Array.isArray(activityBody) ? activityBody : [];
-  const pnlRaw = Array.isArray(pnlBody?.data) ? pnlBody.data : Array.isArray(pnlBody) ? pnlBody : [];
-  const positions = positionsRaw.map((row) => ({
-    proxy_wallet: user,
-    title: row.title || row.market || null,
-    outcome: row.outcome || null,
-    size: row.size != null ? Number(row.size) : null,
-    avg_price: row.avgPrice != null ? Number(row.avgPrice) : row.avg_price != null ? Number(row.avg_price) : null,
-    current_value: row.currentValue != null ? Number(row.currentValue) : row.current_value != null ? Number(row.current_value) : null,
-    cash_pnl: row.cashPnl != null ? Number(row.cashPnl) : row.cash_pnl != null ? Number(row.cash_pnl) : null,
-    condition_id: row.conditionId || row.condition_id || null,
-  }));
-  const activity = activityRaw.map((row) => ({
-    proxy_wallet: user,
-    type: row.type || null,
-    side: row.side || null,
-    size: row.size != null ? Number(row.size) : null,
-    usdc_size: row.usdcSize != null ? Number(row.usdcSize) : null,
-    price: row.price != null ? Number(row.price) : null,
-    timestamp: row.timestamp || row.createdAt || null,
-    title: row.title || null,
-    outcome: row.outcome || null,
-  }));
-  const pnl = pnlRaw.map((row) => ({
-    proxy_wallet: user,
-    timestamp: row.t || row.timestamp || null,
-    economic_pnl: row.p != null ? Number(row.p) : row.economic_pnl != null ? Number(row.economic_pnl) : null,
-  }));
-  if (!positions.length && !activity.length) {
-    throw new Error(`No trader data for ${user}. Check proxy_wallet; do not scrape.`);
+
+  const [positionsRes, activityRes, pnlRes, valueRes, closedRes] = settled;
+  const hardFail = [positionsRes, activityRes].find(
+    (r) => r.status === "rejected" && /protocol contract|invalid_request/i.test(r.reason?.message || ""),
+  );
+  if (hardFail) {
+    throw new Error(
+      `${hardFail.reason.message} — this holder address is not a tradeable proxy wallet. Pick another holder from preview_holders, or search profiles for the real proxy_wallet. Do not open Lychee magic-link login.`,
+    );
   }
+
+  const asRows = (res) =>
+    res?.status === "fulfilled"
+      ? Array.isArray(res.value?.data)
+        ? res.value.data
+        : Array.isArray(res.value)
+          ? res.value
+          : []
+      : [];
+
+  const positionsRaw = asRows(positionsRes);
+  const activityRaw = asRows(activityRes);
+  const closedRaw = includeClosed ? asRows(closedRes) : [];
+
+  const positions = positionsRaw
+    .filter((row) => row && typeof row === "object")
+    .map((row) => positionSheetRow(row, user));
+  const closed_positions = closedRaw
+    .filter((row) => row && typeof row === "object")
+    .map((row) => positionSheetRow(row, user));
+  const activity = activityRaw
+    .filter((row) => row && typeof row === "object")
+    .map((row) => activitySheetRow(row, user));
+  const pnl =
+    pnlRes.status === "fulfilled" ? pnlSheetRows(pnlRes.value, user) : [];
+  const valueBody = valueRes.status === "fulfilled" ? valueRes.value : null;
+
+  if (!positions.length && !activity.length && !pnl.length && !closed_positions.length) {
+    const detail =
+      positionsRes.status === "rejected"
+        ? positionsRes.reason?.message
+        : activityRes.status === "rejected"
+          ? activityRes.reason?.message
+          : "empty positions + activity";
+    throw new Error(
+      `No trader data for ${user} (${detail}). Use a real proxy_wallet from holders/activity; do not scrape or magic-link login.`,
+    );
+  }
+
+  const lastPnl = pnl.length ? pnl[pnl.length - 1] : null;
   return {
     proxy_wallet: user,
     source: "lychee:polymarket-data-api-v2/trader",
     portfolio_value: valueBody,
+    pnl_summary: lastPnl
+      ? {
+          economic_pnl: lastPnl.economic_pnl ?? null,
+          realized_pnl: lastPnl.realized_pnl ?? null,
+          unrealized_pnl: lastPnl.unrealized_pnl ?? null,
+          points: pnl.length,
+        }
+      : null,
     positions,
+    closed_positions,
     activity,
     pnl,
     preview: {
       positions: positions.slice(0, 20),
+      closed_positions: closed_positions.slice(0, 20),
       activity: activity.slice(0, 20),
       pnl: pnl.slice(-20),
     },
+    analysis_ready: true,
+    note:
+      "These are full wallet records (positions/activity/pnl), not metadata stubs. preferredColumns only affect sheet display. For Skill Score call get_lychee_skill_score; for theme hit-rates call analyze_trader_theme.",
+    chart_hints: {
+      positions: "treemap",
+      closed_positions: "treemap",
+      activity: "activity",
+      pnl: "portfolio",
+    },
     next: {
-      compose: "pull_and_compose",
+      compose: "pull_trader_bundle",
+      alt_compose: "pull_and_compose",
       datasets: ["polymarket.trader_positions", "polymarket.trader_activity", "polymarket.trader_pnl"],
+      analyze: ["get_lychee_skill_score", "analyze_trader_theme"],
+      platform: "explain_lychee_platform",
+      note: "Use exact dataset ids polymarket.trader_*. Never ask for email magic-link. Never substitute lesson snapshots for a failed pull.",
     },
   };
 }
@@ -638,15 +716,42 @@ export async function resolveDatasetPull(datasetId, args = {}) {
     }
     case "polymarket.trader_positions": {
       const trader = await getPolymarketTrader(args.proxy_wallet, { limit: args.limit || 50 });
-      return { meta, title: `Positions · ${args.proxy_wallet}`, rows: trader.positions, preferredColumns: ["title", "outcome", "size", "current_value", "cash_pnl"] };
+      return {
+        meta,
+        title: `Positions · ${args.proxy_wallet}`,
+        rows: trader.positions,
+        preferredColumns: [
+          "title",
+          "outcome",
+          "current_size",
+          "current_value",
+          "unrealized_pnl",
+          "realized_pnl",
+          "avg_price",
+          "condition_id",
+        ],
+        chartView: "treemap",
+      };
     }
     case "polymarket.trader_activity": {
       const trader = await getPolymarketTrader(args.proxy_wallet, { limit: args.limit || 50 });
-      return { meta, title: `Activity · ${args.proxy_wallet}`, rows: trader.activity, preferredColumns: ["timestamp", "type", "side", "price", "size", "title"] };
+      return {
+        meta,
+        title: `Activity · ${args.proxy_wallet}`,
+        rows: trader.activity,
+        preferredColumns: ["timestamp", "type", "side", "price", "size", "usdc_size", "title", "condition_id"],
+        chartView: "activity",
+      };
     }
     case "polymarket.trader_pnl": {
       const trader = await getPolymarketTrader(args.proxy_wallet, { limit: args.limit || 50 });
-      return { meta, title: `PnL · ${args.proxy_wallet}`, rows: trader.pnl, preferredColumns: ["timestamp", "economic_pnl"] };
+      return {
+        meta,
+        title: `PnL · ${args.proxy_wallet}`,
+        rows: trader.pnl,
+        preferredColumns: ["timestamp", "economic_pnl", "realized_pnl", "unrealized_pnl", "trade_count"],
+        chartView: "portfolio",
+      };
     }
     case "kalshi.market": {
       const kalshi = await getKalshiMarket(args.ticker);
@@ -673,11 +778,14 @@ export function catalogCapabilities() {
     first_turn_hint:
       "Open-ended users: list_crazy_workflows → pitch 3 → wait for pick. Named market/wallet/theme: skip pitch and execute.",
     tools: [
-      { name: "list_capabilities", stage: "orient", purpose: "Short catalog + best practices" },
+      { name: "list_capabilities", stage: "orient", purpose: "Short catalog + best practices (+ action=platform)" },
+      { name: "explain_lychee_platform", stage: "orient", purpose: "Attributes, filters, joins, Skill Score, news archive" },
       { name: "list_research_flows", stage: "orient", purpose: "Named composable research paths" },
       { name: "list_crazy_workflows", stage: "orient", purpose: "Ambitious workflows to pitch on first turn" },
       { name: "jarvis_on", stage: "orient", purpose: "Power-up Jarvis proactive mode (+ animation)" },
       { name: "jarvis_pulse", stage: "orient", purpose: "Unprompted interesting-market brief while Jarvis is on" },
+      { name: "approve_pending", stage: "orient", purpose: "Approve/deny MCP confirmations when user says approve in chat" },
+      { name: "list_pending_approvals", stage: "orient", purpose: "Show open confirmations" },
       { name: "list_datasets", stage: "orient", purpose: "Every dataset id + status (live/partial/next)" },
       { name: "list_realtime_feeds", stage: "orient", purpose: "Realtime/live feeds for bots + research" },
       { name: "get_most_active_markets", stage: "orient", purpose: "Rank Polymarket by 24h volume" },
@@ -690,10 +798,14 @@ export function catalogCapabilities() {
       { name: "preview_prices", stage: "sample", purpose: "CLOB price history (callable — use it)" },
       { name: "preview_orderbook", stage: "sample", purpose: "CLOB book levels" },
       { name: "preview_open_interest", stage: "sample", purpose: "Open interest" },
-      { name: "preview_trader", stage: "sample", purpose: "Positions + activity + PnL for a wallet" },
+      { name: "preview_trader", stage: "sample", purpose: "Full wallet records (open/closed/activity/PnL)" },
+      { name: "pull_trader_bundle", stage: "ingest+compose", purpose: "Trader open+closed+activity+PnL → sheets+charts" },
+      { name: "get_lychee_skill_score", stage: "analyze", purpose: "Lychee Skill Score −100…100 on finished positions" },
+      { name: "analyze_trader_theme", stage: "analyze", purpose: "Theme hit-rate (Fed etc.) on settled markets" },
+      { name: "search_news", stage: "sample", purpose: "News archive / Google / GDELT headlines for overlays" },
       { name: "preview_kalshi_market", stage: "sample", purpose: "Kalshi live market snapshot" },
       { name: "get_realtime_snapshot", stage: "sample", purpose: "Pollable live snapshot for trading bots" },
-      { name: "pull_market_bundle", stage: "ingest+compose", purpose: "Holders+trades → Lychee sheets+charts" },
+      { name: "pull_market_bundle", stage: "ingest+compose", purpose: "Prices+holders+trades → Lychee sheets+charts" },
       { name: "pull_and_compose", stage: "ingest+compose", purpose: "Any live dataset → sheet+chart" },
       { name: "run_recipe_holder_analysis", stage: "ingest+compose", purpose: "UI holder-analysis recipe cousin" },
       { name: "run_recipe_trade_history", stage: "ingest+compose", purpose: "Live trade-history recipe (Athena dump separate)" },

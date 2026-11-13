@@ -159,6 +159,7 @@ const CYCLE_COPY = {
   monthly: "Billed monthly",
   weekly: "Billed weekly",
   lifetime: "One-time payment",
+  prereg: "One-time founding payment",
 };
 
 function addInterval(date, interval, count = 1) {
@@ -179,6 +180,15 @@ function planDisplay(summary) {
   if (summary.cycle === "lifetime") {
     const lifetime = landingPageV2Config.lifetimeAccess || {};
     return { name: "Lifetime access", features: lifetime.features || [], legacy: false };
+  }
+  if (summary.key === "mcp_prereg" || summary.tier === "mcp" || summary.cycle === "prereg") {
+    const mcp = landingPageV2Config.mcpPrereg || {};
+    return {
+      name: mcp.title || "MCP + Jarvis prereg",
+      description: mcp.description || "",
+      features: mcp.features || [],
+      legacy: false,
+    };
   }
   const current = (landingPageV2Config.plans || []).find((plan) => plan.tier === summary.tier);
   if (current) {
@@ -682,7 +692,10 @@ function OrderSummary({ summary, checkout }) {
 
       <dl className="mt-8 space-y-3 border-t border-border pt-6 text-sm">
         <div className="flex justify-between gap-4">
-          <dt className="text-muted-foreground">Lychee {display.name}{summary.cycle !== "lifetime" ? `, ${summary.cycle}` : ""}</dt>
+          <dt className="text-muted-foreground">
+            Lychee {display.name}
+            {summary.cycle !== "lifetime" && summary.cycle !== "prereg" ? `, ${summary.cycle}` : ""}
+          </dt>
           <dd className="tabular-nums text-foreground">{total?.subtotal?.amount || formatCents(summary.amount)}</dd>
         </div>
         {discount ? (

@@ -188,3 +188,38 @@ export async function recentLedger(userId, limit = 30) {
     .limit(Math.min(100, Math.max(1, limit)))
     .lean();
 }
+
+/** Grant credits (e.g. MCP prereg pack). Idempotent callers should check before calling. */
+export async function grantCredits(userId, amount, { reason = "grant", meta = null } = {}) {
+  const add = Math.max(0, Math.ceil(Number(amount) || 0));
+  if (!add) return { ok: true, granted: 0, snapshot: await getCreditSnapshot(userId) };
+  const account = await ensureCreditAccount(userId);
+  if (account.unlimited) {
+    await McpCreditLedger.create({
+      user_id: String(userId),
+      delta: add,
+      balance_after: null,
+      reason,
+      class: "grant",
+      meta,
+      unlimited_account: true,
+    });
+    await McpCreditAccount.updateOne({ _id: account._id }, { $inc: { lifetime_granted: add } });
+    return { ok: true, granted: add, snapshot: await getCreditSnapshot(userId) };
+  }
+  const updated = await McpCreditAccount.findOneAndUpdate(
+    { _id: account._id },
+    { $inc: { balance: add, lifetime_granted: add } },
+    { new: true },
+  );
+  await McpCreditLedger.create({
+    user_id: String(userId),
+    delta: add,
+    balance_after: updated?.balance ?? null,
+    reason,
+    class: "grant",
+    meta,
+    unlimited_account: false,
+  });
+  return { ok: true, granted: add, snapshot: await getCreditSnapshot(userId) };
+}
