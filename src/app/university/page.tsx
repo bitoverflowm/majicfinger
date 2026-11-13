@@ -1,3 +1,4 @@
+import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { CTASection } from "@/components/sections/cta-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { MarketingNavbar } from "@/components/sections/marketing-navbar";
@@ -46,6 +47,7 @@ export default function UniversityPage() {
       <MarketingNavbar />
       <main className="flex min-h-screen w-full flex-col divide-y divide-border bg-background font-sans antialiased theme-landing">
         <UniversityHome lessons={lessons} />
+        <JarvisComingPromo />
         <CTASection />
         <FooterSection />
       </main>

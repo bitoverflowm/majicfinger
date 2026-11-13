@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import GuidesSection from "@/components/sections/guides-section";
+import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { FooterSection } from "@/components/sections/footer-section";
 import { getAllContent } from "@/lib/content";
 import type { ContentItem } from "@/lib/content/types";
@@ -368,6 +369,7 @@ export default function PolymarketMetadataPage() {
           <GuidesSection articles={articles} />
         </section>
 
+        <JarvisComingPromo />
         <FooterSection />
       </main>
     </>

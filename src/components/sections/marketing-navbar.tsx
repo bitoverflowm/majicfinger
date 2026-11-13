@@ -1,8 +1,14 @@
+import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { getProductsNavData } from "@/lib/nav/products-nav";
 import { Navbar } from "@/components/sections/navbar";
 
 /** Server wrapper — loads Products mega-menu links for SSR. */
 export function MarketingNavbar() {
   const productsNav = getProductsNavData();
-  return <Navbar productsNav={productsNav} />;
+  return (
+    <>
+      <Navbar productsNav={productsNav} />
+      <JarvisComingPromo variant="banner" />
+    </>
+  );
 }

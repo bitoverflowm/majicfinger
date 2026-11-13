@@ -178,6 +178,14 @@ export function getProductsNavData(): ProductsNavData {
     ],
     products: [
       {
+        id: "jarvis",
+        label: "Jarvis",
+        href: "/jarvis",
+        description:
+          "Coming soon. Included in Black Friday — preorder or a sale purchase includes 3 months of free usage at launch.",
+        badge: "Coming",
+      },
+      {
         id: "holder-terminal",
         label: "Holder Terminal",
         href: "/polymarket-holder-terminal",

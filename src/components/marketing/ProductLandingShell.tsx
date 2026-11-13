@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { FooterSection } from "@/components/sections/footer-section";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
@@ -99,6 +100,7 @@ export function ProductLandingShell({
           {children}
         </div>
       </div>
+      <JarvisComingPromo />
       <FooterSection />
     </main>
   );

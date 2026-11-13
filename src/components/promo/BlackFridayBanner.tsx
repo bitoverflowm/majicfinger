@@ -74,8 +74,8 @@ export function BlackFridayBanner() {
                 {BLACK_FRIDAY.name}
               </span>
               <p className="hidden truncate text-[13px] text-white/75 md:block">
-                <span className="font-semibold text-white">{BLACK_FRIDAY.percentOff}% off</span> every annual plan, applied at
-                checkout.
+                <span className="font-semibold text-white">{BLACK_FRIDAY.percentOff}% off</span> every annual plan · Jarvis
+                included · 3 months free at launch.
               </p>
             </div>
 
