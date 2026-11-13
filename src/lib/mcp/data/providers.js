@@ -784,6 +784,7 @@ export function catalogCapabilities() {
       { name: "list_crazy_workflows", stage: "orient", purpose: "Ambitious workflows to pitch on first turn" },
       { name: "jarvis_on", stage: "orient", purpose: "Power-up Jarvis proactive mode (+ animation)" },
       { name: "jarvis_pulse", stage: "orient", purpose: "Unprompted interesting-market brief while Jarvis is on" },
+      { name: "jarvis_research", stage: "analyze", purpose: "Fused pack (X + MCP): markets, lookalikes, whales, news, gated reply" },
       { name: "approve_pending", stage: "orient", purpose: "Approve/deny MCP confirmations when user says approve in chat" },
       { name: "list_pending_approvals", stage: "orient", purpose: "Show open confirmations" },
       { name: "list_datasets", stage: "orient", purpose: "Every dataset id + status (live/partial/next)" },

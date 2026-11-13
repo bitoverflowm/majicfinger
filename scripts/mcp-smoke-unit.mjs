@@ -183,7 +183,7 @@ assert.ok(guidancePreamble().walkthrough.some((s) => /Jarvis/i.test(s)));
 assert.ok(guidancePreamble().hard_rules.some((r) => /action=jarvis_on/i.test(r)));
 assert.ok(findFlow("jarvis_proactive")?.tools.includes("jarvis_pulse"));
 
-import { parseMentionIntent } from "../src/lib/mcp/xJarvis/intent.js";
+import { parseMentionIntent } from "../src/lib/mcp/research/intent.js";
 import { isKnownCheckoutQuery } from "../src/lib/stripe/checkoutPlanQuery.js";
 
 const holdersIntent = parseMentionIntent({

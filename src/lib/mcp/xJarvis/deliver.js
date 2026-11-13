@@ -12,7 +12,7 @@ export async function postPublicReply({ in_reply_to_tweet_id, text }) {
     throw err;
   }
   const tweetId = String(in_reply_to_tweet_id || "").trim();
-  const body = String(text || "").trim().slice(0, 280);
+  const body = String(text || "").trim().slice(0, 4000);
   if (!tweetId) throw new Error("in_reply_to_tweet_id required");
   if (!body) throw new Error("reply text required");
 

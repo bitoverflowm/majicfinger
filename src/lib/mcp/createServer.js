@@ -27,6 +27,7 @@ import { runHolderAnalysisRecipe, runTradeHistoryRecipe } from "@/lib/mcp/data/r
 import { catalogRealtimeFeeds, getRealtimeSnapshot } from "@/lib/mcp/data/realtime";
 import { findCrazyWorkflow, listCrazyWorkflows, pitchCrazyWorkflows } from "@/lib/mcp/data/crazyWorkflows";
 import { jarvisPowerUpPayload, jarvisPulse } from "@/lib/mcp/data/jarvis";
+import { runResearchPack } from "@/lib/mcp/research/pack";
 import {
   getLatestPendingConfirmation,
   listPendingConfirmations,
@@ -304,6 +305,31 @@ export function createLycheeMcpServer(actor) {
         handler: async () => ({
           ...guidancePreamble(),
           ...(await jarvisPulse({ limit })),
+        }),
+      }),
+  );
+
+  server.registerTool(
+    "jarvis_research",
+    {
+      description:
+        "Fused Lychee research pack shared with @lychee_data on X. Pass the user question and optional parent tweet/article. Returns Kalshi+Polymarket matches, lookalikes, whale/holder line, news overlay, gated x_reply. Use this instead of a one-off analysis. Then pull_market_bundle / pull_trader_bundle for charts.",
+      inputSchema: {
+        text: z.string().min(1).max(2000),
+        parent_text: z.string().max(4000).optional(),
+        author_handle: z.string().max(40).optional(),
+      },
+    },
+    async ({ text, parent_text, author_handle }) =>
+      runMcpTool(actor, {
+        tool: "jarvis_research",
+        actionClass: "analyze",
+        args: { text, parent_text, author_handle },
+        summary: `Jarvis research ${String(text).slice(0, 80)}`,
+        handler: async () => ({
+          ...guidancePreamble(),
+          ...(await runResearchPack({ text, parent_text, author_handle })),
+          next: "SHOW x_reply to the user. For charts call pull_market_bundle on a condition_id from markets[]. Do not invent a second methodology.",
         }),
       }),
   );
