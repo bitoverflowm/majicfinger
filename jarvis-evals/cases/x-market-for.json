@@ -10,6 +10,6 @@
     "contains": ["lycheedata.com/jarvis"],
     "not_contains": ["No listed market"],
     "not_matches": ["[Nn]o (prediction )?market", "\\b(null|undefined)\\b", "\\b(pull_market_bundle|analyze_\\w+|preview_\\w+|compare_venues)\\b"],
-    "max_chars": 420
+    "max_chars": 1400
   }
 }

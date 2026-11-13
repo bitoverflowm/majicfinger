@@ -600,6 +600,21 @@ async function fetchTraderJson(url) {
   return body;
 }
 
+/** One wallet's activity in one market (newest first), for trade-timing reads. */
+export async function getPolymarketWalletMarketActivity(wallet, conditionId, { limit = 200 } = {}) {
+  const { activitySheetRow } = await import("@/lib/polymarketLive/traderActivityCompose");
+  const user = String(wallet || "").trim();
+  const market = String(conditionId || "").trim();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(user)) throw new Error("proxy_wallet must be 0x…40 hex");
+  if (!/^0x[a-fA-F0-9]{64}$/.test(market)) throw new Error("condition_id must be 0x…64 hex");
+  const lim = Math.min(500, Math.max(10, limit));
+  const body = await fetchTraderJson(
+    `${DATA_API_BASE}/v2/activity?user=${encodeURIComponent(user)}&condition=${market}&limit=${lim}`,
+  );
+  const rows = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
+  return rows.filter((row) => row && typeof row === "object").map((row) => activitySheetRow(row, user));
+}
+
 export async function getPolymarketTrader(wallet, { limit = 50, includeClosed = false } = {}) {
   const { pnlSheetRows } = await import("@/lib/polymarketLive/traderPnlCompose");
   const { positionSheetRow } = await import("@/lib/polymarketLive/traderPositionsCompose");

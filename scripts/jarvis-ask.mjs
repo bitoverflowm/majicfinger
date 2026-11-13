@@ -68,6 +68,9 @@ if (values.debug) {
       ? `second search: ${JSON.stringify(llm.second_search.queries)} → ${llm.second_search.new_candidates} new candidates`
       : null,
     pack.whale_line ? `holders (${pack.whale_market}): ${pack.whale_line}` : null,
+    pack.holder
+      ? `holder: ${pack.holder.wallet} in ${pack.holder.market?.title || "(no market)"} · rank ${JSON.stringify(pack.holder.rank)} · category keywords ${pack.holder.category_keywords.join("/")}`
+      : null,
     ...(pack.news || []).map((n) => `  news    ${n.title} (${n.source || "?"})`),
     llm.writer === "template" && llm.model_draft ? `model draft (rejected): ${llm.model_draft}` : null,
     ...(llm.issues || []).map((issue) => `issue: ${issue}`),

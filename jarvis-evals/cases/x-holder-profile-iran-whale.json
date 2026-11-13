@@ -1,0 +1,20 @@
+{
+  "id": "x-holder-profile-iran-whale",
+  "expectation": "A follow-up under Jarvis's own reply (\"that whale looks interesting\") finds the largest NO holder on the named Polymarket market and profiles them: position, overall and category record, Skill Score, one-off vs pattern, trade timing vs headlines, and a link to the wallet in the holder terminal.",
+  "kind": "x_mention",
+  "text": "@lychee_data hmm that whale looks interesting: can you look into this further. What is their success rate on related markets? or is this a random one time bet? Do their trades line up with breaking news? Also give me their breakdown, pnl and success rate in this market category",
+  "parent_text": "Netanyahu/Iran: markets this could impact (no guarantee):\n- Polymarket · US-Iran Final Nuclear Deal by…? — December 31 7¢\n- Kalshi · Will the US strike Iran before 2027? 31¢\nQuick reads:\n- Largest NO holder on Polymarket's nuclear deal market controls ~59.8% of NO side.",
+  "expect": {
+    "paths": { "intent.mode": { "equals": "holder_profile" } },
+    "matches": [
+      "0x[0-9a-f]{4}…[0-9a-f]{4}",
+      "Breakdown:",
+      "Timing vs news:",
+      "PnL",
+      "Skill Score",
+      "lycheedata\\.com/jarvis/holder/0x[0-9a-f]{40}"
+    ],
+    "not_matches": ["\\binsider\\b", "\\b(null|undefined|NaN)\\b"],
+    "max_chars": 2100
+  }
+}

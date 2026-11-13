@@ -8,6 +8,6 @@
     "contains": ["lycheedata.com/jarvis"],
     "not_matches": ["\\b(jarvis_pulse|pull_market_bundle|analyze_\\w+|preview_\\w+|compare_venues)\\b"],
     "min_chars": 40,
-    "max_chars": 380
+    "max_chars": 1400
   }
 }

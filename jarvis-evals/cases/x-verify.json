@@ -15,6 +15,6 @@
     "not_contains": ["fact check", "fact-check"],
     "not_matches": ["[Nn]o (prediction )?market (was )?found", "\\b(null|undefined)\\b"],
     "contains": ["lycheedata.com/jarvis"],
-    "max_chars": 380
+    "max_chars": 1400
   }
 }

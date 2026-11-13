@@ -5,7 +5,8 @@ import { compactSearchQuery, relevanceScore } from "./relevance.js";
 import { llmAvailable, llmModel } from "./llm.js";
 import { understandRequest } from "./understand.js";
 import { pickMarkets } from "./pick.js";
-import { writeReply } from "./write.js";
+import { holderTemplate, writeReply } from "./write.js";
+import { findHolder, holderDeepDive } from "./holder.js";
 import { jarvisPulse } from "@/lib/mcp/data/jarvis";
 import {
   getLookalikeMarkets,
@@ -231,8 +232,46 @@ async function optionalLookalikes(conditionId, query) {
   }
 }
 
+/** A deep dive on one wallet: given directly, or the `holder_rank`-th holder on `holder_side` of the picked market. */
+async function holderProfilePack({ as_of, intent, understanding, picked, llm }) {
+  const market = (picked?.matches || []).find((m) => m.venue === "polymarket" && m.condition_id);
+  let wallet = intent.subject.wallet || (/^0x[a-fA-F0-9]{40}$/.test(understanding?.wallet || "") ? understanding.wallet : "");
+  let found = null;
+  const base = { as_of, intent, markets: [], lookalikes: [], news: [], flows: ["polymarket_holders", "trader_profile"] };
+  if (!wallet && market) {
+    found = await findHolder(market.condition_id, {
+      side: understanding?.holder_side || "NO",
+      rank: understanding?.holder_rank || 1,
+    }).catch((err) => {
+      llm.issues.push(`holder: ${err?.message || err}`);
+      return null;
+    });
+    wallet = found?.wallet || "";
+  }
+  if (!wallet) {
+    return { ...base, verdict: "none", take: "Couldn't pin down which wallet you mean — paste the address or market and tag me again." };
+  }
+  try {
+    const profile = await holderDeepDive({
+      wallet,
+      conditionId: market?.condition_id || "",
+      themeKeywords: understanding?.category_keywords || [],
+      newsQuery: intent.subject.queries?.[0] || "",
+    });
+    return {
+      ...base,
+      verdict: "listed",
+      holder: { ...profile, market: market ? { title: market.title, price: market.yes_price } : null, rank: found },
+      take: "",
+    };
+  } catch (err) {
+    llm.issues.push(`holder: ${err?.message || err}`);
+    return { ...base, verdict: "none", take: "Couldn't expand that wallet on Lychee." };
+  }
+}
+
 async function settleDraft(pack, { text = "", parent_text = "" } = {}) {
-  let draft = formatXReply(pack);
+  let draft = pack.holder ? holderTemplate(pack) : formatXReply(pack);
   const llm = pack.llm;
   if (llm?.understanding && pack.status !== "needs_clarification") {
     try {
@@ -390,6 +429,10 @@ export async function runResearchPack({
     ranked = [...picked.matches, ...picked.related];
   } else {
     ({ verdict, markets } = pickByRelevance(ranked));
+  }
+
+  if (intent.mode === "holder_profile") {
+    return finish(await holderProfilePack({ as_of, intent, understanding, picked, llm }));
   }
 
   const seed = markets.find((m) => m.condition_id);

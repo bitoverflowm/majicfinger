@@ -24,6 +24,12 @@ export function llmAvailable() {
   return Boolean(apiKey()) && process.env.JARVIS_LLM_DISABLED !== "1";
 }
 
+function todayLine() {
+  const today = new Date().toISOString().slice(0, 10);
+  const year = today.slice(0, 4);
+  return `Today is ${today}. "This year" and "end of the year" mean ${year}; never assume an earlier year.`;
+}
+
 function getClient() {
   if (!client) {
     client = new OpenAI({
@@ -46,7 +52,7 @@ export async function llmJson({ system, input, schema, temperature = 0.2 }) {
     temperature,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: `Today is ${new Date().toISOString().slice(0, 10)}.\n\n${system}` },
+      { role: "system", content: `${todayLine()}\n\n${system}` },
       { role: "user", content: typeof input === "string" ? input : JSON.stringify(input, null, 2) },
     ],
   });
