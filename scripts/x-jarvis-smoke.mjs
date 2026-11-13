@@ -17,7 +17,7 @@ const relMod = await import(pathToFileURL(path.join(root, "src/lib/mcp/research/
 const { parseResearchIntent } = intentMod;
 const { gateResearchPack } = gateMod;
 const { formatXReply } = formatMod;
-const { relevanceScore } = relMod;
+const { compactSearchQuery, relevanceScore } = relMod;
 
 let failed = 0;
 function check(ok, msg) {
@@ -33,6 +33,18 @@ const samples = [
   { text: "@lychee_data is there a market for this", parent_text: "Fed cuts 25bp in December", expect: "market_for" },
   { text: "@lychee_data what markets is this affecting?", parent_text: "Breaking: oil pipeline explosion", expect: "news_impact" },
   {
+    text: "@lychee_data which markets does this impact?",
+    parent_text:
+      "An internal post urging the board to consider employee sentiment about Nvidia’s former CEO has drawn more than 1,600 comments, the majority in full support of reinstalling him.",
+    expect: "news_impact",
+  },
+  {
+    text: "@lychee_data this headline is talking about reinstating Nividia's CEO. your response has nothing to do with that.",
+    parent_text:
+      "An internal post urging the board to consider employee sentiment about Nvidia’s former CEO has drawn more than 1,600 comments, the majority in full support of reinstalling him.",
+    expect: "news_impact",
+  },
+  {
     text: "@lychee_data is this accurate?",
     parent_text: "Smart money loaded YES on 0x24ded84d901a743cfee095f8082b0f9f647183cb",
     expect: "verify",
@@ -41,6 +53,12 @@ const samples = [
     text: "@lychee_data what you got for me on the above?",
     parent_text: "@lychee_data pulse — where is the smart money crowded?",
     expect: "market_for",
+  },
+  {
+    text: "@lychee_data gimme something on this",
+    parent_text:
+      "At the Kisan Tak conference, PM Narendra Modi said the West Asia crisis pushed crude from $70 to $122/barrel. Diesel should have risen by ₹50/litre, but the government limited the increase to ₹7.",
+    expect: "news_impact",
   },
 ];
 
@@ -51,6 +69,43 @@ for (const s of samples) {
 
 check(relevanceScore("fed december rate cut", "Will the Fed cut 25 bps in December?") > 0.3, "relevance fed");
 check(relevanceScore("smart money crowded", "Louisiana Ragin Cajuns vs UNCW") < 0.2, "relevance sports vs smart money");
+
+const nvidiaHeadline =
+  "An internal post urging the board to consider employee sentiment about Nvidia’s former CEO has drawn more than 1,600 comments, the majority in full support of reinstalling him.";
+check(relevanceScore(nvidiaHeadline, "Which Millennium Prize Problem will be solved next?") < 0.12, "nvidia vs millennium");
+check(relevanceScore(nvidiaHeadline, "Will Elon Musk visit Mars in his lifetime?") < 0.12, "nvidia vs mars");
+check(relevanceScore(nvidiaHeadline, "Who will be the next Secretary General of NATO?") < 0.12, "nvidia vs nato");
+check(relevanceScore(nvidiaHeadline, "Will Jensen Huang remain CEO of Nvidia through 2026?") > 0.32, "nvidia vs nvidia CEO book");
+check(relevanceScore(nvidiaHeadline, "Nvidia CEO: will Jensen return?") > 0.32, "nvidia vs short CEO title");
+check(
+  relevanceScore("which markets does this impact?", "Which Millennium Prize Problem will be solved next?") < 0.2,
+  "interrogative which ≠ millennium",
+);
+check(/nvidia/i.test(compactSearchQuery(nvidiaHeadline)), "compact search keeps Nvidia");
+check(!/which markets/i.test(compactSearchQuery("which markets does this impact?")), "compact search drops interrogative");
+
+const nvidiaIntent = parseResearchIntent({
+  text: "@lychee_data which markets does this impact?",
+  parent_text: nvidiaHeadline,
+});
+check(/nvidia/i.test(nvidiaIntent.subject.query || ""), "impact-ask uses parent headline as query");
+check(!/which markets does this impact/i.test(nvidiaIntent.subject.query || ""), "impact-ask does not search the mention");
+
+const noneReply = formatXReply({
+  intent: { mode: "news_impact" },
+  verdict: "none",
+  markets: [],
+  take: "",
+});
+check(/No listed/i.test(noneReply) && !/Millennium|Mars|NATO/i.test(noneReply), "news_impact none does not name junk books");
+
+const junkGate = gateResearchPack({
+  intent: { mode: "news_impact" },
+  verdict: "listed",
+  draft_reply: "Markets this news can hit (2 listed):\nKalshi · Will Elon Musk visit Mars in his lifetime?",
+  markets: [{ venue: "kalshi", title: "Will Elon Musk visit Mars in his lifetime?", relevance: 0 }],
+});
+check(!junkGate.can_post, "gate blocks zero-relevance news_impact books");
 
 const bad = gateResearchPack({
   intent: { mode: "market_for" },
@@ -67,6 +122,35 @@ const x = formatXReply({
   take: "",
 });
 check(x.includes("Yes") && x.includes("lycheedata.com") && !x.includes("condition_id"), "x format clean");
+
+const modiHeadline =
+  "At the Kisan Tak conference, PM Narendra Modi said the West Asia crisis pushed crude from $70 to $122/barrel. Diesel should have risen by ₹50/litre, but the government limited the increase to ₹7.";
+const modiIntent = parseResearchIntent({
+  text: "@lychee_data gimme something on this",
+  parent_text: modiHeadline,
+});
+check(/modi|crude|diesel|oil/i.test(modiIntent.subject.query || ""), "gimme-this uses parent oil headline");
+check(!/gimme something/i.test(modiIntent.subject.query || ""), "gimme-this does not search the mention");
+check(/crude|diesel|modi/i.test(compactSearchQuery(modiHeadline)), "compact search keeps crude/Modi");
+check(relevanceScore(modiHeadline, "Will Elon Musk visit Mars in his lifetime?") < 0.12, "modi oil vs mars");
+check(relevanceScore(modiHeadline, "Will crude oil close above $100 this year?") > 0.28, "modi oil vs crude book");
+
+const noneClosest = formatXReply({
+  intent: { mode: "market_for" },
+  verdict: "none",
+  markets: [{ venue: "kalshi", title: "Will Elon Musk visit Mars in his lifetime?", relevance: 0, yes_price: 0 }],
+  lookalikes: [{ venue: "kalshi", title: "Will Elon Musk visit Mars in his lifetime?", relevance: 0.99, yes_price: 0 }],
+  take: "",
+});
+check(/No listed market/i.test(noneClosest) && !/Mars|Closest/i.test(noneClosest), "none verdict never names Mars as closest");
+
+const closestGate = gateResearchPack({
+  intent: { mode: "market_for" },
+  verdict: "none",
+  draft_reply: "No listed market for that exact thing.\nClosest: Kalshi · Will Elon Musk visit Mars in his lifetime? · 0¢",
+  markets: [{ venue: "kalshi", title: "Will Elon Musk visit Mars in his lifetime?", relevance: 0 }],
+});
+check(!closestGate.can_post, "gate blocks Closest junk on none verdict");
 
 const envMod = await import(pathToFileURL(path.join(root, "src/lib/mcp/xJarvis/xClient.js")).href);
 console.log("env_status", JSON.stringify(envMod.xJarvisEnvStatus(), null, 2));

@@ -26,6 +26,13 @@ export function gateResearchPack(pack) {
       issues.push("no_markets_without_none_verdict");
     }
   }
+  const minRel = 0.28;
+  if (usableMarkets.some((m) => m.relevance != null && m.relevance < minRel)) {
+    issues.push("off_topic_markets");
+  }
+  if (/\bClosest:/i.test(draft) && (verdict === "none" || usableMarkets.every((m) => (m.relevance || 0) < minRel))) {
+    issues.push("closest_off_topic");
+  }
   if (usableMarkets.some((m) => m.relevance != null && m.relevance < 0.12 && pack.verdict === "listed")) {
     issues.push("listed_but_low_relevance");
   }
