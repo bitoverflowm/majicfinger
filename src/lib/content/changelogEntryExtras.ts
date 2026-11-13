@@ -16,6 +16,26 @@ export type ChangelogEntryExtras = {
 
 /** Extra media/links shown on `/changelog` under a release, keyed by MDX filename slug. */
 export const CHANGELOG_ENTRY_EXTRAS: Record<string, ChangelogEntryExtras> = {
+  "jarvis-prelaunch": {
+    highlights: [
+      {
+        title: "Same brain on MCP and X.",
+        body: "jarvis_research is the pack @lychee_data posts: Kalshi + Polymarket, lookalikes, whales, news — gated so empty or internal copy never ships.",
+      },
+      {
+        title: "Tag the thread, not a search box.",
+        body: "“Is there a market for this,” “what markets is this affecting,” and “is this accurate” (never “fact check”) read the parent tweet.",
+      },
+      {
+        title: "Founding MCP access.",
+        body: "Connect ChatGPT / Claude / Cursor and copy workflows from the signed-in MCP playbook.",
+      },
+    ],
+    links: [
+      { label: "Preregister", href: "/jarvis" },
+      { label: "MCP playbook (sign in)", href: "/mcp" },
+    ],
+  },
   "polymarket-holder-terminal-launch": {
     highlights: [
       {

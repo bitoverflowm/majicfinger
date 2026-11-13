@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useUser } from "@/lib/hooks";
 import Login from "@/components/login";
 import { CRAZY_WORKFLOWS } from "@/lib/mcp/data/crazyWorkflows";
+import { JARVIS_BEST_PRACTICES, JARVIS_MCP_LOOP, JARVIS_X_TAGS } from "@/lib/mcp/data/jarvisPlaybook";
 
 const MCP_URL = "https://lycheedata.com/api/mcp";
 
@@ -31,7 +32,7 @@ Only Lychee tools. Start a new chat if your tool list looks stale.`;
 
 const TOOL_ROWS = [
   ["list_capabilities / list_research_flows / list_crazy_workflows", "Orient + ambitious workflow pitches"],
-  ["jarvis_on / jarvis_pulse", "Proactive briefs + power-up (ask first)"],
+  ["jarvis_on / jarvis_pulse / jarvis_research", "Power-up, pulse, fused pack (same as X)"],
   ["list_datasets / list_realtime_feeds / get_realtime_snapshot", "Datasets + live bot snapshots (poll)"],
   ["get_most_active_markets / search_markets / search_closed_markets", "Find open or settled markets (+ winners)"],
   ["get_lookalike_markets / compare_venues", "Related deadlines · Kalshi↔Polymarket gaps"],
@@ -220,6 +221,48 @@ export default function McpConnectPage() {
               <pre className="mt-3 overflow-x-auto rounded-xl bg-zinc-950 p-4 text-xs text-zinc-100 whitespace-pre-wrap">
                 {STARTER_PROMPT}
               </pre>
+            </section>
+
+            <section
+              id="jarvis-playbook"
+              className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-zinc-50 p-6 shadow-sm"
+            >
+              <h2 className="text-lg font-semibold text-orange-950">Jarvis playbook</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Everything Jarvis can do today — MCP chat and <strong>@lychee_data</strong> on X share one
+                research pack. Logged-in only so we can ship workflows as they go live.
+              </p>
+
+              <h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-zinc-500">On X</h3>
+              <ul className="mt-2 space-y-3 text-sm text-zinc-700">
+                {JARVIS_X_TAGS.map((row) => (
+                  <li key={row.tag}>
+                    <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-900">{row.tag}</code>
+                    <p className="mt-1 text-zinc-600">{row.use}</p>
+                  </li>
+                ))}
+              </ul>
+
+              <h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-zinc-500">In ChatGPT / Claude / Cursor</h3>
+              <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-zinc-700">
+                {JARVIS_MCP_LOOP.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+
+              <h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-zinc-500">Best practices</h3>
+              <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-zinc-700">
+                {JARVIS_BEST_PRACTICES.map((line) => (
+                  <li key={line.slice(0, 48)}>{line}</li>
+                ))}
+              </ul>
+              <p className="mt-4 text-xs text-zinc-500">
+                Copy a workflow below, or tell the agent “pitch 3 crazy workflows.” Public prereg:{" "}
+                <Link href="/jarvis" className="underline underline-offset-2">
+                  /jarvis
+                </Link>
+                .
+              </p>
             </section>
 
             <section className="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-zinc-50 p-6 shadow-sm">
