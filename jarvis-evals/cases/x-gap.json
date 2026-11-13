@@ -1,0 +1,14 @@
+{
+  "id": "x-gap",
+  "expectation": "A Kalshi vs Polymarket question routes to the gap mode and names markets on both venues with prices.",
+  "kind": "x_mention",
+  "text": "@lychee_data is there an arb between Kalshi and Polymarket on the Fed decision?",
+  "expect": {
+    "paths": { "intent.mode": { "equals": "gap" } },
+    "matches": ["Kalshi[^\\n]*(Fed|rate)", "Poly[^\\n]*(Fed|rate)"],
+    "contains": ["lycheedata.com/jarvis"],
+    "not_contains": ["No listed market"],
+    "not_matches": ["· 0¢", "\\b(pull_market_bundle|analyze_\\w+|preview_\\w+|compare_venues)\\b"],
+    "max_chars": 420
+  }
+}

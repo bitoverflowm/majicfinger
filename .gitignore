@@ -25,6 +25,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# Jarvis eval run output (cases in jarvis-evals/cases are tracked)
+/jarvis-evals/out/
+
 # local env files
 .env
 .env*.local

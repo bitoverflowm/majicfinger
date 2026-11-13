@@ -14,6 +14,9 @@ import { extractKalshiMarketTiming } from "@/lib/kalshiLive/kalshiMarketTiming";
  *   openTime?: string;
  *   closeTime?: string;
  *   subtitle?: string;
+ *   outcomeLabel?: string;
+ *   yesPrice?: number | null;
+ *   volume24h?: number | null;
  * }} KalshiLiveSearchSuggestion */
 
 const SUGGESTION_LIMIT = 12;
@@ -112,7 +115,11 @@ function buildSuggestionDisplay(event, market) {
  * @param {Record<string, unknown>} event
  * @param {Record<string, unknown>} market
  */
-function scoreEventMarket(tokens, event, market) {
+function scoreEventMarket(tokens, event, market, allTokens = false) {
+  if (allTokens) {
+    const haystack = [event?.title, event?.sub_title, market?.yes_sub_title, market?.title].join(" ");
+    if (!allTokensMatch(tokens, haystack)) return 0;
+  }
   const eventTitle = String(event?.title || "").trim();
   const eventSub = String(event?.sub_title || "").trim();
   const eventTicker = String(event?.event_ticker || market?.event_ticker || "").trim();
@@ -163,8 +170,21 @@ function toSuggestion(event, market, score) {
     openTime: timing.openTime,
     closeTime: timing.closeTime,
     subtitle,
+    outcomeLabel: marketOutcomeLabel(market) || undefined,
+    yesPrice: marketYesPrice(market),
+    volume24h: Number(market?.volume_24h_fp ?? market?.volume_24h) || null,
     score,
   };
+}
+
+/** Last trade in dollars (0–1), else the bid/ask midpoint. */
+function marketYesPrice(market) {
+  const last = Number(market?.last_price_dollars);
+  if (Number.isFinite(last) && last > 0) return last;
+  const bid = Number(market?.yes_bid_dollars);
+  const ask = Number(market?.yes_ask_dollars);
+  if (Number.isFinite(bid) && Number.isFinite(ask) && ask > 0) return (bid + ask) / 2;
+  return null;
 }
 
 /** @param {string} path @param {Record<string, string>} params */
@@ -262,7 +282,7 @@ async function searchByText(tokens, opts = {}) {
     for (const event of events) {
       const markets = Array.isArray(event?.markets) ? event.markets : [];
       for (const market of markets) {
-        const score = scoreEventMarket(tokens, event, market);
+        const score = scoreEventMarket(tokens, event, market, opts.allTokens);
         if (score <= 0) continue;
         const sug = toSuggestion(event, market, score);
         if (!sug) continue;
@@ -372,6 +392,7 @@ export async function fetchKalshiLiveSearchSuggestions(q, opts = {}) {
       limit: pageLimit,
       maxPages: 4,
       budgetMs: 3500,
+      allTokens: Boolean(opts.allTokens),
     });
     const merged = new Map(scored.map((item) => [item.ticker, item]));
     for (const hit of text.suggestions) {

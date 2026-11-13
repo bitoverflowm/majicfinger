@@ -15,7 +15,9 @@
     "test:workspace": "node --import ./scripts/register-alias.mjs ./scripts/run-workspace-unit-tests.mjs",
     "backfill:chart-bundles": "node --import ./scripts/register-alias.mjs ./scripts/backfill-published-chart-bundles.mjs",
     "stripe:reconcile": "node scripts/reconcile-stripe-entitlements.cjs",
-    "test:mcp-unit": "node scripts/mcp-smoke-unit.mjs && node --import ./scripts/register-alias.mjs scripts/mcp-access-unit.mjs && node scripts/x-jarvis-smoke.mjs"
+    "test:mcp-unit": "node scripts/mcp-smoke-unit.mjs && node --import ./scripts/register-alias.mjs scripts/mcp-access-unit.mjs && node scripts/x-jarvis-smoke.mjs",
+    "jarvis:eval": "node scripts/jarvis-eval.mjs",
+    "jarvis:ask": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-alias.mjs ./scripts/jarvis-ask.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-athena": "^3.826.0",

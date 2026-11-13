@@ -1,0 +1,15 @@
+{
+  "id": "jarvis-on",
+  "expectation": "Turning Jarvis on returns the power-up image, says it's online, and tells the agent to pulse next.",
+  "kind": "tool",
+  "tool": "jarvis_on",
+  "args": {},
+  "expect": {
+    "images_min": 1,
+    "contains": ["jarvis_pulse"],
+    "paths": {
+      "jarvis_mode": { "equals": true },
+      "status": { "equals": "online" }
+    }
+  }
+}

@@ -2,12 +2,17 @@ import { parseResearchIntent } from "./intent.js";
 import { gateResearchPack } from "./gate.js";
 import { formatXReply } from "./formatX.js";
 import { compactSearchQuery, relevanceScore } from "./relevance.js";
+import { llmAvailable, llmModel } from "./llm.js";
+import { understandRequest } from "./understand.js";
+import { pickMarkets } from "./pick.js";
+import { writeReply } from "./write.js";
 import { jarvisPulse } from "@/lib/mcp/data/jarvis";
 import {
   getLookalikeMarkets,
   getPolymarketHolders,
   getPolymarketTrader,
   searchKalshi,
+  searchKalshiEvents,
   searchPolymarket,
 } from "@/lib/mcp/data/providers";
 import { compareVenues } from "@/lib/mcp/data/compareVenues";
@@ -15,6 +20,7 @@ import { analyzeHolders } from "@/lib/mcp/data/stats";
 import { searchNewsHeadlines } from "@/lib/mcp/data/news";
 
 function yesPrice(row) {
+  if (row?.yes_price != null && Number.isFinite(Number(row.yes_price))) return Number(row.yes_price);
   const prices = row?.outcome_prices;
   if (Array.isArray(prices) && prices.length) {
     const n = Number(prices[0]);
@@ -23,17 +29,41 @@ function yesPrice(row) {
   return null;
 }
 
+/** Open outcomes of a multi-outcome event, highest price first. */
+function openOutcomes(row) {
+  if (row?.entity !== "event" || !Array.isArray(row.markets)) return [];
+  return row.markets
+    .filter((m) => !m.closed && m.yes_price != null)
+    .sort((a, b) => b.yes_price - a.yes_price)
+    .map((m) => ({
+      label: m.outcome_label || m.title,
+      yes_price: m.yes_price,
+      condition_id: m.condition_id || null,
+      ticker: m.ticker || null,
+    }));
+}
+
+function withOutcome(title, label) {
+  const l = String(label || "").trim();
+  return l && !title.toLowerCase().includes(l.toLowerCase()) ? `${title} — ${l}` : title;
+}
+
 function asMarket(row, query, venueHint) {
   const venue = row?.venue || venueHint || (row?.condition_id ? "polymarket" : "kalshi");
-  const title = String(row?.title || row?.question || "").trim();
+  const baseTitle = String(row?.title || row?.question || "").trim();
+  const outcomes = openOutcomes(row);
+  const leader = outcomes[0] || null;
+  const title = withOutcome(baseTitle, leader?.label || row?.outcome_label);
   return {
     venue,
     title,
-    ticker: row?.ticker || null,
-    condition_id: row?.condition_id || null,
+    event_title: outcomes.length ? baseTitle : undefined,
+    ticker: leader?.ticker || row?.ticker || null,
+    condition_id: leader?.condition_id || row?.condition_id || null,
     slug: row?.slug || null,
-    event_slug: row?.event_slug || null,
-    yes_price: yesPrice(row),
+    event_slug: row?.event_slug || (row?.entity === "event" ? row?.slug : null) || null,
+    yes_price: leader ? leader.yes_price : outcomes[0]?.yes_price ?? yesPrice(row),
+    outcomes: outcomes.length ? outcomes.slice(0, 8) : undefined,
     volume_24h: row?.volume_24h ?? null,
     relevance: relevanceScore(query, title),
     url:
@@ -47,10 +77,14 @@ function asMarket(row, query, venueHint) {
   };
 }
 
-async function searchBoth(query, limit = 6) {
-  const q = compactSearchQuery(query);
+/** `keywords`: q is a short title-style query (model path), so use Kalshi's ranked site search. */
+async function searchBoth(query, limit = 6, { keywords = false } = {}) {
+  const q = keywords ? String(query || "").trim().slice(0, 180) : compactSearchQuery(query);
   if (q.length < 2) return { kalshi: [], polymarket: [] };
-  const [k, p] = await Promise.allSettled([searchKalshi(q, { limit }), searchPolymarket(q, { limit })]);
+  const kalshi = keywords
+    ? searchKalshiEvents(q, { limit: 4 }).catch(() => searchKalshi(q, { limit, allTokens: true }))
+    : searchKalshi(q, { limit });
+  const [k, p] = await Promise.allSettled([kalshi, searchPolymarket(q, { limit, activeOnly: true })]);
   return {
     kalshi: k.status === "fulfilled" && Array.isArray(k.value) ? k.value : [],
     polymarket: p.status === "fulfilled" && Array.isArray(p.value) ? p.value : [],
@@ -70,7 +104,8 @@ function rankMarkets(query, kalshi, polymarket) {
   return rows;
 }
 
-function pickMarkets(ranked, mode) {
+/** Rule-based pick by word-overlap relevance; used when the model is off or fails. */
+function pickByRelevance(ranked) {
   const listedMin = 0.32;
   const cousinMin = 0.28;
   const listed = ranked.filter((m) => (m.relevance || 0) >= listedMin);
@@ -78,6 +113,59 @@ function pickMarkets(ranked, mode) {
   const cousins = ranked.filter((m) => (m.relevance || 0) >= cousinMin);
   if (cousins.length) return { verdict: "cousin", markets: cousins.slice(0, 2) };
   return { verdict: "none", markets: [] };
+}
+
+/** Every query on both venues, merged without duplicates; the pool the model picks from. */
+async function searchCandidates(queries, limit = 18) {
+  const results = await Promise.all(queries.slice(0, 3).map((q) => searchBoth(q, 6, { keywords: true })));
+  const byTitle = new Map();
+  const better = (a, b) =>
+    (a.yes_price != null) !== (b.yes_price != null) ? a.yes_price != null : (Number(a.volume_24h) || 0) > (Number(b.volume_24h) || 0);
+  results.forEach((found, i) => {
+    for (const m of rankMarkets(queries[i], found.kalshi, found.polymarket)) {
+      const key = `${m.venue}:${m.title.trim().toLowerCase()}`;
+      const prev = byTitle.get(key);
+      if (!prev || better(m, prev)) byTitle.set(key, m);
+    }
+  });
+  return [...byTitle.values()].slice(0, limit);
+}
+
+/** First `n` rows, but each venue's best row comes before any venue's second. */
+function acrossVenues(rows, n) {
+  const leads = [];
+  const rest = [];
+  const seen = new Set();
+  for (const m of rows) {
+    if (seen.has(m.venue)) rest.push(m);
+    else {
+      seen.add(m.venue);
+      leads.push(m);
+    }
+  }
+  return [...leads, ...rest].slice(0, n);
+}
+
+const CLARIFY_FALLBACK =
+  "Reply under the tweet (or paste a market / wallet) and tag me again — I need a subject to pull from Lychee.";
+
+/** The rule-based intent, with the model's reading of mode, subject, and search queries layered on. */
+function withUnderstanding(intent, understanding) {
+  const hasId = Boolean(intent.subject.condition_id || intent.subject.wallet);
+  const mode = understanding.mode === "clarify" && hasId ? intent.mode : understanding.mode;
+  return {
+    ...intent,
+    mode,
+    depth: mode === "pulse" ? "quick" : "standard",
+    ask_user: mode === "clarify" ? understanding.clarify_question || intent.ask_user || CLARIFY_FALLBACK : null,
+    subject: {
+      ...intent.subject,
+      query: understanding.search_queries[0] || intent.subject.query,
+      queries: understanding.search_queries,
+      summary: understanding.subject,
+      claim: understanding.claim || null,
+    },
+  };
 }
 
 async function optionalNews(query) {
@@ -125,8 +213,21 @@ async function optionalLookalikes(conditionId, query) {
   }
 }
 
-function settleDraft(pack) {
-  const draft = formatXReply(pack);
+async function settleDraft(pack, { text = "", parent_text = "" } = {}) {
+  let draft = formatXReply(pack);
+  const llm = pack.llm;
+  if (llm?.understanding && pack.status !== "needs_clarification") {
+    try {
+      const written = await writeReply({ pack, text, parent_text });
+      llm.writer = written.reply ? "model" : "template";
+      llm.model_draft = written.draft;
+      llm.issues.push(...written.issues.map((issue) => `write: ${issue}`));
+      if (written.reply) draft = written.reply;
+    } catch (err) {
+      llm.writer = "template";
+      llm.issues.push(`write: ${err?.message || err}`);
+    }
+  }
   let gated = gateResearchPack({ ...pack, draft_reply: draft, x_reply: draft });
   let status = pack.status || "draft_ready";
   let outDraft = draft;
@@ -160,12 +261,24 @@ export async function runResearchPack({
   author_handle = "",
   deliver_default = "public_reply",
 } = {}) {
-  const intent = parseResearchIntent({ text, parent_text, author_handle, deliver_default });
+  const ruleIntent = parseResearchIntent({ text, parent_text, author_handle, deliver_default });
+  const llm = { on: llmAvailable(), model: llmModel(), issues: [] };
+  let understanding = null;
+  if (llm.on) {
+    try {
+      understanding = await understandRequest({ text, parent_text });
+      llm.understanding = understanding;
+    } catch (err) {
+      llm.issues.push(`understand: ${err?.message || err}`);
+    }
+  }
+  const intent = understanding ? withUnderstanding(ruleIntent, understanding) : ruleIntent;
   const as_of = new Date().toISOString();
   const query = intent.subject.query || "";
+  const finish = (pack) => settleDraft({ ...pack, llm }, { text, parent_text });
 
   if (intent.mode === "clarify") {
-    return settleDraft({
+    return finish({
       as_of,
       intent,
       verdict: "clarify",
@@ -192,7 +305,7 @@ export async function runResearchPack({
       .map((a) => ({ ...a, headline: cleanH(a.headline) }))
       .filter((a) => a?.headline);
     const take = alerts[0] ? String(alerts[0].headline).slice(0, 140) : "Nothing spicy on Lychee's active board.";
-    return settleDraft({
+    return finish({
       as_of,
       intent,
       verdict: alerts.length ? "listed" : "none",
@@ -206,7 +319,7 @@ export async function runResearchPack({
   }
 
   if (intent.mode === "calibrate") {
-    return settleDraft({
+    return finish({
       as_of,
       intent,
       verdict: "none",
@@ -216,11 +329,34 @@ export async function runResearchPack({
     });
   }
 
-  const searches = await searchBoth(query, 8);
-  const ranked = rankMarkets(query, searches.kalshi, searches.polymarket);
-  const picked = pickMarkets(ranked, intent.mode);
-  let verdict = picked.verdict;
-  const markets = picked.markets;
+  let ranked = [];
+  let verdict = "none";
+  let markets = [];
+  let picked = null;
+  if (understanding && intent.subject.queries?.length) {
+    ranked = await searchCandidates(intent.subject.queries);
+    try {
+      picked = await pickMarkets({ understanding, request: text, candidates: ranked });
+      llm.picks = picked.picks.map((p) => ({
+        ...p,
+        title: ranked[p.id]?.title,
+        venue: ranked[p.id]?.venue,
+        outcomes: ranked[p.id]?.outcomes?.map((o) => o.label),
+      }));
+    } catch (err) {
+      llm.issues.push(`pick: ${err?.message || err}`);
+    }
+  } else {
+    const searches = await searchBoth(query, 8);
+    ranked = rankMarkets(query, searches.kalshi, searches.polymarket);
+  }
+  if (picked) {
+    verdict = picked.matches.length ? "listed" : picked.related.length ? "cousin" : "none";
+    markets = picked.matches.length ? acrossVenues(picked.matches, 3) : acrossVenues(picked.related, 2);
+    ranked = [...picked.matches, ...picked.related];
+  } else {
+    ({ verdict, markets } = pickByRelevance(ranked));
+  }
 
   const seed = markets.find((m) => m.condition_id);
   const wantDeep = ["holders", "research", "lookalikes", "verify", "news_impact", "market_for"].includes(intent.mode);
@@ -293,6 +429,7 @@ export async function runResearchPack({
     as_of,
     intent,
     verdict: intent.mode === "verify" ? verifyVerdict : verdict,
+    market_verdict: verdict,
     markets,
     lookalikes: (lookalikes || []).filter((m) => m.title).slice(0, 3),
     news: news || [],
@@ -307,7 +444,7 @@ export async function runResearchPack({
     lychee_url: "https://lycheedata.com/jarvis",
   };
 
-  return settleDraft(pack);
+  return finish(pack);
 }
 
 export { parseResearchIntent, gateResearchPack, formatXReply, relevanceScore };

@@ -1,0 +1,13 @@
+{
+  "id": "x-pulse",
+  "expectation": "\"What's hot\" on X routes to a pulse and replies with a real market headline plus the Jarvis link, under X length.",
+  "kind": "x_mention",
+  "text": "@lychee_data pulse — what's hot on Polymarket right now?",
+  "expect": {
+    "paths": { "intent.mode": { "equals": "pulse" } },
+    "contains": ["lycheedata.com/jarvis"],
+    "not_matches": ["\\b(jarvis_pulse|pull_market_bundle|analyze_\\w+|preview_\\w+|compare_venues)\\b"],
+    "min_chars": 40,
+    "max_chars": 380
+  }
+}

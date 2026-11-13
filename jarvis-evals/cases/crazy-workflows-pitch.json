@@ -1,0 +1,11 @@
+{
+  "id": "crazy-workflows-pitch",
+  "expectation": "An open-ended ask gets three concrete workflow pitches the agent can offer.",
+  "kind": "tool",
+  "tool": "list_crazy_workflows",
+  "args": { "pitch_limit": 3 },
+  "expect": {
+    "contains": ["Whale war room"],
+    "not_contains": ["undefined"]
+  }
+}

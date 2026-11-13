@@ -1,5 +1,5 @@
 import { fetchKalshiLiveSearchSuggestions } from "@/lib/kalshiLive/kalshiLiveSearchSuggestions";
-import { kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
+import { kalshiLiveSocialUrl, kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
 import { orderProfileSuggestions } from "@/lib/polymarketLive/polymarketPublicSearch";
 import { flattenPolymarketHoldersV2 } from "@/lib/mcp/data/holdersFlatten";
 import { getFlowsCatalog, findDataset } from "@/lib/mcp/data/flowsCatalog";
@@ -71,17 +71,22 @@ function safeJson(value) {
   }
 }
 
-export async function searchKalshi(query, { limit = 12 } = {}) {
+/** `allTokens` keeps only markets whose titles contain every query word. */
+export async function searchKalshi(query, { limit = 12, allTokens = false } = {}) {
   const q = String(query || "").trim();
   if (q.length < 2) return [];
   const { suggestions } = await fetchKalshiLiveSearchSuggestions(q, {
     limit: Math.min(40, Math.max(1, limit)),
+    allTokens,
   });
   return (suggestions || []).slice(0, limit).map((item) => ({
     venue: "kalshi",
     entity: "market",
     ticker: item.ticker,
     title: item.title,
+    outcome_label: item.outcomeLabel || null,
+    yes_price: item.yesPrice ?? null,
+    volume_24h: item.volume24h ?? null,
     event_ticker: item.eventTicker || null,
     status: item.status || null,
     close_time: item.closeTime || null,
@@ -90,6 +95,42 @@ export async function searchKalshi(query, { limit = 12 } = {}) {
       ticker: item.ticker,
     },
   }));
+}
+
+/**
+ * Kalshi's own site search (undocumented v1), ranked by query match. Returns open events
+ * with their outcome markets and prices; the trade API has no text search.
+ */
+export async function searchKalshiEvents(query, { limit = 6 } = {}) {
+  const q = String(query || "").trim();
+  if (q.length < 2) return [];
+  const params = new URLSearchParams({ query: q, order_by: "querymatch", page_size: String(Math.min(20, limit)) });
+  const body = await fetchJson(`${kalshiLiveSocialUrl("search/series")}?${params}`);
+  const price = (m) => {
+    const last = Number(m.last_price_dollars);
+    if (Number.isFinite(last) && last > 0) return last;
+    const bid = Number(m.yes_bid_dollars);
+    const ask = Number(m.yes_ask_dollars);
+    return Number.isFinite(bid) && Number.isFinite(ask) && ask > 0 ? (bid + ask) / 2 : null;
+  };
+  return (Array.isArray(body?.current_page) ? body.current_page : [])
+    .filter((e) => e.event_ticker && Array.isArray(e.markets) && e.markets.length)
+    .slice(0, limit)
+    .map((e) => ({
+      venue: "kalshi",
+      entity: "event",
+      title: e.event_title || e.series_title || "",
+      event_ticker: e.event_ticker,
+      ticker: e.markets[0].ticker,
+      markets: e.markets.slice(0, 12).map((m) => ({
+        title: m.title || m.yes_subtitle || "",
+        outcome_label: m.yes_subtitle || null,
+        ticker: m.ticker,
+        yes_price: price(m),
+        closed: Boolean(m.result),
+      })),
+      pull: { tool: "preview_kalshi_market", ticker: e.markets[0].ticker },
+    }));
 }
 
 function looksLikeHottestQuery(query) {
@@ -101,7 +142,8 @@ function looksLikeHottestQuery(query) {
   );
 }
 
-export async function searchPolymarket(query, { limit = 12 } = {}) {
+/** `activeOnly` drops closed events (e.g. last year's "Fed decision in December?"). */
+export async function searchPolymarket(query, { limit = 12, activeOnly = false } = {}) {
   const q = String(query || "").trim();
   if (q.length < 2) return [];
 
@@ -115,7 +157,9 @@ export async function searchPolymarket(query, { limit = 12 } = {}) {
     }));
   }
 
-  const url = `${GAMMA_BASE}/public-search?q=${encodeURIComponent(q)}&limit_per_type=${Math.min(20, limit)}`;
+  const url =
+    `${GAMMA_BASE}/public-search?q=${encodeURIComponent(q)}&limit_per_type=${Math.min(20, limit)}` +
+    (activeOnly ? "&events_status=active&keep_closed_markets=0" : "");
   let body;
   try {
     body = await fetchJson(url);
@@ -162,13 +206,23 @@ export async function searchPolymarket(query, { limit = 12 } = {}) {
       slug: ev.slug || null,
       title: ev.title || "",
       volume: ev.volume ?? null,
+      volume_24h: Number(ev.volume24hr) || null,
+      closed: ev.closed === true,
+      end_date: ev.endDate || null,
       condition_id: Array.isArray(ev.markets) ? ev.markets[0]?.conditionId || null : null,
       markets: Array.isArray(ev.markets)
-        ? ev.markets.slice(0, 12).map((m) => ({
-            title: m.question || m.groupItemTitle || "",
-            condition_id: m.conditionId || null,
-            slug: m.slug || null,
-          }))
+        ? ev.markets.slice(0, 12).map((m) => {
+            const prices = typeof m.outcomePrices === "string" ? safeJson(m.outcomePrices) : m.outcomePrices;
+            return {
+              title: m.question || m.groupItemTitle || "",
+              outcome_label: m.groupItemTitle || null,
+              condition_id: m.conditionId || null,
+              slug: m.slug || null,
+              yes_price: Array.isArray(prices) && Number.isFinite(Number(prices[0])) ? Number(prices[0]) : null,
+              volume_24h: Number(m.volume24hr) || null,
+              closed: m.closed === true,
+            };
+          })
         : [],
       pull: {
         tool: "get_lookalike_markets",

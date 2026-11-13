@@ -1,0 +1,16 @@
+{
+  "id": "jarvis-pulse",
+  "expectation": "A pulse names real hot markets with something concrete (volume or a big print), not errors or placeholders.",
+  "kind": "tool",
+  "tool": "jarvis_pulse",
+  "args": { "limit": 8 },
+  "expect": {
+    "contains": ["Hottest right now"],
+    "not_contains": ["Could not load", "Untitled", "undefined", "NaN"],
+    "paths": {
+      "jarvis_mode": { "equals": true },
+      "alerts.length": { "min": 3 },
+      "alerts.0.condition_id": { "exists": true }
+    }
+  }
+}

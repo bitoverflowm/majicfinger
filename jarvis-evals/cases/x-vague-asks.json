@@ -1,0 +1,13 @@
+{
+  "id": "x-vague-asks",
+  "expectation": "A bare tag with no subject asks for one instead of guessing.",
+  "kind": "x_mention",
+  "text": "@lychee_data thoughts?",
+  "expect": {
+    "paths": {
+      "intent.mode": { "equals": "clarify" },
+      "status": { "equals": "needs_clarification" }
+    },
+    "max_chars": 280
+  }
+}

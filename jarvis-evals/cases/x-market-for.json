@@ -1,0 +1,15 @@
+{
+  "id": "x-market-for",
+  "expectation": "\"Is there a market for this?\" under a Fed post finds the listed Fed markets with venue and price.",
+  "kind": "x_mention",
+  "text": "@lychee_data is there a market for this?",
+  "parent_text": "Fed is going to cut rates again in December, the data is clear.",
+  "expect": {
+    "paths": { "intent.mode": { "equals": "market_for" } },
+    "matches": ["(Kalshi|Poly)", "(Fed|rate)", "\\b[1-9]\\d?¢"],
+    "contains": ["lycheedata.com/jarvis"],
+    "not_contains": ["No listed market"],
+    "not_matches": ["[Nn]o (prediction )?market", "\\b(null|undefined)\\b", "\\b(pull_market_bundle|analyze_\\w+|preview_\\w+|compare_venues)\\b"],
+    "max_chars": 420
+  }
+}

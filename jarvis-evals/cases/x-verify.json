@@ -1,0 +1,20 @@
+{
+  "id": "x-verify",
+  "expectation": "\"Does the data back this?\" finds the BTC $150k-by-year-end market (a long shot), says the data contradicts the claim with the price, and never says \"fact check\".",
+  "kind": "x_mention",
+  "text": "@lychee_data does the data back this?",
+  "parent_text": "Bitcoin is going to $150K before the end of the year, prediction markets agree.",
+  "expect": {
+    "paths": { "intent.mode": { "equals": "verify" } },
+    "matches": [
+      "(Bitcoin|BTC)",
+      "150",
+      "\\b\\d{1,2}¢",
+      "([Cc]ontradict|[Dd]oes ?n[o']?t back|[Nn]ot backed|[Dd]isagree|[Uu]nlikely|[Ll]ong shot)"
+    ],
+    "not_contains": ["fact check", "fact-check"],
+    "not_matches": ["[Nn]o (prediction )?market (was )?found", "\\b(null|undefined)\\b"],
+    "contains": ["lycheedata.com/jarvis"],
+    "max_chars": 380
+  }
+}

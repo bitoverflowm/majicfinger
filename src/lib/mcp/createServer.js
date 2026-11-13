@@ -326,11 +326,14 @@ export function createLycheeMcpServer(actor) {
         actionClass: "analyze",
         args: { text, parent_text, author_handle },
         summary: `Jarvis research ${String(text).slice(0, 80)}`,
-        handler: async () => ({
-          ...guidancePreamble(),
-          ...(await runResearchPack({ text, parent_text, author_handle })),
-          next: "SHOW x_reply to the user. For charts call pull_market_bundle on a condition_id from markets[]. Do not invent a second methodology.",
-        }),
+        handler: async () => {
+          const { llm, ...pack } = await runResearchPack({ text, parent_text, author_handle });
+          return {
+            ...guidancePreamble(),
+            ...pack,
+            next: "SHOW x_reply to the user. For charts call pull_market_bundle on a condition_id from markets[]. Do not invent a second methodology.",
+          };
+        },
       }),
   );
 

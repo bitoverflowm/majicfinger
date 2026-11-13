@@ -2,6 +2,8 @@ function cents(price) {
   const n = Number(price);
   if (!Number.isFinite(n)) return null;
   const p = n > 1.5 ? n : n * 100;
+  if (p > 0 && p < 0.5) return "<1¢";
+  if (p < 100 && p > 99.5) return ">99¢";
   return `${Math.round(p)}¢`;
 }
 

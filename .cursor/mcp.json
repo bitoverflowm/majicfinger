@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "lychee-local": {
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/jarvis-mcp-bridge.mjs"]
+    }
+  }
+}
