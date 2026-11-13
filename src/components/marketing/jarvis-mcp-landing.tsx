@@ -1,5 +1,9 @@
+"use client";
+
 import { Check } from "lucide-react";
 import Link from "next/link";
+import { useUser } from "@/lib/hooks";
+import { mcpDocAccess, userHasMcpPrereg } from "@/lib/mcp/access";
 
 import { FAQSection } from "@/components/sections/faq-section";
 import { FEATURE_KEYFRAMES } from "@/components/sections/features/feature-keyframes";
@@ -95,10 +99,19 @@ const FAQ = [
     answer:
       "A one-time payment for founding access: Lychee MCP in ChatGPT, Claude, and Cursor, Jarvis mode and crazy workflows, chat-side approvals, early X @lychee_data mention packs, and a founding MCP credit grant.",
   },
+  {
+    question: "I already subscribe to Lychee. Should I preregister?",
+    answer:
+      "No. If you're already on a Lychee subscription, monthly MCP tokens are accruing now and you'll have Jarvis as soon as it launches. Skip the $49 founding payment.",
+  },
 ];
 
 export function JarvisMcpLanding() {
   const prereg = landingPageV2Config.mcpPrereg;
+  const user = useUser();
+  const access = mcpDocAccess(user);
+  const alreadyPrereg = userHasMcpPrereg(user);
+  const skipPrereg = access.skipPrereg;
   return (
     <main className="flex min-h-screen w-full flex-col items-stretch divide-y divide-border bg-background font-sans antialiased theme-landing scroll-smooth">
       <style dangerouslySetInnerHTML={{ __html: FEATURE_KEYFRAMES + JARVIS_KEYFRAMES }} />
@@ -117,14 +130,31 @@ export function JarvisMcpLanding() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Link href={CHECKOUT_HREF} className={PRIMARY_CTA}>
-              Preregister · {PRICE}
-            </Link>
+            {skipPrereg || alreadyPrereg ? (
+              <Link href="/mcp" className={PRIMARY_CTA}>
+                Open MCP playbook
+              </Link>
+            ) : (
+              <Link href={CHECKOUT_HREF} className={PRIMARY_CTA}>
+                Preregister · {PRICE}
+              </Link>
+            )}
             <SectionScrollLink href="/jarvis#jarvis-demo" sectionId="jarvis-demo" className={SECONDARY_CTA}>
               Watch it work
               <span aria-hidden>→</span>
             </SectionScrollLink>
           </div>
+          {skipPrereg ? (
+            <p className="max-w-[36rem] text-sm leading-relaxed text-muted-foreground">
+              You&apos;re already on a Lychee subscription. Monthly MCP tokens are accruing now, and you&apos;ll have
+              Jarvis as soon as it launches. You don&apos;t need to preregister.
+            </p>
+          ) : (
+            <p className="max-w-[36rem] text-sm leading-relaxed text-muted-foreground">
+              Already on a Lychee subscription? Don&apos;t preregister — you&apos;re already accruing MCP tokens and will
+              have Jarvis at launch.
+            </p>
+          )}
         </div>
         <div className="mx-auto w-full max-w-[min(100%,84rem)] px-6 pb-10 sm:px-8 md:pb-14 lg:px-10">
           <JarvisChatShowcase />
@@ -167,29 +197,58 @@ export function JarvisMcpLanding() {
                 </span>
                 Lychee MCP + Jarvis
               </span>
-              <h2 className="text-4xl font-medium tracking-tighter text-foreground md:text-6xl">Get Jarvis first.</h2>
-              <p className="flex items-baseline gap-2">
-                <span className="text-3xl font-medium tracking-tight text-primary">{PRICE}</span>
-                <span className="text-sm text-muted-foreground">one-time · founding access · MCP credits included</span>
-              </p>
-              <ul className="flex flex-col gap-2.5">
-                {(prereg?.features || []).map((feature) => (
-                  <li key={feature} className="flex items-start gap-2.5 text-[15px] text-primary">
-                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary/15 text-secondary">
-                      <Check className="size-3" strokeWidth={3} />
-                    </span>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-3 pt-2">
-                <Link href={CHECKOUT_HREF} className={PRIMARY_CTA}>
-                  {prereg?.buttonText || `Preregister · ${PRICE}`}
-                </Link>
-                <Link href="/mcp" className="text-sm text-secondary transition-colors hover:text-primary">
-                  Already connected? Open MCP settings →
-                </Link>
-              </div>
+              {skipPrereg ? (
+                <>
+                  <h2 className="text-4xl font-medium tracking-tighter text-foreground md:text-6xl">You&apos;re already in.</h2>
+                  <p className="text-[15px] leading-relaxed text-muted-foreground">
+                    You&apos;re on a Lychee subscription, so monthly MCP tokens are accruing now and you&apos;ll have Jarvis
+                    as soon as it launches. Don&apos;t buy the {PRICE} founding seat.
+                  </p>
+                  <Link href="/mcp" className={PRIMARY_CTA}>
+                    Open MCP playbook
+                  </Link>
+                </>
+              ) : alreadyPrereg ? (
+                <>
+                  <h2 className="text-4xl font-medium tracking-tighter text-foreground md:text-6xl">You&apos;re preregistered.</h2>
+                  <p className="text-[15px] leading-relaxed text-muted-foreground">
+                    Your MCP preregistration is on file. Open the playbook to connect ChatGPT, Claude, or Cursor.
+                  </p>
+                  <Link href="/mcp" className={PRIMARY_CTA}>
+                    Open MCP playbook
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-4xl font-medium tracking-tighter text-foreground md:text-6xl">Get Jarvis first.</h2>
+                  <p className="flex items-baseline gap-2">
+                    <span className="text-3xl font-medium tracking-tight text-primary">{PRICE}</span>
+                    <span className="text-sm text-muted-foreground">one-time · founding access · MCP credits included</span>
+                  </p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    Already on a Lychee subscription? Skip this — you&apos;re already accruing MCP tokens and will have
+                    Jarvis at launch.
+                  </p>
+                  <ul className="flex flex-col gap-2.5">
+                    {(prereg?.features || []).map((feature) => (
+                      <li key={feature} className="flex items-start gap-2.5 text-[15px] text-primary">
+                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary/15 text-secondary">
+                          <Check className="size-3" strokeWidth={3} />
+                        </span>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-3 pt-2">
+                    <Link href={CHECKOUT_HREF} className={PRIMARY_CTA}>
+                      {prereg?.buttonText || `Preregister · ${PRICE}`}
+                    </Link>
+                    <Link href="/mcp" className="text-sm text-secondary transition-colors hover:text-primary">
+                      Already connected? Open MCP settings →
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

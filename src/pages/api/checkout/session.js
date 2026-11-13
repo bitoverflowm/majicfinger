@@ -23,6 +23,7 @@ import { buildCheckoutVisitorContext } from "@/lib/analytics/checkoutVisitorCont
 import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
 import { publishCheckoutTelegram } from "@/lib/telegram/checkoutJourney";
 import { loadSessionMember } from "@/lib/requirePaidMember";
+import { userShouldSkipMcpPrereg } from "@/lib/mcp/access";
 import { BLACK_FRIDAY, blackFridayAppliesTo, blackFridayCents } from "@/lib/promo/blackFriday";
 
 /** A second Checkout would start a second subscription; these members change plans in billing. */
@@ -125,7 +126,16 @@ export default async function handler(req, res) {
     if (member) {
       const { session: login, user, state } = member;
       const renewalFailing = ["past_due", "unpaid"].includes(String(user?.subscriptionStatus || "").toLowerCase());
-      // MCP/Jarvis prereg is a separate one-time product — allow even if already a member.
+      if (plan.key === "mcp_prereg" && login && userShouldSkipMcpPrereg(user)) {
+        return res.status(409).json({
+          code: "SUBSCRIBER_SKIP_PREREG",
+          reason: state.reason,
+          redirect: "/mcp",
+          message:
+            "You're already on a Lychee subscription. Monthly MCP tokens are accruing now, and you'll have Jarvis as soon as it launches. No need to preregister.",
+        });
+      }
+      // MCP/Jarvis prereg is a one-time product for people who are not already on a plan.
       if (
         plan.key !== "mcp_prereg" &&
         login &&

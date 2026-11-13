@@ -91,6 +91,7 @@ export default async function user(req, res) {
         await adoptDevBypassWorkspace(payload.userId).catch(() => {});
       }
       payload.lifetimeMember = !!dbUser.lifetimeMember;
+      payload.mcp_prereg = Boolean(dbUser.metadata?.mcp_prereg_paid_at);
       if (dbUser.subscriptionTier != null) payload.subscriptionTier = dbUser.subscriptionTier;
       if (dbUser.billingCycle != null) payload.billingCycle = dbUser.billingCycle;
       if (dbUser.subscriptionStatus != null) payload.subscriptionStatus = dbUser.subscriptionStatus;

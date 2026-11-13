@@ -280,7 +280,7 @@ export default function CheckoutClient({ plan, cycle, referral }) {
     if (!sessionRequest || fatal === "plan") return null;
     return sessionRequest.then((res) => {
       const data = res.data || {};
-      if (data.code === "ALREADY_MEMBER" && data.redirect) {
+      if ((data.code === "ALREADY_MEMBER" || data.code === "SUBSCRIBER_SKIP_PREREG") && data.redirect) {
         window.location.assign(data.redirect);
         // Hang while navigating — never reject into CheckoutElementsProvider.
         return new Promise(() => {});
@@ -306,7 +306,7 @@ export default function CheckoutClient({ plan, cycle, referral }) {
       .then((res) => {
         if (cancelled) return;
         const data = res.data || {};
-        if (data.code === "ALREADY_MEMBER" && data.redirect) {
+        if ((data.code === "ALREADY_MEMBER" || data.code === "SUBSCRIBER_SKIP_PREREG") && data.redirect) {
           window.location.assign(data.redirect);
           return;
         }
@@ -430,7 +430,7 @@ function HostedCheckoutNotice({ plan, cycle, referral, title = "Taking longer th
         visitorSessionId: getOrCreateVisitorSessionId() || undefined,
       });
       const data = res.data || {};
-      if (data.code === "ALREADY_MEMBER" && data.redirect) {
+      if ((data.code === "ALREADY_MEMBER" || data.code === "SUBSCRIBER_SKIP_PREREG") && data.redirect) {
         window.location.assign(data.redirect);
         return;
       }
