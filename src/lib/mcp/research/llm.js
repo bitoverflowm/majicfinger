@@ -7,7 +7,7 @@ import OpenAI from "openai";
  *   JARVIS_LLM_MODEL     optional, defaults to DEFAULT_MODEL
  * Without a key, the research engine keeps its rule-based behaviour.
  */
-const DEFAULT_MODEL = "gpt-4.1-mini";
+const DEFAULT_MODEL = "gpt-4.1";
 const TIMEOUT_MS = 30_000;
 
 let client = null;

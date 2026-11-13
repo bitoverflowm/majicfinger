@@ -38,9 +38,15 @@ function openOutcomes(row) {
     .map((m) => ({
       label: m.outcome_label || m.title,
       yes_price: m.yes_price,
+      price_change_24h: m.price_change_24h ?? null,
       condition_id: m.condition_id || null,
       ticker: m.ticker || null,
     }));
+}
+
+/** Headline outcome: the most likely one that isn't a near-certain floor or a dead long shot. */
+function headlineOutcome(outcomes) {
+  return outcomes.find((o) => o.yes_price >= 0.03 && o.yes_price <= 0.97) || outcomes[0] || null;
 }
 
 function withOutcome(title, label) {
@@ -52,7 +58,7 @@ function asMarket(row, query, venueHint) {
   const venue = row?.venue || venueHint || (row?.condition_id ? "polymarket" : "kalshi");
   const baseTitle = String(row?.title || row?.question || "").trim();
   const outcomes = openOutcomes(row);
-  const leader = outcomes[0] || null;
+  const leader = headlineOutcome(outcomes);
   const title = withOutcome(baseTitle, leader?.label || row?.outcome_label);
   return {
     venue,
@@ -62,7 +68,8 @@ function asMarket(row, query, venueHint) {
     condition_id: leader?.condition_id || row?.condition_id || null,
     slug: row?.slug || null,
     event_slug: row?.event_slug || (row?.entity === "event" ? row?.slug : null) || null,
-    yes_price: leader ? leader.yes_price : outcomes[0]?.yes_price ?? yesPrice(row),
+    yes_price: leader ? leader.yes_price : yesPrice(row),
+    price_change_24h: leader ? leader.price_change_24h : row?.price_change_24h ?? null,
     outcomes: outcomes.length ? outcomes.slice(0, 8) : undefined,
     volume_24h: row?.volume_24h ?? null,
     relevance: relevanceScore(query, title),
@@ -123,12 +130,23 @@ async function searchCandidates(queries, limit = 18) {
     (a.yes_price != null) !== (b.yes_price != null) ? a.yes_price != null : (Number(a.volume_24h) || 0) > (Number(b.volume_24h) || 0);
   results.forEach((found, i) => {
     for (const m of rankMarkets(queries[i], found.kalshi, found.polymarket)) {
-      const key = `${m.venue}:${m.title.trim().toLowerCase()}`;
+      const key = candidateKey(m);
       const prev = byTitle.get(key);
       if (!prev || better(m, prev)) byTitle.set(key, m);
     }
   });
   return [...byTitle.values()].slice(0, limit);
+}
+
+function candidateKey(m) {
+  return `${m.venue}:${(m.event_title || m.title).trim().toLowerCase()}`;
+}
+
+/** Near-certain (≥97¢) and dead (≤3¢) rows go last, and drop out once 3 informative rows exist. */
+function informativeFirst(rows) {
+  const live = (m) => m.yes_price == null || (m.yes_price > 0.03 && m.yes_price < 0.97);
+  const good = rows.filter(live);
+  return good.length >= 3 ? good : [...good, ...rows.filter((m) => !live(m))];
 }
 
 /** First `n` rows, but each venue's best row comes before any venue's second. */
@@ -260,6 +278,8 @@ export async function runResearchPack({
   parent_text = "",
   author_handle = "",
   deliver_default = "public_reply",
+  /** true when the asker's X handle is linked to a Lychee account (DM follow-ups work), false/null otherwise. */
+  asker_registered = null,
 } = {}) {
   const ruleIntent = parseResearchIntent({ text, parent_text, author_handle, deliver_default });
   const llm = { on: llmAvailable(), model: llmModel(), issues: [] };
@@ -275,7 +295,7 @@ export async function runResearchPack({
   const intent = understanding ? withUnderstanding(ruleIntent, understanding) : ruleIntent;
   const as_of = new Date().toISOString();
   const query = intent.subject.query || "";
-  const finish = (pack) => settleDraft({ ...pack, llm }, { text, parent_text });
+  const finish = (pack) => settleDraft({ ...pack, asker_registered, llm }, { text, parent_text });
 
   if (intent.mode === "clarify") {
     return finish({
@@ -337,6 +357,15 @@ export async function runResearchPack({
     ranked = await searchCandidates(intent.subject.queries);
     try {
       picked = await pickMarkets({ understanding, request: text, candidates: ranked });
+      if (picked.missing_searches.length) {
+        const known = new Set(ranked.map(candidateKey));
+        const fresh = (await searchCandidates(picked.missing_searches, 10)).filter((m) => !known.has(candidateKey(m)));
+        llm.second_search = { queries: picked.missing_searches, new_candidates: fresh.length };
+        if (fresh.length) {
+          ranked = [...ranked, ...fresh];
+          picked = await pickMarkets({ understanding, request: text, candidates: ranked });
+        }
+      }
       llm.picks = picked.picks.map((p) => ({
         ...p,
         title: ranked[p.id]?.title,
@@ -351,8 +380,13 @@ export async function runResearchPack({
     ranked = rankMarkets(query, searches.kalshi, searches.polymarket);
   }
   if (picked) {
+    const broad = ["news_impact", "research"].includes(intent.mode);
     verdict = picked.matches.length ? "listed" : picked.related.length ? "cousin" : "none";
-    markets = picked.matches.length ? acrossVenues(picked.matches, 3) : acrossVenues(picked.related, 2);
+    markets = broad
+      ? acrossVenues(informativeFirst([...picked.matches, ...picked.related]), 5)
+      : picked.matches.length
+        ? acrossVenues(picked.matches, 3)
+        : acrossVenues(picked.related, 2);
     ranked = [...picked.matches, ...picked.related];
   } else {
     ({ verdict, markets } = pickByRelevance(ranked));
@@ -360,14 +394,16 @@ export async function runResearchPack({
 
   const seed = markets.find((m) => m.condition_id);
   const wantDeep = ["holders", "research", "lookalikes", "verify", "news_impact", "market_for"].includes(intent.mode);
+  const wantNews = ["news_impact", "verify", "research"].includes(intent.mode) || Boolean(picked);
 
   const [lookalikes, whale, news] = await Promise.all([
-    wantDeep && seed?.condition_id && intent.mode !== "gap" ? optionalLookalikes(seed.condition_id, query) : [],
+    wantDeep && !picked && seed?.condition_id && intent.mode !== "gap" ? optionalLookalikes(seed.condition_id, query) : [],
     wantDeep && seed?.condition_id && intent.mode !== "gap" ? optionalHolders(seed.condition_id) : { whale_line: null, inferences: [] },
-    intent.mode === "news_impact" || intent.mode === "verify" || intent.mode === "research"
-      ? optionalNews(query)
-      : [],
+    wantNews ? optionalNews(understanding?.subject || query) : [],
   ]);
+  const onTopicNews = understanding
+    ? news.filter((n) => relevanceScore(understanding.subject, n.title) >= 0.5)
+    : news;
 
   let gapTake = "";
   if (intent.mode === "gap") {
@@ -419,7 +455,7 @@ export async function runResearchPack({
       verdict === "none"
         ? ""
         : whale.whale_line ||
-          (news[0]?.title ? `Related coverage: ${String(news[0].title).slice(0, 90)}` : "") ||
+          (onTopicNews[0]?.title ? `Related coverage: ${String(onTopicNews[0].title).slice(0, 90)}` : "") ||
           (markets.length ? "Prices/holders from Lychee live books — not the headline site." : "");
   } else if (!take && whale.whale_line && verdict === "listed") {
     take = whale.whale_line;
@@ -431,9 +467,11 @@ export async function runResearchPack({
     verdict: intent.mode === "verify" ? verifyVerdict : verdict,
     market_verdict: verdict,
     markets,
+    venues_with_markets: picked ? [...new Set(ranked.map((m) => m.venue))] : undefined,
     lookalikes: (lookalikes || []).filter((m) => m.title).slice(0, 3),
-    news: news || [],
+    news: onTopicNews || [],
     whale_line: whale.whale_line || null,
+    whale_market: whale.whale_line ? seed?.title || null : null,
     take: String(take || "").slice(0, 180),
     flows: [
       "search_markets",

@@ -1,0 +1,25 @@
+{
+  "id": "x-news-impact-colom",
+  "expectation": "\"What markets does this touch?\" under a political news post lists the markets it could move (the Mississippi Senate race, both venues) in list form, with hedged impact language, quick reads, and the follow-up offer.",
+  "kind": "x_mention",
+  "text": "@lychee_data what markets does this touch?",
+  "parent_text": "BREAKING: Trump says he gives Democrat Scott Colom \"a lot of credit\" for showing up to rally and \"courting MAGA supporters\"",
+  "expect": {
+    "paths": { "intent.mode": { "equals": "news_impact" } },
+    "matches": [
+      "Mississippi",
+      "\\n- Kalshi",
+      "\\n- Poly",
+      "[Cc]ould (impact|move)",
+      "Want me to dig into any of these\\?"
+    ],
+    "not_matches": [
+      "\\b(is|are) (moving|driving|pushing)\\b",
+      "\\b(pushed|drove)\\b",
+      "At least 34%",
+      "\\b(null|undefined)\\b"
+    ],
+    "contains": ["lycheedata.com/jarvis"],
+    "max_chars": 1400
+  }
+}

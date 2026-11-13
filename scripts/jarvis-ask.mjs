@@ -22,12 +22,15 @@ const { values } = parseArgs({
     tweet: { type: "string", short: "t", default: "" },
     ask: { type: "string", short: "a", default: "" },
     debug: { type: "boolean", short: "d", default: false },
+    registered: { type: "boolean", short: "r", default: false },
   },
 });
 
 const ask = values.ask.trim();
 if (!ask) {
-  console.error('Usage: npm run jarvis:ask -- --tweet "<tweet text>" --ask "<what you want to know>" [--debug]');
+  console.error(
+    'Usage: npm run jarvis:ask -- --tweet "<tweet text>" --ask "<what you want to know>" [--debug] [--registered]',
+  );
   process.exit(1);
 }
 
@@ -37,6 +40,7 @@ const pack = await runResearchPack({
   text: /@lychee_data/i.test(ask) ? ask : `@lychee_data ${ask}`,
   parent_text: values.tweet.trim(),
   author_handle: "jarvis_ask",
+  asker_registered: values.registered,
 });
 
 console.log(pack.draft_reply || pack.x_reply || "(no reply)");
@@ -60,6 +64,11 @@ if (values.debug) {
     ...(llm.picks || []).map(
       (p) => `  ${p.verdict.padEnd(9)} ${String(p.venue).padEnd(10)} ${p.title}  — ${p.reason}`,
     ),
+    llm.second_search
+      ? `second search: ${JSON.stringify(llm.second_search.queries)} → ${llm.second_search.new_candidates} new candidates`
+      : null,
+    pack.whale_line ? `holders (${pack.whale_market}): ${pack.whale_line}` : null,
+    ...(pack.news || []).map((n) => `  news    ${n.title} (${n.source || "?"})`),
     llm.writer === "template" && llm.model_draft ? `model draft (rejected): ${llm.model_draft}` : null,
     ...(llm.issues || []).map((issue) => `issue: ${issue}`),
     ...(pack.lookalikes || []).map((m) => `  lookalike ${m.venue.padEnd(8)} ${cents(m.yes_price)}  ${m.title}`),

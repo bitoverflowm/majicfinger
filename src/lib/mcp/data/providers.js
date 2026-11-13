@@ -113,6 +113,11 @@ export async function searchKalshiEvents(query, { limit = 6 } = {}) {
     const ask = Number(m.yes_ask_dollars);
     return Number.isFinite(bid) && Number.isFinite(ask) && ask > 0 ? (bid + ask) / 2 : null;
   };
+  const dayChange = (m) => {
+    const last = Number(m.last_price_dollars);
+    const prev = Number(m.previous_price_dollars);
+    return Number.isFinite(last) && Number.isFinite(prev) && prev > 0 ? last - prev : null;
+  };
   return (Array.isArray(body?.current_page) ? body.current_page : [])
     .filter((e) => e.event_ticker && Array.isArray(e.markets) && e.markets.length)
     .slice(0, limit)
@@ -127,6 +132,7 @@ export async function searchKalshiEvents(query, { limit = 6 } = {}) {
         outcome_label: m.yes_subtitle || null,
         ticker: m.ticker,
         yes_price: price(m),
+        price_change_24h: dayChange(m),
         closed: Boolean(m.result),
       })),
       pull: { tool: "preview_kalshi_market", ticker: e.markets[0].ticker },
@@ -219,6 +225,7 @@ export async function searchPolymarket(query, { limit = 12, activeOnly = false }
               condition_id: m.conditionId || null,
               slug: m.slug || null,
               yes_price: Array.isArray(prices) && Number.isFinite(Number(prices[0])) ? Number(prices[0]) : null,
+              price_change_24h: Number.isFinite(Number(m.oneDayPriceChange)) ? Number(m.oneDayPriceChange) : null,
               volume_24h: Number(m.volume24hr) || null,
               closed: m.closed === true,
             };

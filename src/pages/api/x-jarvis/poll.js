@@ -4,6 +4,8 @@ import { runXJarvisJob } from "@/lib/mcp/xJarvis/runJob";
 import { postPublicReply } from "@/lib/mcp/xJarvis/deliver";
 import { xJarvisEnvStatus } from "@/lib/mcp/xJarvis/xClient";
 
+export const config = { maxDuration: 300 };
+
 /**
  * Process mention payloads (manual / external feeder).
  * Prefer /api/x-jarvis/cron for self-fetching mentions.

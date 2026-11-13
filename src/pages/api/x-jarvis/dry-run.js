@@ -1,6 +1,8 @@
 import { runXJarvisJob } from "@/lib/mcp/xJarvis/runJob";
 import { parseMentionIntent } from "@/lib/mcp/xJarvis/intent";
 
+export const config = { maxDuration: 120 };
+
 /**
  * POST { text, parent_text?, author_handle?, deliver? }
  * Returns intent + draft reply without posting to X.

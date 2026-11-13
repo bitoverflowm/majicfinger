@@ -1,6 +1,9 @@
 import { runXJarvisCronTick } from "@/lib/mcp/xJarvis/cronTick";
 import { xJarvisEnvStatus } from "@/lib/mcp/xJarvis/xClient";
 
+// Each mention runs several model calls (~20s), so a tick needs well over the default function limit.
+export const config = { maxDuration: 300 };
+
 /**
  * Cron / manual tick for @lychee_data Jarvis.
  *
@@ -11,7 +14,7 @@ import { xJarvisEnvStatus } from "@/lib/mcp/xJarvis/xClient";
  *
  * Query/body:
  *   live=1     — post replies when X_JARVIS_LIVE=1 and OAuth is set
- *   max=10     — max mentions to process
+ *   max=5      — max mentions to process
  *   status=1   — env/status only (no fetch)
  */
 export default async function handler(req, res) {
@@ -43,7 +46,7 @@ export default async function handler(req, res) {
     q.live === true ||
     process.env.X_JARVIS_CRON_LIVE === "1" ||
     vercelCron;
-  const max = Number(q.max) || 10;
+  const max = Number(q.max) || 5;
   const force_since_id = String(q.since_id || "").trim();
 
   try {

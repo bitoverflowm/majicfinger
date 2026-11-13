@@ -31,13 +31,18 @@ Modes:
 - gap: price differences / arbitrage between Kalshi and Polymarket on a topic
 - holders: who is buying / whales / wallets / positioning in a market
 - lookalikes: related markets, other deadlines or thresholds of the same event
-- news_impact: which markets a news item could move
+- news_impact: which markets a news item or post could move ("what markets does this touch", "how does this affect…").
+  Never look for a market about the news event itself; look for the markets it moves.
 - research: a general dig into a topic's markets
-- pulse: what's hot / moving right now, no specific topic
+- pulse: only when they explicitly ask what's hot / moving / trending right now, with no specific topic
 - calibrate: how accurate markets were on settled events
 - clarify: there is no identifiable subject in the post or the ask
+  (a bare "thoughts?", "what do you think?", or "look at this" with an empty post is clarify, not pulse)
 
 search_queries: 2-4 queries you would type into a market search box to find the relevant markets.
+Search for the stakes, not the words in the post: the race, office, company, policy, or event each named person or
+thing is tied to (a Senate candidate -> "Mississippi Senate"; a CEO -> the company; a bill -> the bill or policy).
+Put the most important market first, usually the race or event the main subject is competing in.
 Search matches market titles word for word, so use the words a market title would use, 1-4 words each.
 Start with the broadest (e.g. "Fed decision", "Bitcoin price", "House control"), then narrower ones ("Fed rate December", "Bitcoin 150k").
 Market titles say "Fed decision", not "rate cut"; "Bitcoin above", not "BTC moon". No filler words, no sentences. Empty for pulse and clarify.

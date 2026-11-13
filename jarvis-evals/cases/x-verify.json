@@ -10,7 +10,7 @@
       "(Bitcoin|BTC)",
       "150",
       "\\b\\d{1,2}¢",
-      "([Cc]ontradict|[Dd]oes ?n[o']?t back|[Nn]ot backed|[Dd]isagree|[Uu]nlikely|[Ll]ong shot)"
+      "([Cc]ontradict|[Dd]oes ?n[o']?t back|[Nn]ot backed|[Dd]isagree|[Dd]o ?n[o']?t agree|[Uu]nlikely|[Ll]ong shot)"
     ],
     "not_contains": ["fact check", "fact-check"],
     "not_matches": ["[Nn]o (prediction )?market (was )?found", "\\b(null|undefined)\\b"],
