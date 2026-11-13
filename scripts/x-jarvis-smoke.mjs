@@ -54,6 +54,12 @@ const samples = [
     parent_text: "@lychee_data pulse — where is the smart money crowded?",
     expect: "market_for",
   },
+  {
+    text: "@lychee_data gimme something on this",
+    parent_text:
+      "At the Kisan Tak conference, PM Narendra Modi said the West Asia crisis pushed crude from $70 to $122/barrel. Diesel should have risen by ₹50/litre, but the government limited the increase to ₹7.",
+    expect: "news_impact",
+  },
 ];
 
 for (const s of samples) {
@@ -116,6 +122,35 @@ const x = formatXReply({
   take: "",
 });
 check(x.includes("Yes") && x.includes("lycheedata.com") && !x.includes("condition_id"), "x format clean");
+
+const modiHeadline =
+  "At the Kisan Tak conference, PM Narendra Modi said the West Asia crisis pushed crude from $70 to $122/barrel. Diesel should have risen by ₹50/litre, but the government limited the increase to ₹7.";
+const modiIntent = parseResearchIntent({
+  text: "@lychee_data gimme something on this",
+  parent_text: modiHeadline,
+});
+check(/modi|crude|diesel|oil/i.test(modiIntent.subject.query || ""), "gimme-this uses parent oil headline");
+check(!/gimme something/i.test(modiIntent.subject.query || ""), "gimme-this does not search the mention");
+check(/crude|diesel|modi/i.test(compactSearchQuery(modiHeadline)), "compact search keeps crude/Modi");
+check(relevanceScore(modiHeadline, "Will Elon Musk visit Mars in his lifetime?") < 0.12, "modi oil vs mars");
+check(relevanceScore(modiHeadline, "Will crude oil close above $100 this year?") > 0.28, "modi oil vs crude book");
+
+const noneClosest = formatXReply({
+  intent: { mode: "market_for" },
+  verdict: "none",
+  markets: [{ venue: "kalshi", title: "Will Elon Musk visit Mars in his lifetime?", relevance: 0, yes_price: 0 }],
+  lookalikes: [{ venue: "kalshi", title: "Will Elon Musk visit Mars in his lifetime?", relevance: 0.99, yes_price: 0 }],
+  take: "",
+});
+check(/No listed market/i.test(noneClosest) && !/Mars|Closest/i.test(noneClosest), "none verdict never names Mars as closest");
+
+const closestGate = gateResearchPack({
+  intent: { mode: "market_for" },
+  verdict: "none",
+  draft_reply: "No listed market for that exact thing.\nClosest: Kalshi · Will Elon Musk visit Mars in his lifetime? · 0¢",
+  markets: [{ venue: "kalshi", title: "Will Elon Musk visit Mars in his lifetime?", relevance: 0 }],
+});
+check(!closestGate.can_post, "gate blocks Closest junk on none verdict");
 
 const envMod = await import(pathToFileURL(path.join(root, "src/lib/mcp/xJarvis/xClient.js")).href);
 console.log("env_status", JSON.stringify(envMod.xJarvisEnvStatus(), null, 2));

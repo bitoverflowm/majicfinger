@@ -5,7 +5,8 @@ const STOP = new Set(
     "will would could should whom whose next his her their our your about talking response nothing " +
     "with from into over after before than then also more most some these those have has had been " +
     "not but if so just still very can may might must shall do doing done impact affecting affected " +
-    "listed closest related news headline article tweet post comment comments"
+    "listed closest related news headline article tweet post comment comments " +
+    "gimme give something anything thoughts take above more"
   ).split(" "),
 );
 
@@ -65,8 +66,10 @@ export function relevanceScore(query, title) {
   if (distinctive.length >= 2 && dHit === 0) return 0;
   if (q.some((w) => w.length >= 6) && dHit === 0 && titleCover < 0.34) return 0;
 
-  const dRate = distinctive.length ? dHit / Math.min(distinctive.length, 8) : cover;
+  const dRate = distinctive.length ? dHit / Math.min(distinctive.length, 3) : cover;
   let score = 0.5 * cover + 0.5 * Math.min(1, dRate * 1.5);
+  const KEY = new Set(["oil", "crude", "diesel", "gasoline", "nvidia", "bitcoin", "fed", "election", "tariff"]);
+  if ([...t].some((w) => KEY.has(w) && q.includes(w))) score = Math.max(score, 0.4);
 
   const qYears = String(query).match(/\b20\d{2}\b/g) || [];
   const titleLower = String(title || "").toLowerCase();

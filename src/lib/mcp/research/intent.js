@@ -1,6 +1,7 @@
 /**
  * Shared Jarvis intent — MCP chat and X mentions use the same router.
  */
+import { contentTokens } from "./relevance.js";
 
 const SHORTCUTS = [
   { re: /\b(holders?|whales?|concentration|whale\s*move)\b/i, mode: "holders" },
@@ -18,7 +19,7 @@ const SHORTCUTS = [
 ];
 
 const FILLER =
-  /\b(is there a market( for this)?|any market for this|(what|which) markets?( (is|are|does|do) this( affecting| impact)?)?|does this impact|jarvis|please|pls)\b/gi;
+  /\b(is there a market( for this)?|any market for this|(what|which) markets?( (is|are|does|do) this( affecting| impact)?)?|does this impact|gimme|give me|hit me|something (on|about) (this|that)|anything (on|about) (this|that)|what about (this|that)|thoughts( on (this|that))?|your take|on the above|check this out|look (at|into) this|tell me (more )?about this|jarvis|please|pls)\b/gi;
 
 const META_COMPLAINT =
   /\b(your response|you('re| are) wrong|nothing to do with|unrelated|not even close|try again|that('s| is) (wrong|unrelated))\b[^.!?\n]*/gi;
@@ -32,8 +33,17 @@ function stripAsk(text) {
 }
 
 function isThinFollowUp(mention) {
-  const c = stripAsk(mention);
-  if (c.length < 12) return true;
+  const raw = String(mention || "");
+  if (
+    /\b(gimme|give me|hit me|something (on|about) (this|that)|anything (on|about)|what (about|you got)|thoughts|your take|on the above|check this out|look (at|into) this)\b/i.test(
+      raw,
+    )
+  ) {
+    return true;
+  }
+  const c = stripAsk(raw);
+  if (c.length < 16) return true;
+  if (contentTokens(c).length <= 2) return true;
   return /^(this|that|the above|the (tweet|post|headline))[.!?]*$/i.test(c);
 }
 
@@ -72,10 +82,11 @@ function extractHandle(text) {
 }
 
 function looksLikeNews(text) {
-  return (
-    /\b(news|headline|breaking|article|reported|reports that)\b/i.test(text) ||
-    /https?:\/\/(www\.)?(nytimes|wsj|reuters|bloomberg|cnn|bbc|coindesk|theblock)/i.test(text)
-  );
+  const s = String(text || "");
+  if (/\b(news|headline|breaking|article|reported|reports that|conference)\b/i.test(s)) return true;
+  if (/https?:\/\/(www\.)?(nytimes|wsj|reuters|bloomberg|cnn|bbc|coindesk|theblock)/i.test(s)) return true;
+  if (s.length > 90 && /([\$₹€£]\s?\d|\b\d+\s*\/\s*(barrel|litre|liter)\b|\bcrude\b|\boil\b)/i.test(s)) return true;
+  return false;
 }
 
 /**

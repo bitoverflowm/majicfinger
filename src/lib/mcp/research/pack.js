@@ -72,7 +72,7 @@ function rankMarkets(query, kalshi, polymarket) {
 
 function pickMarkets(ranked, mode) {
   const listedMin = 0.32;
-  const cousinMin = mode === "news_impact" ? 0.28 : 0.2;
+  const cousinMin = 0.28;
   const listed = ranked.filter((m) => (m.relevance || 0) >= listedMin);
   if (listed.length) return { verdict: "listed", markets: listed.slice(0, 3) };
   const cousins = ranked.filter((m) => (m.relevance || 0) >= cousinMin);
@@ -112,11 +112,14 @@ async function optionalHolders(conditionId) {
   }
 }
 
-async function optionalLookalikes(conditionId) {
+async function optionalLookalikes(conditionId, query) {
   if (!conditionId) return [];
   try {
     const pack = await getLookalikeMarkets({ conditionId, limit: 6 });
-    return (pack.lookalikes || []).slice(0, 4).map((m) => asMarket(m, m.title || "", "polymarket"));
+    return (pack.lookalikes || [])
+      .slice(0, 4)
+      .map((m) => asMarket(m, query, "polymarket"))
+      .filter((m) => (m.relevance || 0) >= 0.28);
   } catch {
     return [];
   }
@@ -223,7 +226,7 @@ export async function runResearchPack({
   const wantDeep = ["holders", "research", "lookalikes", "verify", "news_impact", "market_for"].includes(intent.mode);
 
   const [lookalikes, whale, news] = await Promise.all([
-    wantDeep && seed?.condition_id && intent.mode !== "gap" ? optionalLookalikes(seed.condition_id) : [],
+    wantDeep && seed?.condition_id && intent.mode !== "gap" ? optionalLookalikes(seed.condition_id, query) : [],
     wantDeep && seed?.condition_id && intent.mode !== "gap" ? optionalHolders(seed.condition_id) : { whale_line: null, inferences: [] },
     intent.mode === "news_impact" || intent.mode === "verify" || intent.mode === "research"
       ? optionalNews(query)
