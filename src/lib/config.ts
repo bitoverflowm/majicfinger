@@ -132,7 +132,10 @@ export const siteConfig = {
       },
       jarvis: {
         href: "/jarvis",
-        text: "Jarvis",
+        text: "Meet Jarvis",
+        badge: "New",
+        title: "Turn Lychee into your research assistant.",
+        description: "Jarvis watches Polymarket and Kalshi and briefs you inside ChatGPT, Claude, and Cursor.",
       },
     },
   },

@@ -4,6 +4,7 @@ import { CompanyShowcase } from "./company-showcase";
 import { DashboardDemoSectionLazy } from "./dashboard-demo-section-lazy";
 import { DemoScrollLink } from "./demo-scroll-link";
 import { HeroDescription } from "./hero-description";
+import { JarvisHeroCallout } from "./jarvis-hero-callout";
 import { LandingDemoScrollManager } from "./landing-demo-scroll";
 export function HeroSection() {
   const { hero } = siteConfig;
@@ -39,18 +40,8 @@ export function HeroSection() {
             {hero.cta.secondary.text}
             <span aria-hidden>→</span>
           </Link>
-          {hero.cta.jarvis ? (
-            <Link
-              href={hero.cta.jarvis.href}
-              className="flex h-12 items-center justify-center gap-1.5 rounded-full border border-orange-500/40 bg-orange-50 px-6 text-base font-normal text-orange-950 transition-all ease-out hover:bg-orange-100 active:scale-95 dark:border-orange-400/30 dark:bg-orange-950/40 dark:text-orange-50 dark:hover:bg-orange-950/70"
-            >
-              {hero.cta.jarvis.text}
-              <span className="rounded-full bg-orange-600 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
-                Prelaunch
-              </span>
-            </Link>
-          ) : null}
         </div>
+        {hero.cta.jarvis ? <JarvisHeroCallout cta={hero.cta.jarvis} /> : null}
       </div>
 
       <DashboardDemoSectionLazy framed />
