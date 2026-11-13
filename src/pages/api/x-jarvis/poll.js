@@ -110,7 +110,7 @@ export default async function handler(req, res) {
       },
       results,
       note: wantLive
-        ? "Live replies attempted via Twitter user OAuth"
+        ? "Live replies attempted via JARVIS_TWITTER_* OAuth"
         : "Dry-run drafts only — set live:true and X_JARVIS_LIVE=1 to post",
     },
   });

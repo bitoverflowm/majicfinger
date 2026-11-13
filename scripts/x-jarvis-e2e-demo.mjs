@@ -6,7 +6,7 @@
  *   node --import ./scripts/register-alias.mjs ./scripts/x-jarvis-e2e-demo.mjs
  *   LIVE=1 node --import ./scripts/register-alias.mjs ./scripts/x-jarvis-e2e-demo.mjs
  *
- * LIVE=1 also requires TWITTER_* user OAuth + X_JARVIS_LIVE=1 and a real in_reply_to tweet id:
+ * LIVE=1 also requires JARVIS_TWITTER_* user OAuth + X_JARVIS_LIVE=1 and a real in_reply_to tweet id:
  *   REPLY_TO=<tweet_id> LIVE=1 ...
  */
 import { runXJarvisJob } from "@/lib/mcp/xJarvis/runJob.js";

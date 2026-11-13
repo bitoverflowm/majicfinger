@@ -7,7 +7,7 @@ import { getUserClient, xJarvisEnvStatus } from "./xClient.js";
 export async function postPublicReply({ in_reply_to_tweet_id, text }) {
   const status = xJarvisEnvStatus();
   if (!status.can_post_replies) {
-    const err = new Error("Cannot post — Twitter user OAuth for @lychee_data is not configured");
+    const err = new Error("Cannot post — JARVIS_TWITTER_* OAuth is not configured");
     err.code = "X_POST_NOT_CONFIGURED";
     throw err;
   }
