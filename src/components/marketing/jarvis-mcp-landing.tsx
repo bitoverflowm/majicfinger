@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FooterSection } from "@/components/sections/footer-section";
 import { landingPageV2Config } from "@/lib/landingPageV2Config";
+import { useUser } from "@/lib/hooks";
+import { mcpDocAccess, userHasMcpPrereg } from "@/lib/mcp/access";
 import { CRAZY_WORKFLOWS } from "@/lib/mcp/data/crazyWorkflows";
 import styles from "./jarvis-mcp-landing.module.css";
 
@@ -56,6 +58,10 @@ function JarvisHeroVisual() {
 }
 
 export function JarvisMcpLanding() {
+  const user = useUser();
+  const access = mcpDocAccess(user);
+  const alreadyPrereg = userHasMcpPrereg(user);
+  const skipPrereg = access.skipPrereg;
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
@@ -83,12 +89,21 @@ export function JarvisMcpLanding() {
               Your chat becomes a Lychee research desk — MCP tools, proactive Jarvis, and one-word approvals.
             </p>
             <div className={`mt-8 flex flex-wrap items-center gap-3 ${rise(styles.riseDelay2)}`}>
-              <Link
-                href={CHECKOUT_HREF}
-                className="inline-flex h-12 items-center justify-center rounded-full bg-white px-7 text-sm font-medium text-zinc-950 transition hover:bg-orange-50 active:scale-[0.98]"
-              >
-                Preregister · {PRICE}
-              </Link>
+              {skipPrereg || alreadyPrereg ? (
+                <Link
+                  href="/mcp"
+                  className="inline-flex h-12 items-center justify-center rounded-full bg-white px-7 text-sm font-medium text-zinc-950 transition hover:bg-orange-50 active:scale-[0.98]"
+                >
+                  Open MCP playbook
+                </Link>
+              ) : (
+                <Link
+                  href={CHECKOUT_HREF}
+                  className="inline-flex h-12 items-center justify-center rounded-full bg-white px-7 text-sm font-medium text-zinc-950 transition hover:bg-orange-50 active:scale-[0.98]"
+                >
+                  Preregister · {PRICE}
+                </Link>
+              )}
               <a
                 href="#preregister"
                 className="inline-flex h-12 items-center justify-center rounded-full border border-white/20 bg-white/5 px-6 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/10"
@@ -96,6 +111,12 @@ export function JarvisMcpLanding() {
                 What’s included
               </a>
             </div>
+            {skipPrereg ? (
+              <p className={`mt-5 max-w-md text-sm leading-relaxed text-sky-100/90 ${rise(styles.riseDelay2)}`}>
+                You&apos;re already on a Lychee subscription. Monthly MCP tokens are accruing now, and
+                you&apos;ll have Jarvis as soon as it launches. You don&apos;t need to preregister.
+              </p>
+            ) : null}
           </div>
         </div>
       </section>
@@ -207,28 +228,71 @@ export function JarvisMcpLanding() {
         <div className="pointer-events-none absolute -right-24 top-0 h-80 w-80 rounded-full bg-orange-500/20 blur-3xl" />
         <div className="pointer-events-none absolute -left-16 bottom-0 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl" />
         <div className="relative mx-auto max-w-[min(100%,42rem)] text-center">
-          <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-orange-300/90">
-            Preregister for Lychee MCP
-          </p>
-          <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">{PRICE}</h2>
-          <p className="mt-2 text-sm text-zinc-400">Single payment · founding access · MCP credit grant</p>
-          <p className="mx-auto mt-6 max-w-md text-base leading-relaxed text-zinc-300">
-            {landingPageV2Config.mcpPrereg?.description}
-          </p>
-          <ul className="mx-auto mt-8 max-w-md space-y-2 text-left text-sm text-zinc-300">
-            {(landingPageV2Config.mcpPrereg?.features || []).map((f) => (
-              <li key={f} className="flex gap-3 border-t border-white/10 pt-3 first:border-0 first:pt-0">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-sky-400" aria-hidden />
-                <span>{f}</span>
-              </li>
-            ))}
-          </ul>
-          <Link
-            href={CHECKOUT_HREF}
-            className="mt-10 inline-flex h-12 items-center justify-center rounded-full bg-white px-8 text-sm font-medium text-zinc-950 transition hover:bg-orange-50 active:scale-[0.98]"
-          >
-            {landingPageV2Config.mcpPrereg?.buttonText || `Preregister · ${PRICE}`}
-          </Link>
+          {skipPrereg ? (
+            <>
+              <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-orange-300/90">
+                Already on a Lychee plan
+              </p>
+              <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">You&apos;re in</h2>
+              <p className="mx-auto mt-6 max-w-md text-base leading-relaxed text-zinc-300">
+                If you&apos;re already on a subscription, you&apos;re already accruing MCP tokens and
+                will have access to Jarvis as soon as it launches. You shouldn&apos;t preregister —
+                the {PRICE} founding payment is only for people who aren&apos;t on a plan yet.
+              </p>
+              <Link
+                href="/mcp"
+                className="mt-10 inline-flex h-12 items-center justify-center rounded-full bg-white px-8 text-sm font-medium text-zinc-950 transition hover:bg-orange-50 active:scale-[0.98]"
+              >
+                Open MCP playbook
+              </Link>
+            </>
+          ) : alreadyPrereg ? (
+            <>
+              <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-orange-300/90">
+                Preregistered
+              </p>
+              <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">You&apos;re in</h2>
+              <p className="mx-auto mt-6 max-w-md text-base leading-relaxed text-zinc-300">
+                Your MCP preregistration is on file. Open the playbook to connect ChatGPT, Claude, or
+                Cursor.
+              </p>
+              <Link
+                href="/mcp"
+                className="mt-10 inline-flex h-12 items-center justify-center rounded-full bg-white px-8 text-sm font-medium text-zinc-950 transition hover:bg-orange-50 active:scale-[0.98]"
+              >
+                Open MCP playbook
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-orange-300/90">
+                Preregister for Lychee MCP
+              </p>
+              <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">{PRICE}</h2>
+              <p className="mt-2 text-sm text-zinc-400">Single payment · founding access · MCP credit grant</p>
+              <p className="mx-auto mt-6 max-w-md text-base leading-relaxed text-zinc-300">
+                {landingPageV2Config.mcpPrereg?.description}
+              </p>
+              <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-zinc-400">
+                Already on a Lychee subscription? Don&apos;t preregister — you&apos;re already accruing
+                MCP tokens and will have Jarvis as soon as it launches.
+              </p>
+              <ul className="mx-auto mt-8 max-w-md space-y-2 text-left text-sm text-zinc-300">
+                {(landingPageV2Config.mcpPrereg?.features || []).map((f) => (
+                  <li key={f} className="flex gap-3 border-t border-white/10 pt-3 first:border-0 first:pt-0">
+                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-sky-400" aria-hidden />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href={CHECKOUT_HREF}
+                className="mt-10 inline-flex h-12 items-center justify-center rounded-full bg-white px-8 text-sm font-medium text-zinc-950 transition hover:bg-orange-50 active:scale-[0.98]"
+              >
+                {landingPageV2Config.mcpPrereg?.buttonText || `Preregister · ${PRICE}`}
+              </Link>
+            </>
+          )}
           <p className="mt-4 text-xs text-zinc-500">
             Already connected?{" "}
             <Link href="/mcp" className="underline underline-offset-4 hover:text-zinc-300">

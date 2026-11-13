@@ -1,17 +1,13 @@
-import { getLoginSession } from "@/lib/auth";
 import { ensureCreditAccount, getCreditSnapshot, recentLedger } from "@/lib/mcp/credits";
 import { recentAudit } from "@/lib/mcp/audit";
 import { listDelegations, setDelegation } from "@/lib/mcp/confirm";
 import { mcpResourceUrl } from "@/lib/mcp/config";
+import { requireMcpConsole } from "@/lib/mcp/requireConsole";
 
 export default async function handler(req, res) {
-  let session;
-  try {
-    session = await getLoginSession(req);
-  } catch {
-    session = null;
-  }
-  if (!session?.userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+  const member = await requireMcpConsole(req, res);
+  if (!member) return;
+  const session = member.session;
 
   if (req.method === "GET") {
     await ensureCreditAccount(session.userId);

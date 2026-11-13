@@ -1,19 +1,15 @@
-import { getLoginSession } from "@/lib/auth";
 import {
   createPersonalAccessToken,
   getPatMetadata,
   revokePersonalAccessToken,
 } from "@/lib/mcp/auth/pat";
 import { ensureCreditAccount, getCreditSnapshot } from "@/lib/mcp/credits";
+import { requireMcpConsole } from "@/lib/mcp/requireConsole";
 
 export default async function handler(req, res) {
-  let session;
-  try {
-    session = await getLoginSession(req);
-  } catch {
-    session = null;
-  }
-  if (!session?.userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+  const member = await requireMcpConsole(req, res);
+  if (!member) return;
+  const session = member.session;
 
   if (req.method === "GET") {
     const [meta, usage] = await Promise.all([

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@/lib/hooks";
 import Login from "@/components/login";
+import { mcpDocAccess } from "@/lib/mcp/access";
 import { CRAZY_WORKFLOWS } from "@/lib/mcp/data/crazyWorkflows";
 import { JARVIS_BEST_PRACTICES, JARVIS_MCP_LOOP, JARVIS_X_TAGS } from "@/lib/mcp/data/jarvisPlaybook";
 
@@ -45,6 +46,7 @@ const TOOL_ROWS = [
 
 export default function McpConnectPage() {
   const user = useUser();
+  const access = mcpDocAccess(user);
   const [loading, setLoading] = useState(true);
   const [usage, setUsage] = useState(null);
   const [tokenMeta, setTokenMeta] = useState(null);
@@ -74,12 +76,12 @@ export default function McpConnectPage() {
   }
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !access.ok) {
       setLoading(false);
       return;
     }
     refresh();
-  }, [user]);
+  }, [user, access.ok]);
 
   async function copy(text, key) {
     try {
@@ -132,6 +134,36 @@ export default function McpConnectPage() {
     );
   }
 
+  if (!access.ok) {
+    return (
+      <main className="min-h-screen bg-zinc-50 text-zinc-900">
+        <div className="mx-auto max-w-lg px-4 py-16 space-y-5">
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-orange-700/80">Lychee MCP</p>
+          <h1 className="text-3xl font-semibold tracking-tight">MCP docs are gated</h1>
+          <p className="text-sm leading-relaxed text-zinc-600">
+            The MCP playbook, tool list, and connection settings are only for paying Lychee
+            subscribers and people who preregistered for MCP. Signed in as{" "}
+            <span className="font-medium text-zinc-900">{user.email}</span>.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/jarvis"
+              className="inline-flex h-11 items-center rounded-full bg-zinc-900 px-5 text-sm font-medium text-white"
+            >
+              Preregister for MCP
+            </Link>
+            <Link
+              href="/dashboard?view=billing"
+              className="inline-flex h-11 items-center rounded-full border border-zinc-300 px-5 text-sm font-medium"
+            >
+              See subscription plans
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ed,_#fafafa_45%,_#f4f4f5)] text-zinc-900">
       <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-12">
@@ -145,13 +177,21 @@ export default function McpConnectPage() {
             <span className="font-medium text-zinc-900">{user.email}</span>
             {user.user_name ? ` (@${user.user_name})` : ""}.
           </p>
+          {access.skipPrereg ? (
+            <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+              You&apos;re already on a Lychee subscription. Monthly MCP tokens are accruing now, and
+              you&apos;ll have Jarvis as soon as it launches — no need to preregister.
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-3 text-sm">
             <Link href="/dashboard" className="underline underline-offset-4">
               Open dashboard
             </Link>
-            <Link href="/jarvis" className="underline underline-offset-4">
-              MCP + Jarvis prereg
-            </Link>
+            {access.skipPrereg ? null : (
+              <Link href="/jarvis" className="underline underline-offset-4">
+                MCP + Jarvis prereg
+              </Link>
+            )}
           </div>
         </header>
 
