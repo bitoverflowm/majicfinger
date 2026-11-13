@@ -1,246 +1,208 @@
-"use client";
-
+import { Check } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { FooterSection } from "@/components/sections/footer-section";
-import { landingPageV2Config } from "@/lib/landingPageV2Config";
-import { CRAZY_WORKFLOWS } from "@/lib/mcp/data/crazyWorkflows";
-import styles from "./jarvis-mcp-landing.module.css";
 
-const CHECKOUT_HREF =
-  landingPageV2Config.mcpPrereg?.href || "/checkout?plan=mcp_prereg";
+import { FAQSection } from "@/components/sections/faq-section";
+import { FEATURE_KEYFRAMES } from "@/components/sections/features/feature-keyframes";
+import { ShowcaseRows, type ShowcaseRow } from "@/components/sections/features/feature-showcase-section";
+import { FooterSection } from "@/components/sections/footer-section";
+import { SectionHeader } from "@/components/section-header";
+import { SectionScrollLink } from "@/components/sections/section-scroll-link";
+import { landingPageV2Config } from "@/lib/landingPageV2Config";
+import automateBackdrop from "../../../public/landing/feature-automate.jpg";
+import connectBackdrop from "../../../public/landing/feature-connect-village.jpg";
+import exploreBackdrop from "../../../public/landing/feature-explore-lake.jpg";
+import { JarvisChatShowcase } from "./jarvis/jarvis-chat-showcase";
+import { JARVIS_KEYFRAMES } from "./jarvis/jarvis-keyframes";
+import { JarvisOrb } from "./jarvis/jarvis-orb";
+import { PulseRadarDemo } from "./jarvis/pulse-radar-demo";
+import { WorkflowRunnerDemo } from "./jarvis/workflow-runner-demo";
+import { XMentionDemo } from "./jarvis/x-mention-demo";
+
+const CHECKOUT_HREF = landingPageV2Config.mcpPrereg?.href || "/checkout?plan=mcp_prereg";
 const PRICE = landingPageV2Config.mcpPrereg?.price || "$49";
 
-const JARVIS_MOVES = [
-  { cmd: "jarvis_on", line: "Power-up animation. Proactive mode online." },
-  { cmd: "jarvis_pulse", line: "Unprompted briefs — what’s moving on Polymarket & Kalshi." },
-  { cmd: "list_crazy_workflows", line: "Pitch whale war rooms, gap radar, calibration roasts." },
-  { cmd: "pull_market_bundle", line: "Land sheets + inline charts while the model thinks." },
-  { cmd: "approve_pending", line: "You say “approve” in chat. No tab-hopping to Lychee." },
+const PRIMARY_CTA =
+  "flex h-12 items-center justify-center rounded-full border border-white/[0.12] bg-secondary px-6 text-base font-normal text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] transition-all ease-out hover:bg-secondary/80 active:scale-95 dark:text-secondary-foreground";
+const SECONDARY_CTA =
+  "flex h-12 items-center justify-center gap-1.5 rounded-full border border-border bg-muted px-6 text-base font-normal text-primary transition-all ease-out hover:bg-muted/70 active:scale-95";
+
+const CAPABILITIES: ShowcaseRow[] = [
+  {
+    id: "pulse",
+    title: "Jarvis keeps watch so you don't have to.",
+    description: [
+      "Every turn starts with a pulse across Polymarket and Kalshi: the hottest market, the biggest print on the tape, fresh wallets loading up, and gaps between venues.",
+      "Say “pulse” or “what's hot?” anytime for a fresh scan.",
+    ],
+    showcase: { demo: <PulseRadarDemo />, backdrop: automateBackdrop, href: CHECKOUT_HREF, cta: `Preregister · ${PRICE}` },
+  },
+  {
+    id: "workflows",
+    title: "Whole research projects from one ask.",
+    description: [
+      "Ask for a whale war room, a cross-venue gap hunt, or a calibration roast. Jarvis chains the right Lychee tools, lands charts in the chat, and writes up what it found.",
+      "Every workflow runs on real Lychee data, never scraped pages.",
+    ],
+    showcase: { demo: <WorkflowRunnerDemo />, backdrop: exploreBackdrop, href: "/mcp", cta: "Connect Lychee MCP" },
+  },
+  {
+    id: "x",
+    title: "Tag @lychee_data under any post.",
+    description: [
+      "Ask “is there a market for this?”, “does the data back this?”, or “who's buying?” right in the thread. Jarvis reads the question, pulls Lychee numbers, and replies.",
+      "New reply packs run as dry runs first, so nothing posts until it's right.",
+    ],
+    showcase: { demo: <XMentionDemo />, backdrop: connectBackdrop, href: "https://x.com/lychee_data", cta: "Follow @lychee_data" },
+  },
 ];
 
-const MCP_SURFACE = [
+const ORBIT_CHIPS = [
+  { label: "jarvis_pulse", className: "left-[2%] top-[14%]", delay: "0s" },
+  { label: "analyze_holders", className: "right-[0%] top-[8%]", delay: "-1.2s" },
+  { label: "compare_venues", className: "left-[-4%] bottom-[22%]", delay: "-2.1s" },
+  { label: "approve_pending", className: "right-[-2%] bottom-[16%]", delay: "-0.6s" },
+  { label: "@lychee_data", className: "left-1/2 -translate-x-1/2 bottom-[-2%]", delay: "-1.6s" },
+] as const;
+
+const FAQ = [
   {
-    title: "Lychee MCP",
-    copy: "ChatGPT, Claude, and Cursor call Lychee as source-of-truth — holders, tape, calibration, compose, publish.",
+    question: "What is Jarvis?",
+    answer:
+      "Jarvis is a proactive mode for Lychee MCP. Once it's on, your AI assistant opens every turn with a short brief on what's moving across Polymarket and Kalshi, and can run full research workflows with Lychee data and charts.",
   },
   {
-    title: "Jarvis mode",
-    copy: "Ask once. Jarvis turns on, pulses interesting markets, and keeps scanning at the start of every turn.",
+    question: "Which apps does it work in?",
+    answer:
+      "ChatGPT, Claude, and Cursor, through Lychee MCP. On X, mention @lychee_data under any post with your question.",
   },
   {
-    title: "X @lychee_data",
-    copy: "Mention research in natural language. Jarvis drafts the dig — dry-run first, live when you flip the switch.",
+    question: "Will Jarvis message me when I'm not chatting?",
+    answer:
+      "Not yet. Chat apps only let Jarvis speak when you send a message, so it pulses at the start of every turn. Say “pulse” or “update” for a fresh scan anytime. Push alerts to Slack and webhooks are next.",
+  },
+  {
+    question: "Can Jarvis publish or spend credits without asking?",
+    answer:
+      "No. Publishing and expensive pulls wait for your go-ahead. Reply “approve”, “always allow”, or “deny” right in the chat and Jarvis carries on.",
+  },
+  {
+    question: "How do the X replies work?",
+    answer:
+      "Tag @lychee_data with a question like “is there a market for this?” or “does the data back this?”. Jarvis works out what you're asking, pulls matching markets, holders, or prices from Lychee, and replies in the thread. New reply packs run as dry runs before they go live.",
+  },
+  {
+    question: `What does the ${PRICE} preregistration include?`,
+    answer:
+      "A one-time payment for founding access: Lychee MCP in ChatGPT, Claude, and Cursor, Jarvis mode and crazy workflows, chat-side approvals, early X @lychee_data mention packs, and a founding MCP credit grant.",
   },
 ];
-
-function JarvisHeroVisual() {
-  return (
-    <div className="relative h-full min-h-[min(72vh,40rem)] w-full overflow-hidden" aria-hidden>
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(14,165,233,0.28),transparent_55%),radial-gradient(ellipse_at_80%_70%,rgba(234,88,12,0.22),transparent_50%),linear-gradient(160deg,#071018_0%,#0b1220_45%,#120a08_100%)]" />
-      <div className={`absolute inset-0 opacity-[0.35] ${styles.grid}`} />
-      <div className="absolute left-1/2 top-[42%] h-[min(58vw,22rem)] w-[min(58vw,22rem)] -translate-x-1/2 -translate-y-1/2">
-        <div className={`absolute inset-0 rounded-full bg-sky-400/20 blur-3xl ${styles.pulse}`} />
-        <div className={`absolute inset-[12%] rounded-full border border-sky-300/40 ${styles.ring}`} />
-        <div className={`absolute inset-[22%] rounded-full border border-orange-400/30 ${styles.ringSlow}`} />
-        <div className="absolute inset-[38%] rounded-full bg-gradient-to-br from-sky-300 via-sky-500 to-orange-500 opacity-90 shadow-[0_0_60px_rgba(14,165,233,0.45)]" />
-      </div>
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#071018] via-[#071018]/80 to-transparent px-6 pb-10 pt-24 sm:px-10">
-        <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-sky-200/80">Jarvis online</p>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-300">
-          Proactive Lychee watch · inline charts · chat approve · X mentions
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export function JarvisMcpLanding() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-
-  const workflows = CRAZY_WORKFLOWS.slice(0, 4);
-  const rise = (extra = "") => `${styles.rise} ${mounted ? styles.riseIn : ""} ${extra}`.trim();
-
+  const prereg = landingPageV2Config.mcpPrereg;
   return (
-    <div className={`relative min-h-screen overflow-x-hidden bg-[#f7f4ef] text-zinc-950 ${styles.landing}`}>
-      <section className="relative isolate min-h-[100svh] w-full">
-        <div className="absolute inset-0">
-          <JarvisHeroVisual />
-        </div>
-        <div className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-[min(100%,84rem)] flex-col justify-end px-6 pb-16 pt-28 sm:px-8 lg:justify-center lg:px-10 lg:pb-20">
-          <div className={`max-w-xl ${rise()}`}>
-            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.32em] text-orange-300/90">
-              Lychee MCP
-            </p>
-            <h1 className="mt-4 text-balance text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-[3.4rem] lg:leading-[1.05]">
-              Jarvis for prediction markets
+    <main className="flex min-h-screen w-full flex-col items-stretch divide-y divide-border bg-background font-sans antialiased theme-landing scroll-smooth">
+      <style dangerouslySetInnerHTML={{ __html: FEATURE_KEYFRAMES + JARVIS_KEYFRAMES }} />
+
+      <section id="hero" className="features-showcase relative w-full">
+        <div className="mx-auto flex w-full max-w-[min(100%,84rem)] flex-col items-start gap-6 px-6 pb-10 pt-28 sm:px-8 md:pt-32 lg:px-10">
+          <div className="flex w-full max-w-[36rem] flex-col gap-3 text-left">
+            <h1 className="text-balance text-[1.5rem] font-normal leading-[1.25] tracking-tight text-primary sm:text-[1.625rem]">
+              Jarvis for prediction markets.
+              <span className="block text-muted-foreground">Your AI chat, now watching Polymarket and Kalshi for you.</span>
             </h1>
-            <p className={`mt-4 max-w-md text-base leading-relaxed text-zinc-300 ${rise(styles.riseDelay1)}`}>
-              Your chat becomes a Lychee research desk — MCP tools, proactive Jarvis, and one-word approvals.
-            </p>
-            <div className={`mt-8 flex flex-wrap items-center gap-3 ${rise(styles.riseDelay2)}`}>
-              <Link
-                href={CHECKOUT_HREF}
-                className="inline-flex h-12 items-center justify-center rounded-full bg-white px-7 text-sm font-medium text-zinc-950 transition hover:bg-orange-50 active:scale-[0.98]"
-              >
-                Preregister · {PRICE}
-              </Link>
-              <a
-                href="#preregister"
-                className="inline-flex h-12 items-center justify-center rounded-full border border-white/20 bg-white/5 px-6 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/10"
-              >
-                What’s included
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="relative border-t border-zinc-900/10 bg-[#f7f4ef] px-6 py-20 sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-[min(100%,84rem)]">
-          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-orange-700/80">The product</p>
-          <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-            Not just MCP — the whole Jarvis stack
-          </h2>
-          <p className="mt-3 max-w-xl text-base text-zinc-600">
-            One founding seat unlocks the assistant surface we&apos;ve been shipping into ChatGPT, Claude, Cursor, and X.
-          </p>
-          <ul className="mt-12 grid gap-10 md:grid-cols-3">
-            {MCP_SURFACE.map((item) => (
-              <li key={item.title} className="border-t border-zinc-900/15 pt-5">
-                <h3 className="text-lg font-semibold tracking-tight text-zinc-950">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-zinc-600">{item.copy}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      <section className="relative bg-[#0b1220] px-6 py-20 text-white sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-[min(100%,84rem)]">
-          <div className="flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-xl">
-              <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-sky-300/80">Jarvis commands</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Say the quiet part out loud
-              </h2>
-              <p className="mt-3 text-base text-zinc-400">
-                Turn Jarvis on. Pulse the tape. Pitch crazy workflows. Approve publishes without leaving the chat.
-              </p>
-            </div>
-            <div className={`h-px w-full max-w-xs lg:mb-2 ${styles.scanline}`} />
-          </div>
-          <ul className="mt-12 divide-y divide-white/10 border-y border-white/10">
-            {JARVIS_MOVES.map((row) => (
-              <li
-                key={row.cmd}
-                className="grid gap-2 py-5 sm:grid-cols-[minmax(12rem,18rem)_1fr] sm:items-baseline sm:gap-8"
-              >
-                <code className="font-mono text-sm text-sky-300">{row.cmd}</code>
-                <span className="text-sm text-zinc-300">{row.line}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      <section className="bg-[#f7f4ef] px-6 py-20 sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-[min(100%,84rem)]">
-          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-orange-700/80">Crazy workflows</p>
-          <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-            Ambitious research, copy-paste ready
-          </h2>
-          <p className="mt-3 max-w-xl text-base text-zinc-600">
-            On connect, Jarvis can pitch live workflows — not vaporware. Each maps to Lychee MCP tools.
-          </p>
-          <ol className="mt-12 space-y-0">
-            {workflows.map((wf, i) => (
-              <li
-                key={wf.id}
-                className="grid gap-2 border-t border-zinc-900/15 py-6 sm:grid-cols-[4rem_1fr] sm:gap-6"
-              >
-                <span className="font-mono text-sm text-orange-700/70">{String(i + 1).padStart(2, "0")}</span>
-                <div>
-                  <h3 className="text-lg font-semibold tracking-tight">{wf.vibe}</h3>
-                  <p className="mt-1 text-sm text-zinc-600">{wf.hook}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      <section className="border-t border-zinc-900/10 bg-white px-6 py-20 sm:px-8 lg:px-10">
-        <div className="mx-auto grid max-w-[min(100%,84rem)] gap-14 lg:grid-cols-2">
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-orange-700/80">Approvals</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Just say “approve”</h2>
-            <p className="mt-3 text-base leading-relaxed text-zinc-600">
-              Publishes and expensive pulls still gate safely — but you no longer have to open Lychee. In chat:{" "}
-              <span className="font-medium text-zinc-900">approve</span>,{" "}
-              <span className="font-medium text-zinc-900">always allow</span>, or{" "}
-              <span className="font-medium text-zinc-900">deny</span>. The agent calls{" "}
-              <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[13px]">approve_pending</code> and
-              continues.
+            <p className="text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
+              Connect Lychee MCP to ChatGPT, Claude, or Cursor. Jarvis briefs you on what&apos;s moving, drops charts into the
+              conversation, runs whole research workflows, and answers{" "}
+              <span className="font-medium text-primary">@lychee_data</span> on X.
             </p>
           </div>
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-orange-700/80">X</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">@lychee_data</h2>
-            <p className="mt-3 text-base leading-relaxed text-zinc-600">
-              Tag us under a market thread or ask in natural language. Jarvis routes holders, gaps, calibration, or a
-              pulse — dry-run first so you can taste the reply before anything goes live.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="preregister"
-        aria-label="Preregister for Lychee MCP"
-        className="relative overflow-hidden bg-[#0b1220] px-6 py-24 text-white sm:px-8 lg:px-10"
-      >
-        <div className="pointer-events-none absolute -right-24 top-0 h-80 w-80 rounded-full bg-orange-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute -left-16 bottom-0 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl" />
-        <div className="relative mx-auto max-w-[min(100%,42rem)] text-center">
-          <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-orange-300/90">
-            Preregister for Lychee MCP
-          </p>
-          <h2 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">{PRICE}</h2>
-          <p className="mt-2 text-sm text-zinc-400">Single payment · founding access · MCP credit grant</p>
-          <p className="mx-auto mt-6 max-w-md text-base leading-relaxed text-zinc-300">
-            {landingPageV2Config.mcpPrereg?.description}
-          </p>
-          <ul className="mx-auto mt-8 max-w-md space-y-2 text-left text-sm text-zinc-300">
-            {(landingPageV2Config.mcpPrereg?.features || []).map((f) => (
-              <li key={f} className="flex gap-3 border-t border-white/10 pt-3 first:border-0 first:pt-0">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-sky-400" aria-hidden />
-                <span>{f}</span>
-              </li>
-            ))}
-          </ul>
-          <Link
-            href={CHECKOUT_HREF}
-            className="mt-10 inline-flex h-12 items-center justify-center rounded-full bg-white px-8 text-sm font-medium text-zinc-950 transition hover:bg-orange-50 active:scale-[0.98]"
-          >
-            {landingPageV2Config.mcpPrereg?.buttonText || `Preregister · ${PRICE}`}
-          </Link>
-          <p className="mt-4 text-xs text-zinc-500">
-            Already connected?{" "}
-            <Link href="/mcp" className="underline underline-offset-4 hover:text-zinc-300">
-              Open MCP settings
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href={CHECKOUT_HREF} className={PRIMARY_CTA}>
+              Preregister · {PRICE}
             </Link>
-          </p>
+            <SectionScrollLink href="/jarvis#jarvis-demo" sectionId="jarvis-demo" className={SECONDARY_CTA}>
+              Watch it work
+              <span aria-hidden>→</span>
+            </SectionScrollLink>
+          </div>
+        </div>
+        <div className="mx-auto w-full max-w-[min(100%,84rem)] px-6 pb-10 sm:px-8 md:pb-14 lg:px-10">
+          <JarvisChatShowcase />
         </div>
       </section>
 
-      <div className="bg-[#f7f4ef]">
-        <FooterSection />
-      </div>
-    </div>
+      <section id="capabilities" className="relative w-full scroll-mt-28">
+        <SectionHeader>
+          <h2 className="text-balance pb-1 text-center text-3xl font-medium tracking-tighter md:text-4xl">
+            Everything Jarvis can do
+          </h2>
+          <p className="text-balance text-center font-medium text-muted-foreground">
+            It scans the markets, runs the research, and answers on X, all with live Lychee data.
+          </p>
+        </SectionHeader>
+        <ShowcaseRows rows={CAPABILITIES} className="py-10 md:py-14" />
+      </section>
+
+      <section id="preregister" aria-label="Preregister for Lychee MCP and Jarvis" className="features-showcase flex w-full scroll-mt-28 flex-col items-center px-5 py-10 md:px-10 md:py-14">
+        <div className="relative w-full max-w-7xl overflow-hidden rounded-xl border border-border bg-gradient-to-br from-secondary/35 via-background to-muted shadow-xl">
+          <div className="relative z-10 grid items-center gap-10 px-6 py-12 md:px-12 md:py-16 lg:grid-cols-2">
+            <div className="relative mx-auto aspect-square w-full max-w-[22rem]">
+              <JarvisOrb className="absolute inset-[6%]" />
+              {ORBIT_CHIPS.map((chip) => (
+                <span key={chip.label} className={`absolute ${chip.className}`}>
+                  <span
+                    className="block rounded-full border border-border bg-background/90 px-2.5 py-1 font-mono text-[11px] text-primary shadow-sm backdrop-blur [animation:jx-float_4s_ease-in-out_infinite]"
+                    style={{ animationDelay: chip.delay }}
+                  >
+                    {chip.label}
+                  </span>
+                </span>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-start gap-5">
+              <span className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                <span className="rounded-full bg-gradient-to-r from-secondary to-[#7c5cff] px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-white">
+                  {prereg?.badge || "Founding access"}
+                </span>
+                Lychee MCP + Jarvis
+              </span>
+              <h2 className="text-4xl font-medium tracking-tighter text-foreground md:text-6xl">Get Jarvis first.</h2>
+              <p className="flex items-baseline gap-2">
+                <span className="text-3xl font-medium tracking-tight text-primary">{PRICE}</span>
+                <span className="text-sm text-muted-foreground">one-time · founding access · MCP credits included</span>
+              </p>
+              <ul className="flex flex-col gap-2.5">
+                {(prereg?.features || []).map((feature) => (
+                  <li key={feature} className="flex items-start gap-2.5 text-[15px] text-primary">
+                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary/15 text-secondary">
+                      <Check className="size-3" strokeWidth={3} />
+                    </span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-3 pt-2">
+                <Link href={CHECKOUT_HREF} className={PRIMARY_CTA}>
+                  {prereg?.buttonText || `Preregister · ${PRICE}`}
+                </Link>
+                <Link href="/mcp" className="text-sm text-secondary transition-colors hover:text-primary">
+                  Already connected? Open MCP settings →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <FAQSection
+        id="jarvis-faq"
+        title="Questions about Jarvis"
+        description=""
+        items={FAQ.map((item, index) => ({ id: index + 1, ...item }))}
+      />
+
+      <FooterSection />
+    </main>
   );
 }

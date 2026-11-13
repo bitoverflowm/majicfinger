@@ -20,7 +20,7 @@ import { LiveTerminalDemo } from "./live-terminal-demo";
 import { TradeHistoryDemo } from "./trade-history-demo";
 import { TransformDemo } from "./transform-demo";
 
-type Showcase = {
+export type Showcase = {
   demo: ReactNode;
   backdrop: StaticImageData;
   cta: string;
@@ -85,7 +85,7 @@ const EXPLORE_ROW: { id: string; title: string; description: string; showcase: S
 
 const CTA_CLASS = "w-fit text-sm text-secondary transition-colors hover:text-primary";
 
-type ShowcaseRow = { id: string; title: string; description: string | readonly string[]; showcase: Showcase };
+export type ShowcaseRow = { id: string; title: string; description: string | readonly string[]; showcase: Showcase };
 
 /** `afterConnect` renders between the "Connect" row and the rest of the showcase; `end` after the last row. */
 export function FeatureShowcaseSection({ afterConnect, end }: { afterConnect?: ReactNode; end?: ReactNode }) {
@@ -128,7 +128,7 @@ export function FeatureShowcaseSection({ afterConnect, end }: { afterConnect?: R
   );
 }
 
-function ShowcaseRows({
+export function ShowcaseRows({
   rows,
   offset = 0,
   start,

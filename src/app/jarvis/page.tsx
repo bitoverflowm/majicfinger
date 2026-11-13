@@ -57,7 +57,7 @@ export default function JarvisLandingPage() {
   };
 
   return (
-    <>
+    <div className="relative mx-auto min-w-0 max-w-[min(100%,84rem)] overflow-x-visible">
       <TelegramMarketingTracker />
       <MarketingNavbar />
       <script
@@ -65,6 +65,6 @@ export default function JarvisLandingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <JarvisMcpLanding />
-    </>
+    </div>
   );
 }
