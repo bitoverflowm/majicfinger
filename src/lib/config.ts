@@ -130,6 +130,10 @@ export const siteConfig = {
         href: "/#pricing",
         text: "View Plans",
       },
+      jarvis: {
+        href: "/jarvis",
+        text: "Jarvis",
+      },
     },
   },
   ctaSection: {
