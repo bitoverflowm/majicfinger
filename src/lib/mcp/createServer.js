@@ -313,7 +313,7 @@ export function createLycheeMcpServer(actor) {
     "jarvis_research",
     {
       description:
-        "Fused Lychee research pack shared with @lychee_data on X. Pass the user question and optional parent tweet/article. Returns Kalshi+Polymarket matches, lookalikes, whale/holder line, news overlay, gated x_reply. Use this instead of a one-off analysis. Then pull_market_bundle / pull_trader_bundle for charts.",
+        "Fused Lychee research pack shared with @lychee_data on X. Pass the user question and optional parent tweet/article. Returns Kalshi+Polymarket matches, lookalikes, whale/holder line, news overlay, gated x_reply. Use this instead of a one-off analysis. Then pull_market_bundle / pull_trader_bundle for charts. Trader deep dives: name a Polymarket trader or pass a wallet ('dig into this trader'). The default run returns the 2-3 most surprising trader insights. Asking about one insight returns it plus the rest of its group: edge (before/after the news, how early, does price move their way), style (longshots vs favorites, profit concentration, holder or flipper, current form), category (PnL by category, country edge in elections, category ranks), book (buying now, contrarian bets, copy-trade check), crowd (similar traders, with or against whales, followers). Include 'go ultra deep' for all 16 plus a dashboard link (holder.report_url).",
       inputSchema: {
         text: z.string().min(1).max(2000),
         parent_text: z.string().max(4000).optional(),

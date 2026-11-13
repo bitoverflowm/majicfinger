@@ -1,12 +1,16 @@
 import { z } from "zod";
 import { llmJson } from "./llm.js";
+import { cents, entryCents, money, pct, shares, signedMoney } from "./format.js";
+import { insightFacts, insightLabels } from "./insightFacts.js";
 
 const MAX_BODY_CHARS = 1100;
-const MAX_HOLDER_BODY_CHARS = 1500;
-const maxBody = (pack) => (pack.holder ? MAX_HOLDER_BODY_CHARS : MAX_BODY_CHARS);
+const MAX_HOLDER_BODY_CHARS = 2000;
+const MAX_ULTRA_BODY_CHARS = 3400;
+const maxBody = (pack) =>
+  pack.holder?.depth === "ultra" ? MAX_ULTRA_BODY_CHARS : pack.holder ? MAX_HOLDER_BODY_CHARS : MAX_BODY_CHARS;
 const CTA = "lycheedata.com/jarvis";
 
-const Reply = z.object({ reply: z.string().min(1).max(2000) });
+const Reply = z.object({ reply: z.string().min(1).max(4200) });
 
 const INTRO = `You are Jarvis, Lychee's prediction-market research assistant, replying on X to someone who tagged you about a post.
 You get their post, their request, and the facts Lychee pulled from Kalshi and Polymarket. Write the reply they will read.
@@ -22,7 +26,47 @@ const HOLDER_SHAPE = `This is a deep dive on one wallet (facts.holder). Shape:
    gap and before/after exactly as given. If none had a headline nearby, say so. Timing can only "line up" or not:
    never suggest insider knowledge, and never say news caused a trade.
 4. "Related exposure:" one line on their positions in lookalike markets, only if the facts list any.
-Stop there. Do not write a closing line or sign-off; Lychee appends the follow-up offer and the wallet link.`;
+Separate the sections with a blank line. Stop there. Do not write a closing line or sign-off; Lychee appends the follow-up offer and the wallet link.`;
+
+const CLAIM_CHECK = `If the post makes claims about them (profit, volume, biggest wins, prices paid, open bets), say whether
+   Lychee's data checks out and call out only real differences. Prices within 1¢ and amounts within rounding match:
+   never mention them as differences. Check each bet the post names against bets_named_in_post; if one wasn't found,
+   say so and don't guess its size.`;
+
+const STANDOUT = `"What stands out:" then the 2-3 most surprising lines from facts.holder.insights: things a leaderboard or the
+   post doesn't show (a category they rank #1 in or bleed money on, longshots vs favorites, how concentrated the profit
+   is, a copy-trade result that cuts against their reputation, current form). Lead each with the finding, then the number.`;
+
+const PROFILE_SHAPE = `This is a profile of one trader (facts.holder), not tied to one market. Shape:
+1. One line naming the trader (as given in facts.holder.trader). ${CLAIM_CHECK}
+2. ${STANDOUT}
+3. "Breakdown:" then "- " lines: lifetime PnL, volume and trade count, portfolio value, Skill Score and tier, closed
+   win rate, active since; then their record in the post's niche (facts.holder.category).
+4. "Biggest wins:" then 3-5 "- " lines from biggest_wins (market — side, entry price, realized PnL).
+5. "Misses:" then 1-3 "- " lines from biggest_losses and losing notable_open_bets. Skip if none.
+6. One line on any notable open bet the post does not mention, if the facts have one.
+Separate the sections with a blank line. Stop there. Do not write a closing line or sign-off; Lychee appends the follow-up offer and the wallet link.`;
+
+const FOCUS_SHAPE = `This is a focused look at one trader (facts.holder). They asked specifically about facts.holder.asked_about.
+1. One line naming the trader (as given in facts.holder.trader) with a direct answer to what they asked.
+2. For each insight they asked about, a heading with its name, then 1-3 "- " lines from facts.holder.insights.
+3. "Also worth knowing:" then 1-3 "- " lines from the other insights in the same groups, most surprising first.
+4. "Breakdown:" one or two "- " lines: lifetime PnL, volume, Skill Score.
+Rewrite the insight lines in plain words rather than copying them, and shorten market names ("Carney PM",
+"Mamdani NYC mayor"); keep every number exact.
+Separate the sections with a blank line. Stop there. Do not write a closing line or sign-off; Lychee appends the follow-up offer and the wallet link.`;
+
+const ULTRA_SHAPE = `This is an ultra deep dive on one trader (facts.holder): every insight Lychee has. Shape:
+1. One headline line naming the trader (as given in facts.holder.trader) with the single most surprising finding.
+   ${CLAIM_CHECK}
+2. "Top findings:" then the 3 most surprising "- " lines across all insights.
+3. One section per group in facts.holder.insights, in this order: Edge & timing, Style, Category edge, Current book,
+   Crowd. Title each with the group name and 2-3 "- " lines each, the finding first and then the number.
+   For news timing say "bought before / after the headline" exactly as given; never suggest insider knowledge.
+4. "Record:" one line: lifetime PnL, volume and trades, Skill Score, active since.
+Rewrite the insight lines in plain words rather than copying them, and shorten market names; keep every number exact.
+Separate the sections with a blank line. Stop there. Do not write a closing line or sign-off; Lychee appends the
+follow-up offer and the dashboard link.`;
 
 const MARKETS_SHAPE = `Shape:
 1. One line that answers their actual question (for a claim: a clear verdict, backed / contradicted / no market to judge it).
@@ -34,6 +78,7 @@ const MARKETS_SHAPE = `Shape:
 Stop there. Do not write a closing line or sign-off; Lychee appends the follow-up offer.`;
 
 const RULES = `Rules:
+- Call the post "the post", never "your post": the person asking usually didn't write it.
 - Use only the facts given. Every number must come from the facts (a difference between two given prices is fine).
   Never invent prices, volumes, wallets, dates, or news.
 - Never say news "is moving", "pushed", or "drove" a market. Frame impact as possibility: "this could impact…",
@@ -47,26 +92,20 @@ const RULES = `Rules:
 
 Respond with JSON only: {"reply": "..."}`;
 
-const systemFor = (pack) =>
-  [INTRO, pack.holder ? HOLDER_SHAPE : MARKETS_SHAPE, RULES.replace("{MAX}", String(maxBody(pack)))].join("\n\n");
-
-function cents(price) {
-  if (price == null || !Number.isFinite(Number(price))) return null;
-  const n = Number(price);
-  const p = n > 1.5 ? n : n * 100;
-  if (p > 0 && p < 0.5) return "<1";
-  if (p < 100 && p > 99.5) return ">99";
-  return Math.round(p);
+function shapeFor(pack) {
+  const h = pack.holder;
+  if (!h) return MARKETS_SHAPE;
+  if (h.depth === "ultra") return ULTRA_SHAPE;
+  if (h.market) {
+    return h.focus?.length
+      ? `${HOLDER_SHAPE}\nThey also asked about facts.holder.asked_about: before "Related exposure", add a short section for each with 1-2 "- " lines from facts.holder.insights.`
+      : `${HOLDER_SHAPE}\nIf facts.holder.insights has anything surprising, add "What stands out:" with 1-2 "- " lines before "Related exposure".`;
+  }
+  if (h.focus?.length) return FOCUS_SHAPE;
+  return PROFILE_SHAPE;
 }
 
-function money(n) {
-  const v = Number(n);
-  if (!Number.isFinite(v) || v <= 0) return null;
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  if (v >= 1e3) return `$${Math.round(v / 1e3)}K`;
-  return `$${Math.round(v)}`;
-}
+const systemFor = (pack) => [INTRO, shapeFor(pack), RULES.replace("{MAX}", String(maxBody(pack)))].join("\n\n");
 
 function move(change) {
   const c = Number(change);
@@ -94,28 +133,16 @@ function marketFact(m) {
 
 const VENUE_NAMES = { kalshi: "Kalshi", polymarket: "Polymarket" };
 
-function signedMoney(n) {
-  const v = Number(n);
-  if (!Number.isFinite(v) || Math.abs(v) < 1) return "$0";
-  return `${v < 0 ? "-" : "+"}${money(Math.abs(v))}`;
-}
-
-function pct(rate) {
-  return rate == null || !Number.isFinite(Number(rate)) ? null : `${Math.round(Number(rate) * 100)}%`;
-}
-
-function shares(n) {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return null;
-  return v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${Math.round(v / 1e3)}K` : String(Math.round(v));
-}
-
 function tradeFact(b) {
   const head = `${b.date} ${b.side} ${b.outcome} ${money(b.usdc) || "$0"} at ${cents(b.price)}¢`;
   const h = b.nearest_headline;
   if (!h) return `${head}: no headline within 48h in what Lychee found`;
   const when = h.hours_after_headline >= 0 ? `${h.hours_after_headline}h after` : `${-h.hours_after_headline}h before`;
   return `${head}: ${when} the headline "${h.headline}"${h.source ? ` (${h.source})` : ""}`;
+}
+
+function closedLine(x) {
+  return `${x.title} — ${x.outcome}, avg entry ${entryCents(x.avg_price)}¢, realized ${signedMoney(x.pnl_usdc)}`;
 }
 
 /** One wallet, pre-formatted so the writer quotes numbers rather than computing them. */
@@ -133,14 +160,32 @@ export function holderFacts(h) {
     market: h.market ? `Polymarket · ${h.market.title} (YES ${cents(h.market.price)}¢)` : null,
     position: p
       ? `${shares(p.shares)} ${p.outcome} shares, avg ${cents(p.avg_price)}¢, now ${cents(p.current_price)}¢, worth ${money(p.value_usdc)}, PnL ${signedMoney(p.pnl_usdc)}, first bought ${p.first_entry}`
-      : "no open position in this market",
-    built_position: t.count
+      : h.market
+        ? "no open position in this market"
+        : undefined,
+    built_position: t?.count
       ? `${t.count} trades from ${t.first} to ${t.last}: bought ${money(t.bought_usdc) || "$0"}, sold ${money(t.sold_usdc) || "$0"}`
       : null,
-    biggest_trades: t.biggest.map(tradeFact),
-    headlines_checked: t.headlines_checked,
+    biggest_trades: t ? t.biggest.map(tradeFact) : undefined,
+    headlines_checked: t ? t.headlines_checked : undefined,
+    bets_named_in_post: (h.post_bets || []).map((b) => ({
+      looked_up: b.query,
+      found: b.positions.length
+        ? b.positions.map(
+            (x) =>
+              `${x.title} — ${x.outcome}, ${x.status}, avg entry ${entryCents(x.avg_price)}¢${x.status === "open" ? `, now ${cents(x.current_price)}¢` : ""}, PnL ${signedMoney(x.pnl_usdc)}`,
+          )
+        : "no position found with that in the title",
+    })),
+    biggest_wins: (h.biggest_wins || []).map(closedLine),
+    biggest_losses: (h.biggest_losses || []).map(closedLine),
+    notable_open_bets: (h.notable_open || []).map(
+      (x) => `${x.title} — ${x.outcome}, avg entry ${entryCents(x.avg_price)}¢, now ${cents(x.current_price)}¢, PnL ${signedMoney(x.pnl_usdc)}`,
+    ),
     overall: {
       lifetime_pnl: o.lifetime_pnl_usdc != null ? signedMoney(o.lifetime_pnl_usdc) : null,
+      lifetime_volume: money(o.volume_usdc),
+      lifetime_trades: o.trade_count ?? null,
       portfolio_value: money(o.portfolio_value_usdc),
       open_positions: o.open_positions,
       closed_win_rate: o.closed_win_rate != null ? `${pct(o.closed_win_rate)} of their last ${o.closed_positions_seen} closed positions` : null,
@@ -156,6 +201,8 @@ export function holderFacts(h) {
     lookalike_exposure: h.lookalike_exposure.map(
       (x) => `${x.title} — ${x.outcome}, worth ${money(x.value_usdc) || "$0"}, PnL ${signedMoney(x.pnl_usdc)}`,
     ),
+    insights: insightFacts(h.insights),
+    asked_about: h.focus?.length ? insightLabels(h.focus) : undefined,
   };
 }
 
@@ -165,13 +212,18 @@ export function holderTemplate(pack) {
   const lines = [
     `${f.trader}${f.found_as ? `, ${f.found_as}` : ""}.`,
     f.market,
-    `- Position: ${f.position}`,
+    f.position ? `- Position: ${f.position}` : null,
     f.built_position ? `- Built: ${f.built_position}` : null,
+    f.overall.lifetime_volume ? `- Volume ${f.overall.lifetime_volume}` : null,
+    ...f.biggest_wins.slice(0, 3).map((w) => `- Win: ${w}`),
     f.overall.lifetime_pnl ? `- Lifetime PnL ${f.overall.lifetime_pnl}${f.overall.portfolio_value ? `, portfolio ${f.overall.portfolio_value}` : ""}` : null,
-    f.overall.skill_score ? `- Lychee Skill Score ${f.overall.skill_score}` : null,
+    f.overall.skill_score ? `- Skill Score: ${f.overall.skill_score}` : null,
     `- Category: ${f.category}`,
   ].filter(Boolean);
-  return `${lines.join("\n")}\n\n${followUpLine(pack)}\n${pack.holder.terminal_url}`;
+  const reads = Object.values(f.insights).flatMap((group) => Object.values(group).map((ls) => ls[0]));
+  if (reads.length) lines.push("", "What stands out:", ...reads.slice(0, pack.holder.depth === "ultra" ? 12 : 3).map((l) => `- ${l}`));
+  const link = (pack.holder.depth === "ultra" && pack.holder.report_url) || pack.holder.terminal_url;
+  return `${lines.join("\n")}\n\n${followUpLine(pack)}\n${link}`;
 }
 
 /** What the writer may say: only what Lychee actually pulled. */
@@ -200,7 +252,9 @@ export function replyFacts(pack) {
 /** Follow-up offer under every model reply. Registered askers can continue in DMs (we know who they are). */
 export function followUpLine(pack) {
   const ask = pack.holder
-    ? "Want their other categories, or every trade lined up against the news?"
+    ? pack.holder.depth === "ultra"
+      ? "Charts for all of it are on the dashboard below. Want me to dig into one of these bets?"
+      : `Say "go ultra deep" for all 16 reads plus a dashboard, or ask about one: news timing, copy-trading, whales, followers.`
     : (pack.markets || []).length || (pack.pulse_alerts || []).length
       ? "Want me to dig into any of these?"
       : "Got a market, wallet, or angle you want me to look at instead?";
@@ -252,6 +306,6 @@ export async function writeReply({ pack, text, parent_text }) {
   if (invented.length) issues.push(`numbers not in facts: ${invented.join(", ")}`);
   if (body.length > maxBody(pack) + 40) issues.push(`too long (${body.length} chars)`);
   if (/\b(null|undefined|NaN)\b/.test(body)) issues.push("placeholder value in reply");
-  const link = pack.holder?.terminal_url || CTA;
+  const link = (pack.holder?.depth === "ultra" && pack.holder.report_url) || pack.holder?.terminal_url || CTA;
   return { reply: issues.length ? null : `${body}\n\n${followUpLine(pack)}\n${link}`, draft: body, issues };
 }

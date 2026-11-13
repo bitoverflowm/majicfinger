@@ -50,6 +50,9 @@ export async function searchNewsHeadlines({
   days = 14,
   limit = 25,
   source = "auto",
+  /** Optional window in epoch ms; overrides `days` (e.g. headlines around a trade a year ago). */
+  startMs = null,
+  endMs = null,
 } = {}) {
   const cleaned = cleanTerms([
     ...(Array.isArray(terms) ? terms : [terms]),
@@ -59,8 +62,11 @@ export async function searchNewsHeadlines({
     throw new Error("Pass terms or query (e.g. Fed, FOMC, rates).");
   }
 
-  const end = Date.now();
-  const start = end - Math.min(90, Math.max(1, Number(days) || 14)) * 24 * 60 * 60 * 1000;
+  const windowed = Number.isFinite(Number(startMs)) && Number.isFinite(Number(endMs)) && Number(endMs) > Number(startMs);
+  const end = windowed ? Math.min(Number(endMs), Date.now()) : Date.now();
+  const start = windowed
+    ? Math.max(Number(startMs), end - 90 * 24 * 60 * 60 * 1000)
+    : end - Math.min(90, Math.max(1, Number(days) || 14)) * 24 * 60 * 60 * 1000;
   const want = String(source || "auto").toLowerCase();
   let provider = "google_news";
   let articles = [];

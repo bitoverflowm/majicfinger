@@ -1,0 +1,30 @@
+{
+  "id": "x-trader-ultra-gopfan2",
+  "expectation": "\"Go ultra deep\" on a trader runs all 16 insights, groups the reply by cluster, and links the shareable report dashboard instead of the wallet card.",
+  "kind": "x_mention",
+  "text": "@Lychee_data go ultra deep on this trader",
+  "parent_text": "This Polymarket trader made $1.7M betting on elections around the world\n\nHis name is \"gopfan2\" (@r_gopfan) and he joined Polymarket in August 2024\n\nHis edge: elections in countries most traders don't follow closely\n\nHis biggest win is $203,073:\n> he bought \"Mark Carney to be the next Canadian PM\" at ~55c\n\nOther big wins:\n> United Russia wins most seats in the Russian parliamentary election - $141K (77c)\n> Karol Nawrocki becomes President of Poland - $128K (64c)\n> AfD wins 20-25% in the German election - $111K (24c)\n> Bhumjaithai wins most seats in Thailand - $80K (bought at 6c)\n> Zohran Mamdani wins NYC mayor - $89K (87c)\n\nNot every bet works: he is down about $21K on Gavin Newsom winning in 2028\n\nBut $1.7M profit on $70.8M volume shows what one niche can do",
+  "expect": {
+    "paths": {
+      "intent.mode": {
+        "equals": "holder_profile"
+      }
+    },
+    "matches": [
+      "gopfan2",
+      "Top findings:",
+      "Edge & timing",
+      "Style",
+      "Category edge",
+      "Current book",
+      "Crowd",
+      "lycheedata\\.com/jarvis/report/0xf2f6af4f27ec2dcf4072095ab804016e14cd5817"
+    ],
+    "not_matches": [
+      "[Yy]our post",
+      "insider",
+      "\\b(null|undefined|NaN)\\b"
+    ],
+    "max_chars": 4000
+  }
+}

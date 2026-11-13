@@ -1,11 +1,14 @@
 import {
   getLookalikeMarkets,
   getPolymarketHolders,
+  getPolymarketPositionsByPnl,
+  getPolymarketPositionsByTitle,
   getPolymarketTrader,
   getPolymarketWalletMarketActivity,
 } from "@/lib/mcp/data/providers";
 import { getLycheeSkillScore } from "@/lib/mcp/data/traderScoreMcp";
 import { searchNewsHeadlines } from "@/lib/mcp/data/news";
+import { traderInsights } from "./traderInsights.js";
 
 const WALLET_RE = /^0x[a-fA-F0-9]{40}$/;
 const DAY = 24 * 60 * 60;
@@ -15,7 +18,7 @@ export function holderTerminalUrl(wallet, conditionId = "") {
   return `https://lycheedata.com/jarvis/holder/${wallet}${conditionId ? `?market=${conditionId}` : ""}`;
 }
 
-const GENERIC_WORDS = new Set(["deal", "war", "price", "election", "win", "will", "market", "before", "after", "year", "end"]);
+const GENERIC_WORDS = new Set(["deal", "war", "price", "win", "will", "market", "before", "after", "year", "end"]);
 
 function themeRegex(keywords) {
   const words = (keywords || [])
@@ -108,19 +111,51 @@ function categoryRecord(positions, re) {
  * the position, track record (overall and in the market's category), Skill Score,
  * whether this is a one-off, trade timing vs headlines, and exposure across lookalike markets.
  */
-export async function holderDeepDive({ wallet, conditionId = "", themeKeywords = [], newsQuery = "" }) {
+export function holderReportUrl(wallet) {
+  return `https://lycheedata.com/jarvis/report/${wallet}`;
+}
+
+export async function holderDeepDive({ wallet, conditionId = "", themeKeywords = [], newsQuery = "", postBets = [], insightIds = [] }) {
   if (!WALLET_RE.test(String(wallet || ""))) throw new Error("wallet must be a 0x… proxy wallet");
   const re = themeRegex(themeKeywords);
-  const [traderRes, marketRes, skillRes, lookRes, newsRes] = await Promise.allSettled([
+  const betsChecked = Promise.all(
+    postBets.slice(0, 8).map(async (q) => ({
+      query: q,
+      positions: await getPolymarketPositionsByTitle(wallet, q, { limit: 3 }).catch(() => []),
+    })),
+  );
+  const [traderRes, winsRes, lossesRes, openLosersRes, openWinnersRes, marketRes, skillRes, lookRes, newsRes, betsRes] = await Promise.allSettled([
     getPolymarketTrader(wallet, { limit: 200, includeClosed: true }),
+    getPolymarketPositionsByPnl(wallet, { status: "closed", limit: 8, direction: "DESC" }),
+    getPolymarketPositionsByPnl(wallet, { status: "closed", limit: 4, direction: "ASC" }),
+    getPolymarketPositionsByPnl(wallet, { status: "open", limit: 10, direction: "ASC" }),
+    getPolymarketPositionsByPnl(wallet, { status: "open", limit: 5, direction: "DESC" }),
     conditionId ? getPolymarketWalletMarketActivity(wallet, conditionId, { limit: 500 }) : Promise.resolve(null),
     getLycheeSkillScore(wallet),
     conditionId ? getLookalikeMarkets({ conditionId, limit: 10 }) : Promise.resolve(null),
     newsQuery ? searchNewsHeadlines({ query: newsQuery, days: 90, limit: 40 }) : Promise.resolve(null),
+    betsChecked,
   ]);
   if (traderRes.status !== "fulfilled") throw traderRes.reason;
   const trader = traderRes.value;
-  const positions = [...(trader.positions || []), ...(trader.closed_positions || [])];
+  const insights = insightIds.length
+    ? await traderInsights(wallet, { ids: insightIds, pnlSeries: trader.pnl || [], lifetimePnl: trader.pnl_summary?.economic_pnl })
+    : {};
+  const wins = winsRes.status === "fulfilled" ? winsRes.value.filter((p) => Number(p.realized_pnl) > 0) : [];
+  const losses = lossesRes.status === "fulfilled" ? lossesRes.value.filter((p) => Number(p.realized_pnl) < 0) : [];
+  const byCondition = new Map();
+  for (const p of [...(trader.positions || []), ...(trader.closed_positions || []), ...wins, ...losses]) {
+    byCondition.set(`${p.condition_id}:${p.outcome}`, p);
+  }
+  const positions = [...byCondition.values()];
+  const pnlSeries = trader.pnl || [];
+  const lastPnl = pnlSeries[pnlSeries.length - 1] || null;
+  const closedFact = (p) => ({
+    title: p.title,
+    outcome: p.outcome,
+    avg_price: p.avg_price,
+    pnl_usdc: Math.round(Number(p.realized_pnl) || 0),
+  });
 
   const here = conditionId ? (trader.positions || []).find((p) => p.condition_id === conditionId) : null;
   const marketActivity = marketRes.status === "fulfilled" && marketRes.value ? marketRes.value : trader.activity || [];
@@ -144,10 +179,9 @@ export async function holderDeepDive({ wallet, conditionId = "", themeKeywords =
       pnl_usdc: Math.round(Number(p.total_pnl) || 0),
     }));
 
-  const firstSeen = Math.min(
-    ...positions.map((p) => epochSeconds(p.first_entry_at)).filter(Boolean),
-    ...marketTrades.map((t) => t.timestamp),
-  );
+  const firstSeen =
+    epochSeconds(pnlSeries[0]?.timestamp) ??
+    Math.min(...positions.map((p) => epochSeconds(p.first_entry_at)).filter(Boolean), ...marketTrades.map((t) => t.timestamp));
   const skill = skillRes.status === "fulfilled" ? skillRes.value : null;
   const closedAll = (trader.closed_positions || []).filter((p) => Number(p.realized_pnl) !== 0);
   const wonAll = closedAll.filter((p) => Number(p.realized_pnl) > 0).length;
@@ -170,7 +204,7 @@ export async function holderDeepDive({ wallet, conditionId = "", themeKeywords =
           last_trade: isoDay(epochSeconds(here.last_event_at)),
         }
       : null,
-    trades_in_market: {
+    trades_in_market: conditionId ? {
       count: marketTrades.length,
       bought_usdc: Math.round(marketTrades.filter((t) => t.side === "BUY").reduce((s, t) => s + (Number(t.usdc_size) || 0), 0)),
       sold_usdc: Math.round(marketTrades.filter((t) => t.side === "SELL").reduce((s, t) => s + (Number(t.usdc_size) || 0), 0)),
@@ -178,8 +212,42 @@ export async function holderDeepDive({ wallet, conditionId = "", themeKeywords =
       last: isoDay(marketTrades.length ? Math.max(...marketTrades.map((t) => t.timestamp)) : null),
       biggest: tradesVsNews(biggest, headlines),
       headlines_checked: headlines.length,
-    },
+    } : null,
+    post_bets: (betsRes.status === "fulfilled" ? betsRes.value : []).map((b) => ({
+      query: b.query,
+      positions: b.positions.slice(0, 4).map((p) => ({
+        title: p.title,
+        outcome: p.outcome,
+        status: String(p.status || "").toUpperCase() === "OPEN" ? "open" : "closed",
+        avg_price: p.avg_price,
+        current_price: p.current_price,
+        pnl_usdc: Math.round(Number(p.total_pnl ?? p.realized_pnl) || 0),
+      })),
+    })),
+    biggest_wins: wins.slice(0, 6).map(closedFact),
+    biggest_losses: losses.slice(0, 3).map(closedFact),
+    notable_open: [
+      ...new Map(
+        [
+          ...(openLosersRes.status === "fulfilled" ? openLosersRes.value : []),
+          ...(openWinnersRes.status === "fulfilled" ? openWinnersRes.value : []),
+          ...(trader.positions || []),
+        ].map((p) => [`${p.condition_id}:${p.outcome}`, p]),
+      ).values(),
+    ]
+      .filter((p) => p.condition_id !== conditionId && Math.abs(Number(p.total_pnl) || 0) >= 1000)
+      .sort((a, b) => Math.abs(Number(b.total_pnl)) - Math.abs(Number(a.total_pnl)))
+      .slice(0, 12)
+      .map((p) => ({
+        title: p.title,
+        outcome: p.outcome,
+        avg_price: p.avg_price,
+        current_price: p.current_price,
+        pnl_usdc: Math.round(Number(p.total_pnl) || 0),
+      })),
     overall: {
+      volume_usdc: Number(lastPnl?.volume) ? Math.round(Number(lastPnl.volume)) : null,
+      trade_count: Number(lastPnl?.trade_count) || null,
       lifetime_pnl_usdc: Math.round(Number(trader.pnl_summary?.economic_pnl) || 0) || null,
       realized_pnl_usdc: Math.round(Number(trader.pnl_summary?.realized_pnl) || 0) || null,
       portfolio_value_usdc: Math.round(Number(trader.portfolio_value?.data?.value ?? trader.portfolio_value?.value) || 0) || null,
@@ -193,5 +261,6 @@ export async function holderDeepDive({ wallet, conditionId = "", themeKeywords =
     category: categoryRecord(positions, re),
     category_keywords: themeKeywords,
     lookalike_exposure: lookalikeExposure,
+    insights,
   };
 }

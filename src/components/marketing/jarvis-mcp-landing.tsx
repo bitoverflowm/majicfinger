@@ -19,6 +19,7 @@ import { JarvisChatShowcase } from "./jarvis/jarvis-chat-showcase";
 import { JARVIS_KEYFRAMES } from "./jarvis/jarvis-keyframes";
 import { JarvisOrb } from "./jarvis/jarvis-orb";
 import { PulseRadarDemo } from "./jarvis/pulse-radar-demo";
+import { TraderDeepDiveDemo } from "./jarvis/trader-deep-dive-demo";
 import { WorkflowRunnerDemo } from "./jarvis/workflow-runner-demo";
 import { XMentionDemo } from "./jarvis/x-mention-demo";
 
@@ -58,6 +59,16 @@ const CAPABILITIES: ShowcaseRow[] = [
     ],
     showcase: { demo: <XMentionDemo />, backdrop: connectBackdrop, href: "https://x.com/lychee_data", cta: "Follow @lychee_data" },
   },
+  {
+    id: "traders",
+    title: "Go ultra deep on any trader.",
+    description: [
+      "Name a Polymarket trader or paste a wallet. Jarvis checks the post's claims, then reads what a leaderboard can't show.",
+      "Edge: before or after the news, how early, does price move their way. Style: longshots vs favorites, profit concentration, holder or flipper, current form. Category: where they win vs bleed, country edge, category ranks. Book: what they're buying now, contrarian bets, the copy-trade check. Crowd: similar traders, with or against the whales, who follows them in.",
+      "Ask for one, like “is he early?”, and Jarvis answers it with the rest of that group. Say “go ultra deep” for all 16 plus a shareable dashboard of charts.",
+    ],
+    showcase: { demo: <TraderDeepDiveDemo />, backdrop: exploreBackdrop, href: "https://x.com/lychee_data", cta: "Try it on X" },
+  },
 ];
 
 const ORBIT_CHIPS = [
@@ -93,6 +104,11 @@ const FAQ = [
     question: "How do the X replies work?",
     answer:
       "Tag @lychee_data with a question like “is there a market for this?” or “does the data back this?”. Jarvis works out what you're asking, pulls matching markets, holders, or prices from Lychee, and replies in the thread. New reply packs run as dry runs before they go live.",
+  },
+  {
+    question: "What can Jarvis tell me about a trader?",
+    answer:
+      "Tag @lychee_data under a post about a trader (or name them, or paste a wallet) and ask “dig into this trader”. You get a claim check, their record, and the 2-3 most surprising reads. Ask about one thing (news timing, how early, longshots vs favorites, profit concentration, holder or flipper, current form, category PnL, country edge, category ranks, what they're buying now, contrarian bets, copy-trade check, similar traders, whales, followers) and Jarvis answers it plus the rest of that group. Say “go ultra deep” for all 16 and a dashboard you can share.",
   },
   {
     question: `What does the ${PRICE} preregistration include?`,

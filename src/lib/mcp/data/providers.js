@@ -50,6 +50,8 @@ function mapMarket(m) {
     volume_24h: Number(m.volume24hr ?? m.volume_24hr) || null,
     liquidity: Number(m.liquidityNum ?? m.liquidity) || null,
     end_date: m.endDate || m.end_date_iso || null,
+    start_date: m.startDate || m.createdAt || null,
+    closed_time: m.closedTime || null,
     active: m.active ?? null,
     closed,
     outcomes,
@@ -342,7 +344,10 @@ export async function searchClosedPolymarketMarkets(query, { limit = 20 } = {}) 
 export async function getPolymarketMarketByCondition(conditionId) {
   const condition = String(conditionId || "").trim();
   if (!condition) throw new Error("condition_id required");
-  const body = await fetchJson(`${GAMMA_BASE}/markets?condition_ids=${encodeURIComponent(condition)}&limit=5`);
+  let body = await fetchJson(`${GAMMA_BASE}/markets?condition_ids=${encodeURIComponent(condition)}&limit=5`);
+  if (!Array.isArray(body) || !body.length) {
+    body = await fetchJson(`${GAMMA_BASE}/markets?condition_ids=${encodeURIComponent(condition)}&closed=true&limit=5`);
+  }
   const markets = Array.isArray(body) ? body : [];
   if (!markets.length) {
     throw new Error(`No Polymarket market found for condition_id ${condition}`);
@@ -418,12 +423,14 @@ export async function getPolymarketHolders(conditionId, { limit = 500, includePn
   };
 }
 
-export async function getPolymarketTradesPreview(conditionId, { limit = 500 } = {}) {
+export async function getPolymarketTradesPreview(conditionId, { limit = 500, start = null, end = null } = {}) {
   const condition = String(conditionId || "").trim();
   if (!condition) throw new Error("condition_id required");
   const params = new URLSearchParams();
   params.set("condition", condition);
   params.set("limit", String(Math.min(2000, Math.max(1, limit))));
+  if (start != null) params.set("start", String(Math.floor(start)));
+  if (end != null) params.set("end", String(Math.floor(end)));
   const body = await fetchJson(`${DATA_API_BASE}/v2/trades?${params}`);
   const rowsRaw = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
   const rows = rowsRaw.map((row) => ({
@@ -598,6 +605,119 @@ async function fetchTraderJson(url) {
     throw err;
   }
   return body;
+}
+
+/** Polymarket profile whose username (or pseudonym) is exactly `name`, else the first profile hit. */
+export async function findPolymarketProfile(name) {
+  const q = String(name || "").trim().replace(/^@/, "");
+  if (q.length < 2) return null;
+  const body = await fetchJson(`${GAMMA_BASE}/public-search?q=${encodeURIComponent(q)}&limit_per_type=10&search_profiles=true`);
+  const profiles = (Array.isArray(body?.profiles) ? body.profiles : []).filter((p) => p?.proxyWallet);
+  const lower = q.toLowerCase();
+  const exact = profiles.find(
+    (p) => String(p.name || "").toLowerCase() === lower || String(p.pseudonym || "").toLowerCase() === lower,
+  );
+  const hit = exact || profiles[0];
+  return hit ? { wallet: String(hit.proxyWallet).toLowerCase(), name: hit.name || hit.pseudonym || q, exact: Boolean(exact) } : null;
+}
+
+/**
+ * A wallet's positions ranked by PnL: biggest wins (DESC) or losses (ASC).
+ * Closed rank by realized PnL; open by total PnL (open includes resolved-but-unredeemed).
+ */
+export async function getPolymarketPositionsByPnl(wallet, { status = "closed", limit = 8, direction = "DESC" } = {}) {
+  const { positionSheetRow } = await import("@/lib/polymarketLive/traderPositionsCompose");
+  const user = String(wallet || "").trim();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(user)) throw new Error("proxy_wallet must be 0x…40 hex");
+  const closed = status === "closed";
+  const body = await fetchTraderJson(
+    `${DATA_API_BASE}/v2/positions?user=${encodeURIComponent(user)}${closed ? "&status=closed" : ""}&limit=${Math.min(50, Math.max(1, limit))}&sort_by=${closed ? "REALIZED_PNL" : "TOTAL_PNL"}&sort_direction=${direction === "ASC" ? "ASC" : "DESC"}`,
+  );
+  const rows = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
+  return rows.filter((row) => row && typeof row === "object").map((row) => positionSheetRow(row, user));
+}
+
+/** Every position a wallet holds (`open`) or has closed, newest first, up to `maxRows`. */
+export async function walkPolymarketPositions(wallet, { status = "closed", maxRows = 2000 } = {}) {
+  const { positionSheetRow } = await import("@/lib/polymarketLive/traderPositionsCompose");
+  const user = String(wallet || "").trim();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(user)) throw new Error("proxy_wallet must be 0x…40 hex");
+  const out = [];
+  let cursor = "";
+  let truncated = false;
+  while (out.length < maxRows) {
+    const params = new URLSearchParams({ user, limit: String(Math.min(1000, maxRows - out.length)) });
+    if (status === "closed") {
+      params.set("status", "closed");
+      params.set("sort_by", "TIMESTAMP");
+      params.set("sort_direction", "DESC");
+    }
+    if (cursor) params.set("cursor", cursor);
+    const body = await fetchTraderJson(`${DATA_API_BASE}/v2/positions?${params}`);
+    const rows = Array.isArray(body?.data) ? body.data : [];
+    out.push(...rows.filter((row) => row && typeof row === "object").map((row) => positionSheetRow(row, user)));
+    cursor = body?.pagination?.has_more ? String(body.pagination.next_cursor || "") : "";
+    if (!cursor || !rows.length) break;
+    truncated = out.length >= maxRows;
+  }
+  return { rows: out, truncated };
+}
+
+/** A wallet's all-time (or `timePeriod`) PnL, volume, and rank on one Polymarket leaderboard category. */
+export async function getPolymarketLeaderboardEntry(wallet, { category = "overall", timePeriod = "all" } = {}) {
+  const params = new URLSearchParams({ user: String(wallet || "").trim(), time_period: timePeriod, category });
+  const body = await fetchTraderJson(`${DATA_API_BASE}/v2/leaderboard?${params}`);
+  const row = body?.data;
+  if (!row || typeof row !== "object") return null;
+  return {
+    category,
+    pnl: Number(row.pnl) || 0,
+    volume: Number(row.volume) || 0,
+    rank_pnl: Number(row.rank_pnl) || null,
+    rank_volume: Number(row.rank_volume) || null,
+    user_name: row.user_name || null,
+    profile_image: row.profile_image || null,
+  };
+}
+
+/** A wallet's activity since `sinceTs` (epoch seconds), newest first. */
+export async function getPolymarketActivitySince(wallet, sinceTs, { limit = 500 } = {}) {
+  const { activitySheetRow } = await import("@/lib/polymarketLive/traderActivityCompose");
+  const user = String(wallet || "").trim();
+  const params = new URLSearchParams({ user, limit: String(Math.min(500, limit)), start: String(Math.floor(sinceTs)) });
+  const body = await fetchTraderJson(`${DATA_API_BASE}/v2/activity?${params}`);
+  const rows = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
+  return rows.filter((row) => row && typeof row === "object").map((row) => activitySheetRow(row, user));
+}
+
+/** One outcome token's price history from the CLOB: [{ t, p }] with t in epoch seconds. */
+export async function getClobPriceHistory(tokenId, { startTs, endTs, fidelity = 60 } = {}) {
+  const params = new URLSearchParams({
+    market: String(tokenId || ""),
+    startTs: String(Math.floor(startTs)),
+    endTs: String(Math.floor(endTs)),
+    fidelity: String(fidelity),
+  });
+  const body = await fetchJson(`${CLOB_BASE}/prices-history?${params}`);
+  return (Array.isArray(body?.history) ? body.history : [])
+    .map((h) => ({ t: Number(h.t), p: Number(h.p) }))
+    .filter((h) => Number.isFinite(h.t) && Number.isFinite(h.p));
+}
+
+/** A wallet's open and closed positions whose market title contains `title`, for checking bets a post names. */
+export async function getPolymarketPositionsByTitle(wallet, title, { limit = 3 } = {}) {
+  const { positionSheetRow } = await import("@/lib/polymarketLive/traderPositionsCompose");
+  const user = String(wallet || "").trim();
+  const t = String(title || "").trim().slice(0, 100);
+  if (!/^0x[a-fA-F0-9]{40}$/.test(user)) throw new Error("proxy_wallet must be 0x…40 hex");
+  if (t.length < 3) return [];
+  const lim = Math.min(10, Math.max(1, limit));
+  const base = `${DATA_API_BASE}/v2/positions?user=${encodeURIComponent(user)}&title=${encodeURIComponent(t)}&limit=${lim}`;
+  const settled = await Promise.allSettled([fetchTraderJson(base), fetchTraderJson(`${base}&status=closed`)]);
+  return settled
+    .flatMap((r) => (r.status === "fulfilled" ? (Array.isArray(r.value?.data) ? r.value.data : Array.isArray(r.value) ? r.value : []) : []))
+    .filter((row) => row && typeof row === "object")
+    .map((row) => positionSheetRow(row, user));
 }
 
 /** One wallet's activity in one market (newest first), for trade-timing reads. */

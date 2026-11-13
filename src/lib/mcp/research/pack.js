@@ -3,12 +3,15 @@ import { gateResearchPack } from "./gate.js";
 import { formatXReply } from "./formatX.js";
 import { compactSearchQuery, relevanceScore } from "./relevance.js";
 import { llmAvailable, llmModel } from "./llm.js";
-import { understandRequest } from "./understand.js";
+import { understandRequest, wantsUltraDeep } from "./understand.js";
 import { pickMarkets } from "./pick.js";
 import { holderTemplate, writeReply } from "./write.js";
-import { findHolder, holderDeepDive } from "./holder.js";
+import { findHolder, holderDeepDive, holderReportUrl } from "./holder.js";
+import { insightsToRun } from "./traderInsights.js";
+import { reportFromDeepDive, saveTraderReport } from "./traderReport.js";
 import { jarvisPulse } from "@/lib/mcp/data/jarvis";
 import {
+  findPolymarketProfile,
   getLookalikeMarkets,
   getPolymarketHolders,
   getPolymarketTrader,
@@ -233,11 +236,22 @@ async function optionalLookalikes(conditionId, query) {
 }
 
 /** A deep dive on one wallet: given directly, or the `holder_rank`-th holder on `holder_side` of the picked market. */
-async function holderProfilePack({ as_of, intent, understanding, picked, llm }) {
+async function holderProfilePack({ as_of, intent, understanding, picked, llm, text = "" }) {
+  const depth = wantsUltraDeep(text) ? "ultra" : "standard";
+  const focus = understanding?.insight_focus || [];
   const market = (picked?.matches || []).find((m) => m.venue === "polymarket" && m.condition_id);
   let wallet = intent.subject.wallet || (/^0x[a-fA-F0-9]{40}$/.test(understanding?.wallet || "") ? understanding.wallet : "");
   let found = null;
+  let profile = null;
   const base = { as_of, intent, markets: [], lookalikes: [], news: [], flows: ["polymarket_holders", "trader_profile"] };
+  if (!wallet && understanding?.trader_name) {
+    profile = await findPolymarketProfile(understanding.trader_name).catch((err) => {
+      llm.issues.push(`profile: ${err?.message || err}`);
+      return null;
+    });
+    llm.profile = profile;
+    wallet = profile?.wallet || "";
+  }
   if (!wallet && market) {
     found = await findHolder(market.condition_id, {
       side: understanding?.holder_side || "NO",
@@ -249,19 +263,39 @@ async function holderProfilePack({ as_of, intent, understanding, picked, llm }) 
     wallet = found?.wallet || "";
   }
   if (!wallet) {
-    return { ...base, verdict: "none", take: "Couldn't pin down which wallet you mean — paste the address or market and tag me again." };
+    return {
+      ...base,
+      verdict: "none",
+      take: understanding?.trader_name
+        ? `Couldn't find a Polymarket profile named "${understanding.trader_name}" — paste their wallet or profile link and tag me again.`
+        : "Couldn't pin down which wallet you mean — paste the address or market and tag me again.",
+    };
   }
   try {
-    const profile = await holderDeepDive({
+    const deep = await holderDeepDive({
       wallet,
-      conditionId: market?.condition_id || "",
+      conditionId: profile ? "" : market?.condition_id || "",
       themeKeywords: understanding?.category_keywords || [],
       newsQuery: intent.subject.queries?.[0] || "",
+      postBets: understanding?.post_bets || [],
+      insightIds: insightsToRun({ depth, focus }),
     });
+    llm.insights = { depth, focus, ran: Object.keys(deep.insights) };
+    if (depth === "ultra") {
+      await saveTraderReport(reportFromDeepDive(deep)).catch((err) => llm.issues.push(`report save: ${err?.message || err}`));
+    }
     return {
       ...base,
       verdict: "listed",
-      holder: { ...profile, market: market ? { title: market.title, price: market.yes_price } : null, rank: found },
+      holder: {
+        ...deep,
+        name: deep.name || profile?.name || null,
+        market: market && deep.position ? { title: market.title, price: market.yes_price } : null,
+        rank: found,
+        depth,
+        focus,
+        report_url: depth === "ultra" ? holderReportUrl(wallet) : null,
+      },
       take: "",
     };
   } catch (err) {
@@ -289,6 +323,7 @@ async function settleDraft(pack, { text = "", parent_text = "" } = {}) {
   let status = pack.status || "draft_ready";
   let outDraft = draft;
   if (!gated.can_post && status !== "needs_clarification") {
+    llm?.issues.push(`gate: ${gated.issues.join(", ")}`, `gated draft: ${draft}`);
     outDraft =
       "Lychee didn't get a clean read on that — try a market link, wallet, or a clearer theme. lycheedata.com/jarvis";
     gated = gateResearchPack({
@@ -332,6 +367,8 @@ export async function runResearchPack({
     }
   }
   const intent = understanding ? withUnderstanding(ruleIntent, understanding) : ruleIntent;
+  const traderNamed = intent.subject.wallet || understanding?.wallet || understanding?.trader_name || understanding?.holder_side;
+  if (wantsUltraDeep(text) && traderNamed) intent.mode = "holder_profile";
   const as_of = new Date().toISOString();
   const query = intent.subject.query || "";
   const finish = (pack) => settleDraft({ ...pack, asker_registered, llm }, { text, parent_text });
@@ -392,7 +429,9 @@ export async function runResearchPack({
   let verdict = "none";
   let markets = [];
   let picked = null;
-  if (understanding && intent.subject.queries?.length) {
+  const knownTrader =
+    intent.mode === "holder_profile" && (intent.subject.wallet || understanding?.wallet || understanding?.trader_name);
+  if (understanding && intent.subject.queries?.length && !knownTrader) {
     ranked = await searchCandidates(intent.subject.queries);
     try {
       picked = await pickMarkets({ understanding, request: text, candidates: ranked });
@@ -414,7 +453,7 @@ export async function runResearchPack({
     } catch (err) {
       llm.issues.push(`pick: ${err?.message || err}`);
     }
-  } else {
+  } else if (!knownTrader) {
     const searches = await searchBoth(query, 8);
     ranked = rankMarkets(query, searches.kalshi, searches.polymarket);
   }
@@ -432,7 +471,7 @@ export async function runResearchPack({
   }
 
   if (intent.mode === "holder_profile") {
-    return finish(await holderProfilePack({ as_of, intent, understanding, picked, llm }));
+    return finish(await holderProfilePack({ as_of, intent, understanding, picked, llm, text }));
   }
 
   const seed = markets.find((m) => m.condition_id);

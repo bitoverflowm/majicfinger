@@ -1,5 +1,5 @@
 const BANNED =
-  /pull_market_bundle|condition_id|analysis_ready|undefined|NaN|0 wallets|snag pulling|Also watching:\s*Also moving/i;
+  /pull_market_bundle|condition_id|analysis_ready|\bundefined\b|\bNaN\b|(?<!\d)0 wallets|snag pulling|Also watching:\s*Also moving/i;
 
 function nonempty(s) {
   return String(s || "").trim().length > 0;

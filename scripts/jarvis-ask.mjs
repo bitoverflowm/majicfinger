@@ -71,6 +71,14 @@ if (values.debug) {
     pack.holder
       ? `holder: ${pack.holder.wallet} in ${pack.holder.market?.title || "(no market)"} · rank ${JSON.stringify(pack.holder.rank)} · category keywords ${pack.holder.category_keywords.join("/")}`
       : null,
+    llm.insights
+      ? `insights: ${llm.insights.depth}${llm.insights.focus?.length ? ` focus ${llm.insights.focus.join("/")}` : ""} · ran ${llm.insights.ran.length} · failed ${
+          Object.entries(pack.holder?.insights || {})
+            .filter(([, v]) => v?.error)
+            .map(([k]) => k)
+            .join(", ") || "none"
+        }`
+      : null,
     ...(pack.news || []).map((n) => `  news    ${n.title} (${n.source || "?"})`),
     llm.writer === "template" && llm.model_draft ? `model draft (rejected): ${llm.model_draft}` : null,
     ...(llm.issues || []).map((issue) => `issue: ${issue}`),
@@ -81,3 +89,7 @@ if (values.debug) {
   ].filter((line) => line != null);
   console.error(lines.join("\n"));
 }
+
+process.exit(0);
+
+process.exit(0);
