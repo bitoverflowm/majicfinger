@@ -48,10 +48,13 @@ export function formatXReply(pack) {
   }
 
   if (mode === "news_impact") {
-    if (!markets.length) {
+    if (!markets.length || pack.verdict === "none") {
       return [`No listed Kalshi/Poly market tied to that news in Lychee.`, take, cta].filter(Boolean).join("\n").slice(0, 380);
     }
-    const head = `Markets this news can hit (${markets.length} listed):`;
+    const head =
+      pack.verdict === "cousin"
+        ? "Not a clean match — closest listed books:"
+        : `Markets this news can hit (${markets.length} listed):`;
     const extra = news[0]?.title ? `Also seeing: ${String(news[0].title).slice(0, 80)}` : null;
     return [head, ...markets.map(lineForMarket), take, extra, cta].filter(Boolean).join("\n").slice(0, 420);
   }

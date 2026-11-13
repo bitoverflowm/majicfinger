@@ -8,7 +8,7 @@ const SHORTCUTS = [
   { re: /\b(calibrat|brier|settled|closed markets?)\b/i, mode: "calibrate" },
   { re: /\b(pulse|what's hot|whats hot|scan|brief)\b/i, mode: "pulse" },
   {
-    re: /\b(what markets? (is|are) this affecting|markets? (for|on) this news|this (headline|article|news))\b/i,
+    re: /\b((what|which) markets?\b|\bmarkets? (does|do|is|are) this\b|\bdoes this impact\b|\bthis impact\b|markets? (for|on) this news|this (headline|article|news))\b/i,
     mode: "news_impact",
   },
   { re: /\b(is there a market|any market for|market for this)\b/i, mode: "market_for" },
@@ -18,7 +18,24 @@ const SHORTCUTS = [
 ];
 
 const FILLER =
-  /\b(is there a market( for this)?|any market for this|what markets? (is|are) this affecting|jarvis|please|pls)\b/gi;
+  /\b(is there a market( for this)?|any market for this|(what|which) markets?( (is|are|does|do) this( affecting| impact)?)?|does this impact|jarvis|please|pls)\b/gi;
+
+const META_COMPLAINT =
+  /\b(your response|you('re| are) wrong|nothing to do with|unrelated|not even close|try again|that('s| is) (wrong|unrelated))\b[^.!?\n]*/gi;
+
+function stripAsk(text) {
+  return String(text || "")
+    .replace(FILLER, " ")
+    .replace(META_COMPLAINT, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isThinFollowUp(mention) {
+  const c = stripAsk(mention);
+  if (c.length < 12) return true;
+  return /^(this|that|the above|the (tweet|post|headline))[.!?]*$/i.test(c);
+}
 
 function extractTickers(text) {
   const out = [];
@@ -98,11 +115,16 @@ export function parseResearchIntent(input = {}) {
   const tickers = extractTickers(cleaned || parent);
   const handle = extractHandle(`${cleaned} ${parent}`);
 
-  const mentionBody = cleaned.replace(FILLER, " ").replace(/\s+/g, " ").trim();
-  const query =
-    mentionBody && mentionBody.length >= 8
-      ? mentionBody
-      : parent.replace(FILLER, " ").replace(/\s+/g, " ").trim().slice(0, 280) || mentionBody;
+  const mentionBody = stripAsk(cleaned);
+  const parentBody = stripAsk(parent).slice(0, 400);
+  let query = mentionBody;
+  if (parentBody && (isThinFollowUp(cleaned) || mentionBody.length < 8)) {
+    query = parentBody;
+  } else if (parentBody && mentionBody) {
+    query = `${parentBody} ${mentionBody}`.slice(0, 400);
+  } else {
+    query = mentionBody || parentBody;
+  }
 
   const vague =
     mode !== "pulse" &&

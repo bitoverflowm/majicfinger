@@ -1,7 +1,7 @@
 import { parseResearchIntent } from "./intent.js";
 import { gateResearchPack } from "./gate.js";
 import { formatXReply } from "./formatX.js";
-import { relevanceScore } from "./relevance.js";
+import { compactSearchQuery, relevanceScore } from "./relevance.js";
 import { jarvisPulse } from "@/lib/mcp/data/jarvis";
 import {
   getLookalikeMarkets,
@@ -48,7 +48,7 @@ function asMarket(row, query, venueHint) {
 }
 
 async function searchBoth(query, limit = 6) {
-  const q = String(query || "").trim().slice(0, 180);
+  const q = compactSearchQuery(query);
   if (q.length < 2) return { kalshi: [], polymarket: [] };
   const [k, p] = await Promise.allSettled([searchKalshi(q, { limit }), searchPolymarket(q, { limit })]);
   return {
@@ -70,17 +70,19 @@ function rankMarkets(query, kalshi, polymarket) {
   return rows;
 }
 
-function verdictFrom(ranked) {
-  const best = ranked[0];
-  if (!best) return "none";
-  if (best.relevance >= 0.34) return "listed";
-  if (best.relevance >= 0.15) return "cousin";
-  return "none";
+function pickMarkets(ranked, mode) {
+  const listedMin = 0.32;
+  const cousinMin = mode === "news_impact" ? 0.28 : 0.2;
+  const listed = ranked.filter((m) => (m.relevance || 0) >= listedMin);
+  if (listed.length) return { verdict: "listed", markets: listed.slice(0, 3) };
+  const cousins = ranked.filter((m) => (m.relevance || 0) >= cousinMin);
+  if (cousins.length) return { verdict: "cousin", markets: cousins.slice(0, 2) };
+  return { verdict: "none", markets: [] };
 }
 
 async function optionalNews(query) {
   try {
-    const news = await searchNewsHeadlines({ query, days: 7, limit: 6 });
+    const news = await searchNewsHeadlines({ query: compactSearchQuery(query) || query, days: 7, limit: 6 });
     return (news.articles || []).slice(0, 3).map((a) => ({
       title: a.title,
       source: a.source,
@@ -212,12 +214,12 @@ export async function runResearchPack({
   }
 
   const searches = await searchBoth(query, 8);
-  let ranked = rankMarkets(query, searches.kalshi, searches.polymarket);
-  let verdict = verdictFrom(ranked);
-  const listed = ranked.filter((m) => (m.relevance || 0) >= (verdict === "listed" ? 0.34 : 0.15)).slice(0, 4);
-  const markets = (listed.length ? listed : ranked.slice(0, 2)).slice(0, 3);
+  const ranked = rankMarkets(query, searches.kalshi, searches.polymarket);
+  const picked = pickMarkets(ranked, intent.mode);
+  let verdict = picked.verdict;
+  const markets = picked.markets;
 
-  const seed = markets.find((m) => m.condition_id) || ranked.find((m) => m.condition_id);
+  const seed = markets.find((m) => m.condition_id);
   const wantDeep = ["holders", "research", "lookalikes", "verify", "news_impact", "market_for"].includes(intent.mode);
 
   const [lookalikes, whale, news] = await Promise.all([
@@ -275,9 +277,11 @@ export async function runResearchPack({
     }
   } else if (intent.mode === "news_impact") {
     take =
-      whale.whale_line ||
-      (news[0]?.title ? `Related coverage: ${String(news[0].title).slice(0, 90)}` : "") ||
-      (markets.length ? "Prices/holders from Lychee live books — not the headline site." : "");
+      verdict === "none"
+        ? ""
+        : whale.whale_line ||
+          (news[0]?.title ? `Related coverage: ${String(news[0].title).slice(0, 90)}` : "") ||
+          (markets.length ? "Prices/holders from Lychee live books — not the headline site." : "");
   } else if (!take && whale.whale_line && verdict === "listed") {
     take = whale.whale_line;
   }
