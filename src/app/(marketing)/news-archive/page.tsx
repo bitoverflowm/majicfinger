@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BarChart3, LineChart, Search } from "lucide-react";
 
 import { NewsArchiveHeroActions, NewsArchiveSearch } from "@/components/newsArchive/NewsArchiveSearch";
+import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { FAQSection } from "@/components/sections/faq-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { pickMarkets } from "@/lib/holderLanding/featuredSubjects";
@@ -247,6 +248,8 @@ export default async function NewsArchivePage() {
           </ul>
         </div>
       </section>
+
+      <JarvisComingPromo />
 
       <FAQSection
         title="Frequently asked questions"

@@ -738,6 +738,8 @@ async function handleCheckoutCompleted(session) {
         stripePriceId: sub.items?.data?.[0]?.price?.id || null,
         nextPaymentDate: nextPaymentDateOf(sub),
         subscriptionStartedAt: sub.start_date ? new Date(sub.start_date * 1000) : new Date(),
+        jarvisLaunchGrant:
+          mapping?.cycle === "annual" && blackFridayAppliesTo({ mode: "subscription", interval: "year" }),
       });
       if (!mapping) return { ok: false, reason: "unrecognized_amount" };
       return { ok: true };
@@ -1083,6 +1085,10 @@ async function grantMcpPreregPurchase(email, name, amount, { stripeCustomerId, c
   const meta = { ...(user.metadata && typeof user.metadata === "object" ? user.metadata : {}) };
   const already = !!meta.mcp_prereg_paid_at;
   meta.mcp_prereg_paid_at = meta.mcp_prereg_paid_at || new Date().toISOString();
+  if (!meta.jarvis_launch_free_months) {
+    meta.jarvis_launch_free_months = 3;
+    meta.jarvis_launch_grant_at = new Date().toISOString();
+  }
   meta.mcp_prereg_amount_cents = amount;
   meta.mcp_prereg_session_id = sessionId || meta.mcp_prereg_session_id || "";
   await User.updateOne(
@@ -1117,6 +1123,7 @@ async function updateUserPayment(email, name, amount, opts) {
     stripePriceId,
     nextPaymentDate,
     subscriptionStartedAt,
+    jarvisLaunchGrant,
   } = opts;
 
   const normalizedEmail = normalizeEmail(email);
@@ -1141,6 +1148,15 @@ async function updateUserPayment(email, name, amount, opts) {
     stripeSubscriptionId: stripeSubscriptionId || user?.stripeSubscriptionId || null,
     stripePriceId: stripePriceId || user?.stripePriceId || null,
   };
+
+  if (jarvisLaunchGrant) {
+    const meta = { ...(user?.metadata && typeof user.metadata === "object" ? user.metadata : {}) };
+    if (!meta.jarvis_launch_free_months) {
+      meta.jarvis_launch_free_months = 3;
+      meta.jarvis_launch_grant_at = new Date().toISOString();
+    }
+    update.metadata = meta;
+  }
 
   if (!user) {
     await User.create({ email: normalizedEmail, ...update });

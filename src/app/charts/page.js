@@ -1,6 +1,7 @@
 import Script from "next/script";
 import { siteConfig } from "@/lib/site";
 import { MarketingNavbar } from "@/components/sections/marketing-navbar";
+import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { FooterSection } from "@/components/sections/footer-section";
 import { TelegramMarketingTracker } from "@/components/analytics/TelegramMarketingTracker";
 import EasyCharts from "./easyCharts";
@@ -94,6 +95,7 @@ export default function ChartsPage() {
       </Script>
       <main className="flex min-h-screen w-full flex-col items-stretch overflow-x-visible bg-background font-sans antialiased theme-landing scroll-smooth">
         <EasyCharts />
+        <JarvisComingPromo />
         <FooterSection />
       </main>
     </div>

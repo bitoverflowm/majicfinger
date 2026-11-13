@@ -1,4 +1,5 @@
 import { Fragment, Suspense } from "react";
+import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
 import { FooterSection } from "@/components/sections/footer-section";
 import { HubAssetSection } from "@/components/hubs/HubAssetSection";
@@ -95,6 +96,7 @@ export function HubPage({ config, slug }: HubPageProps) {
         ) : (
           <HubPageSections config={config} slug={slug} />
         )}
+        <JarvisComingPromo />
         <FooterSection />
       </main>
     </>

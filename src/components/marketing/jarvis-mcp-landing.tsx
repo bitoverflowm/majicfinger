@@ -97,12 +97,12 @@ const FAQ = [
   {
     question: `What does the ${PRICE} preregistration include?`,
     answer:
-      "A one-time payment for founding access: Lychee MCP in ChatGPT, Claude, and Cursor, Jarvis mode and crazy workflows, chat-side approvals, early X @lychee_data mention packs, and a founding MCP credit grant.",
+      "A one-time payment for founding access: Lychee MCP in ChatGPT, Claude, and Cursor, Jarvis mode and crazy workflows, 3 months of free Jarvis usage at launch, chat-side approvals, early X @lychee_data mention packs, and a founding MCP credit grant. Current Lychee subscribers already accrue tokens and should skip this.",
   },
   {
     question: "I already subscribe to Lychee. Should I preregister?",
     answer:
-      "No. If you're already on a Lychee subscription, monthly MCP tokens are accruing now and you'll have Jarvis as soon as it launches. Skip the $49 founding payment.",
+      "No. If you're already on a Lychee subscription, monthly MCP tokens are accruing now and you'll have Jarvis as soon as it launches. Skip the $49 founding payment. A Black Friday annual purchase also includes 3 months of free Jarvis at launch.",
   },
 ];
 
@@ -126,7 +126,8 @@ export function JarvisMcpLanding() {
             <p className="text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
               Connect Lychee MCP to ChatGPT, Claude, or Cursor. Jarvis briefs you on what&apos;s moving, drops charts into the
               conversation, runs whole research workflows, and answers{" "}
-              <span className="font-medium text-primary">@lychee_data</span> on X.
+              <span className="font-medium text-primary">@lychee_data</span> on X. Included in the Black Friday Special.
+              Preorder or a Black Friday purchase includes 3 months of free Jarvis at launch.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -223,11 +224,14 @@ export function JarvisMcpLanding() {
                   <h2 className="text-4xl font-medium tracking-tighter text-foreground md:text-6xl">Get Jarvis first.</h2>
                   <p className="flex items-baseline gap-2">
                     <span className="text-3xl font-medium tracking-tight text-primary">{PRICE}</span>
-                    <span className="text-sm text-muted-foreground">one-time · founding access · MCP credits included</span>
+                    <span className="text-sm text-muted-foreground">
+                      one-time · founding access · 3 months of Jarvis at launch
+                    </span>
                   </p>
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    Already on a Lychee subscription? Skip this — you&apos;re already accruing MCP tokens and will have
-                    Jarvis at launch.
+                    Included in the Black Friday Special. Preorder or a Black Friday purchase includes 3 months of free
+                    Jarvis usage when it launches. Already on a Lychee subscription? Skip this — you&apos;re already
+                    accruing MCP tokens and will have Jarvis at launch.
                   </p>
                   <ul className="flex flex-col gap-2.5">
                     {(prereg?.features || []).map((feature) => (

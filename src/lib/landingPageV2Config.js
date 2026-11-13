@@ -61,6 +61,7 @@ export const landingPageV2Config = {
         { icon: "storage", text: "**1 GB saved workspace storage**" },
         { icon: "publish", text: "Publish charts and dashboards without Lychee branding" },
         { icon: "mail", text: "Email support" },
+        { icon: "fork", text: "**Jarvis included** — Black Friday annual includes 3 months free at launch" },
       ],
     },
     {
@@ -294,12 +295,13 @@ export const landingPageV2Config = {
     priceNote: "one-time",
     headline: "Preregister for Lychee MCP & Jarvis",
     description:
-      "Lock founding access to Lychee MCP, Jarvis mode, and X @mention research — single payment, early credits, priority onboarding.",
+      "Lock founding access to Lychee MCP, Jarvis mode, and X @mention research — single payment, 3 months of free Jarvis at launch, early credits, priority onboarding.",
     buttonText: "Preregister · $49",
     checkoutPlan: "mcp_prereg",
     features: [
       "Lychee MCP in ChatGPT / Claude / Cursor",
       "Jarvis proactive mode + crazy workflows",
+      "3 months of free Jarvis usage at launch",
       "Chat-side approve (say “approve”)",
       "Early X @lychee_data mention packs",
       "Founding MCP credit grant on purchase",
@@ -355,6 +357,11 @@ export const landingPageV2Config = {
       question: "What is included in the free demo?",
       answer:
         "The free demo lets you try Lychee on the homepage before subscribing. You can run sample Kalshi and Polymarket pulls, explore charts and data sheets, fork one published workflow, and test limited historical requests without a credit card.",
+    },
+    {
+      question: "What is Jarvis, and is it included in Black Friday?",
+      answer:
+        "Jarvis is Lychee’s coming research assistant for ChatGPT, Claude, Cursor, and X. It is included in the Black Friday Special. Preorder Jarvis or buy during the Black Friday sale and you get 3 months of free Jarvis usage when it launches. Current Lychee subscribers already accrue MCP tokens and get Jarvis at launch without the $49 prereg.",
     },
     {
       question: "Why use Lychee instead of APIs, CSVs, or Python scripts?",

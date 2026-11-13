@@ -9,6 +9,7 @@ import { OpenLiveDashboardButton } from "@/components/hubs/polymarketLiveDemo/co
 import { HubHashScrollManager } from "@/components/hubs/HubHashScrollManager";
 import { HubSectionRenderer } from "@/components/hubs/HubSections";
 import { BentoSection } from "@/components/sections/bento-section";
+import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { FAQSection } from "@/components/sections/faq-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { EMPTY_HUB_ASSETS } from "@/lib/hubs/loadHubPage";
@@ -372,6 +373,8 @@ export default function KalshiVsPolymarketOddsPage() {
             {copy.pricing.below}
           </p>
         </div>
+
+        <JarvisComingPromo />
 
         <FAQSection
           title={copy.faq.title}

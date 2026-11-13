@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { FAQSection } from "@/components/sections/faq-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { loadHolderLandingSubjects } from "@/lib/holderLanding/featuredSubjects";
@@ -124,6 +125,8 @@ export async function HolderLandingPage({ pageKey }: { pageKey: PageKey }) {
       ))}
 
       <HolderLandingExperience pageKey={pageKey} initial={initial} />
+
+      <JarvisComingPromo />
 
       <FAQSection
         title="Frequently asked questions"

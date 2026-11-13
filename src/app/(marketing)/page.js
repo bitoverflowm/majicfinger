@@ -10,6 +10,7 @@ import { ComingSoonSourcesSection, DataSourcesSection } from "@/components/secti
 import { QuoteSection } from "@/components/sections/quote-section";
 import { FeatureSection } from "@/components/sections/feature-section";
 import { GrowthSection } from "@/components/sections/growth-section";
+import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { PricingSection } from "@/components/sections/pricing-section";
 import { FAQSection } from "@/components/sections/faq-section";
 import { TestimonialSection } from "@/components/sections/testimonial-section";
@@ -105,6 +106,7 @@ export default async function Home() {
           <NewsletterInline band />
           <GrowthSection />
           <TestimonialSection />
+          <JarvisComingPromo />
           <PricingSection />
           <FAQSection />
           <LibrarySection articles={articles} dashboards={dashboards} profilePic={profilePic} />

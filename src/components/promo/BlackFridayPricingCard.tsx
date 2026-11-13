@@ -30,7 +30,8 @@ export function BlackFridayPricingCard({ onSeePlans }: { onSeePlans: () => void 
             {BLACK_FRIDAY.percentOff}% off every annual plan
           </h3>
           <p className="text-sm leading-5 text-muted-foreground">
-            Already applied to the annual plans below. No code needed.
+            Already applied to the annual plans below. No code needed. Jarvis is included — 3 months of free usage at
+            launch.
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-3">
             {countdown ? (
@@ -60,6 +61,7 @@ export function BlackFridayPricingCard({ onSeePlans }: { onSeePlans: () => void 
       </div>
       <p className="relative mt-4 border-t border-border/70 pt-3 text-xs text-muted-foreground">
         {BLACK_FRIDAY.percentOff}% off your first year, then your plan renews at the regular annual price. Cancel anytime.
+        Jarvis comes with the sale: 3 months of free Jarvis usage when it launches.
       </p>
     </div>
   );
