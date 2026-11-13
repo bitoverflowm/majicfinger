@@ -85,7 +85,12 @@ export async function runXJarvisCronTick({ live = false, max = 10, force_since_i
       });
 
       let posted = null;
-      if (wantLive && packed.draft_reply && packed.status !== "needs_clarification") {
+      if (
+        wantLive &&
+        packed.draft_reply &&
+        packed.status !== "needs_clarification" &&
+        packed.gate?.can_post !== false
+      ) {
         try {
           posted = await postPublicReply({
             in_reply_to_tweet_id: tweetId,

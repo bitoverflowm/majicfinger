@@ -68,7 +68,12 @@ export default async function handler(req, res) {
       });
 
       let posted = null;
-      if (wantLive && packed.draft_reply && packed.status !== "needs_clarification") {
+      if (
+        wantLive &&
+        packed.draft_reply &&
+        packed.status !== "needs_clarification" &&
+        packed.gate?.can_post !== false
+      ) {
         posted = await postPublicReply({
           in_reply_to_tweet_id: tweetId,
           text: packed.draft_reply,
