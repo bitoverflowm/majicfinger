@@ -106,8 +106,8 @@ export async function runXJarvisJob({
     research,
     live: false,
     note: live
-      ? "Live mode requested — cron/poll will post via Twitter user OAuth when X_JARVIS_LIVE=1."
-      : "Dry-run only. Review draft_reply; cron with live=1 posts when credentials + X_JARVIS_LIVE=1 are set.",
+      ? "Live mode requested — cron/poll will post via JARVIS_TWITTER_* OAuth when X_JARVIS_LIVE=1."
+      : "Dry-run only. Review draft_reply; cron with live=1 posts when JARVIS_TWITTER_* + X_JARVIS_LIVE=1 are set.",
   };
 }
 

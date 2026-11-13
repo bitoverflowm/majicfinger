@@ -162,6 +162,6 @@ export async function runXJarvisCronTick({ live = false, max = 10, force_since_i
     results,
     note: wantLive
       ? "Live replies enabled (X_JARVIS_LIVE=1)."
-      : "Dry-run: drafts stored in XJarvisJobs. Set X_JARVIS_LIVE=1 and Twitter user OAuth to post.",
+      : "Dry-run: drafts stored in XJarvisJobs. Set X_JARVIS_LIVE=1 and JARVIS_TWITTER_* OAuth to post.",
   };
 }

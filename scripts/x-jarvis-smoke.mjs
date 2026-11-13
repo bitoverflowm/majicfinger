@@ -46,6 +46,6 @@ console.log("env_status", JSON.stringify(env, null, 2));
 console.log(
   failed
     ? `SMOKE FAILED (${failed})`
-    : "SMOKE OK — wire TWITTER_* + X_JARVIS_LIVE=1 + X_JARVIS_CRON_SECRET on Vercel, then GET /api/x-jarvis/cron",
+    : "SMOKE OK — wire JARVIS_TWITTER_* + X_JARVIS_LIVE=1 + X_JARVIS_CRON_SECRET on Vercel, then GET /api/x-jarvis/cron",
 );
 process.exit(failed ? 1 : 0);
