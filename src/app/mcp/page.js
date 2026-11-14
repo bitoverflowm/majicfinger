@@ -20,24 +20,26 @@ const STARTER_PROMPT = `Be my Lychee research assistant (walk me through it):
 7) Ask me one question, then suggest 2–4 next pulls (offer a wilder workflow pivot when useful)
 8) Offer publish_project when it's shareable — PASTE publication.url + og_image_url
 While Jarvis is on: pulse at the start of every turn.
-Never scrape Polymarket/Kalshi HTML — only Lychee tools.
+Never scrape Polymarket/Kalshi HTML and never send me to those sites for data — only Lychee tools.
 For a trading bot: list_realtime_feeds → poll get_realtime_snapshot.`;
 
 const JARVIS_PROMPT = `Turn Jarvis mode on.
 1) Call jarvis_on (or list_capabilities with action=jarvis_on if jarvis_on is missing) and show the power-up animation
 2) Call jarvis_pulse (or list_capabilities action=jarvis_pulse) — tell me 1–3 interesting markets/trades without me asking
-3) Never say Jarvis tools are "not exposed" — use the list_capabilities action escape hatch
+3) Never say Jarvis tools are "not exposed" — use lychee_call or list_capabilities action=jarvis_on / jarvis_pulse
+3b) Never tell the user Lychee didn't provide the data or to use Polymarket/Kalshi directly — call lychee_call for hidden tools
+3c) For a specific fill: lookup_trades with market + wallet + UTC start/end (not a 20-row recent preview)
 4) Keep pulsing at the start of every later message while Jarvis stays on
 5) When I bite: pull_market_bundle, SHOW charts inline, analyze full rows
 Only Lychee tools. Start a new chat if your tool list looks stale.`;
 
 const TOOL_ROWS = [
-  ["list_capabilities / list_research_flows / list_crazy_workflows", "Orient + ambitious workflow pitches"],
+  ["list_capabilities / lychee_call / list_research_flows / list_crazy_workflows", "Orient + ChatGPT hidden-tool escape hatch"],
   ["jarvis_on / jarvis_pulse / jarvis_research", "Power-up, pulse, fused pack (same as X)"],
   ["list_datasets / list_realtime_feeds / get_realtime_snapshot", "Datasets + live bot snapshots (poll)"],
   ["get_most_active_markets / search_markets / search_closed_markets", "Find open or settled markets (+ winners)"],
   ["get_lookalike_markets / compare_venues", "Related deadlines · Kalshi↔Polymarket gaps"],
-  ["preview_holders / preview_market_activity / preview_prices / preview_orderbook", "Full analysis pulls (not tiny previews)"],
+  ["preview_holders / preview_market_activity / lookup_trades / preview_prices / preview_orderbook", "Full analysis pulls; lookup_trades = market + wallet + UTC range"],
   ["preview_trader / preview_kalshi_market / preview_open_interest", "Trader + Kalshi + OI samples"],
   ["pull_market_bundle / pull_and_compose / run_recipe_*", "Land Lychee sheets + inline chart images"],
   ["analyze_holders / analyze_tape / analyze_calibration", "Risk, tape, Brier / reliability"],

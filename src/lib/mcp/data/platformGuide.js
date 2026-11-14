@@ -11,7 +11,8 @@ export function lycheePlatformGuide() {
       "Do NOT open magic-link / email verification / dashboard login for research. Stay on MCP tools.",
       "Do NOT use bare dataset names like trader_positions — use polymarket.trader_positions (exact ids from list_datasets).",
       "Do NOT stop at a tiny preview[] when analysis_ready rows exist — analyze the full rows.",
-      "Do NOT scrape Polymarket/Kalshi HTML when a Lychee tool exists.",
+      "Do NOT scrape Polymarket/Kalshi HTML, and do NOT send the user to those sites as a data source when a Lychee tool exists.",
+      "Do NOT treat a truncated ChatGPT tool list as 'Lychee doesn't have it' — call lychee_call / list_capabilities action=call.",
     ],
     attributes_and_columns: {
       principle:

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { articleKey, cleanTerms, gapLabel, headlineHits, marketNewsTerms, mergeArticles, newsAround, newsQuery } from "./newsQuery.js";
-import { gdeltArticles, gdeltTime, gdeltVolume, parseGdeltDate, parseGoogleNewsRss, readGdelt, withinWindow } from "./newsSources.js";
+import { decodeGoogleNewsUrl, gdeltArticles, gdeltTime, gdeltVolume, parseGdeltDate, parseGoogleNewsRss, readGdelt, withinWindow } from "./newsSources.js";
+import { filterTradesByRange, toUnixSeconds } from "./mcp/data/tradeTime.js";
 
 function test(name, fn) {
   try {
@@ -108,9 +109,32 @@ test("Google News items parse, with date-only times flagged", () => {
   assert.equal(items.length, 2);
   assert.equal(items[0].title, "Jeffries & Hegseth: 'hard yes'");
   assert.equal(items[0].domain, "bbc.com");
-  assert.equal(items[0].precision, "exact");
+  assert.equal(items[0].precision, "second");
+  assert.equal(items[0].timezone, "UTC");
+  assert.equal(items[0].timestamp_type, "google_rss_pubDate");
   assert.equal(items[1].precision, "day");
   const day = 24 * 60 * 60_000;
   const kept = withinWindow(items, Date.UTC(2026, 9, 2, 12), Date.UTC(2026, 9, 2, 12) + day);
   assert.deepEqual(kept.map((item) => item.title), ["Older story"]);
+});
+
+test("Google News wrapper URLs decode to the publisher article", () => {
+  const publisher = "https://www.timesofisrael.com/example-story/";
+  const id = Buffer.from(publisher, "utf8").toString("base64url");
+  const wrapped = `https://news.google.com/rss/articles/${id}`;
+  const decoded = decodeGoogleNewsUrl(wrapped);
+  assert.equal(decoded.publisher_url, publisher);
+  assert.equal(decoded.google_url, wrapped);
+});
+
+test("trade date filter drops rows outside the UTC window", () => {
+  assert.equal(toUnixSeconds("2026-11-04T08:00:00Z"), Math.floor(Date.parse("2026-11-04T08:00:00Z") / 1000));
+  const rows = [
+    { timestamp: "2026-11-13T12:00:00Z", id: "late" },
+    { timestamp: 1793779200, id: "hit" },
+    { timestamp: 1793779200 * 1000, id: "hit-ms" },
+    { timestamp: "2026-11-01T00:00:00Z", id: "early" },
+  ];
+  const kept = filterTradesByRange(rows, "2026-11-04T00:00:00Z", "2026-11-04T23:59:59Z");
+  assert.deepEqual(kept.map((row) => row.id), ["hit", "hit-ms"]);
 });

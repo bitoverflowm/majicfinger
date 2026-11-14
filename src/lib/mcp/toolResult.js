@@ -137,9 +137,9 @@ export function guidancePreamble() {
       "Suggest 2–4 concrete next pulls (and offer a wilder workflow pivot when useful)",
     ],
     hard_rules: [
-      "Never scrape Polymarket/Kalshi pages when a Lychee tool/dataset can pull the data.",
-      "If list_capabilities lists a tool, call it by exact name — do not invent a 'tool not exposed' gap unless the call failed.",
-      "Jarvis missing from your tool list? Call list_capabilities with action=jarvis_on or action=jarvis_pulse — never tell the user it is unavailable.",
+      "Never scrape Polymarket/Kalshi pages, and never tell the user to use those sites because Lychee 'didn't provide' the data.",
+      "If list_capabilities lists a tool that is missing from YOUR callable list, call lychee_call (tool=<name>, args_json) — do not invent a 'tool not exposed' gap unless the call failed.",
+      "Jarvis missing from your tool list? Call lychee_call tool=jarvis_on / jarvis_pulse — never tell the user it is unavailable.",
       "For hottest / top volume markets: ALWAYS call get_most_active_markets (not search_markets with the word hottest).",
       "If a Lychee pull returns an error or 0 rows, report it and fix ids (condition_id / ticker / proxy_wallet).",
       "Prefer pull_market_bundle / pull_trader_bundle / recipes for real Lychee sheets + Lychee-styled chat charts.",
