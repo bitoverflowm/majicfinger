@@ -9,10 +9,13 @@ import { cn } from "@/lib/utils";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { motion } from "framer-motion";
 import {
+  Activity,
   ArrowRight,
   ArrowUpRight,
+  AtSign,
   Bell,
   Check,
+  Coins,
   Download,
   GitFork,
   Globe,
@@ -26,6 +29,8 @@ import {
   Radio,
   Rows3,
   Sigma,
+  Sparkles,
+  UserSearch,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -75,6 +80,7 @@ type Plan = {
   includesLabel?: string;
   venuesLabel?: string;
   features: readonly PlanFeature[];
+  jarvis?: { label: string; features: readonly PlanFeature[] };
 };
 
 type EnterprisePlan = { name: string; description: string; buttonText: string; href: string };
@@ -177,7 +183,30 @@ const FEATURE_ICONS: Record<string, LucideIcon> = {
   mail: Mail,
   bulk: Package,
   support: LifeBuoy,
+  tokens: Coins,
+  jarvis: Sparkles,
+  pulse: Activity,
+  trader: UserSearch,
+  mention: AtSign,
 };
+
+function FeatureList({ features }: { features: readonly PlanFeature[] }) {
+  return (
+    <ul className="flex flex-col gap-2.5">
+      {features.map((feature) => {
+        const Icon = FEATURE_ICONS[feature.icon] ?? Check;
+        return (
+          <li key={feature.text} className="flex gap-2.5 text-sm leading-5 text-foreground/80">
+            <Icon className="mt-0.5 size-4 shrink-0 text-secondary" strokeWidth={1.75} aria-hidden />
+            <span>
+              <RichText text={feature.text} />
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 function formatUsd(amount: number): string {
   const rounded = Math.round(amount * 100) / 100;
@@ -723,19 +752,13 @@ export function PricingSection({
                       </div>
                     ) : null}
                     {plan.includesLabel ? <p className="text-sm text-muted-foreground">{plan.includesLabel}</p> : null}
-                    <ul className="flex flex-col gap-2.5">
-                      {plan.features.map((feature) => {
-                        const Icon = FEATURE_ICONS[feature.icon] ?? Check;
-                        return (
-                          <li key={feature.text} className="flex gap-2.5 text-sm leading-5 text-foreground/80">
-                            <Icon className="mt-0.5 size-4 shrink-0 text-secondary" strokeWidth={1.75} aria-hidden />
-                            <span>
-                              <RichText text={feature.text} />
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <FeatureList features={plan.features} />
+                    {plan.jarvis ? (
+                      <div className="mt-2 flex flex-col gap-3 border-t border-border pt-5">
+                        <p className="text-sm text-muted-foreground">{plan.jarvis.label}</p>
+                        <FeatureList features={plan.jarvis.features} />
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="mt-auto flex flex-col gap-2 pt-8">

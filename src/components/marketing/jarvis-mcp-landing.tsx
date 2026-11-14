@@ -11,7 +11,7 @@ import { ShowcaseRows, type ShowcaseRow } from "@/components/sections/features/f
 import { FooterSection } from "@/components/sections/footer-section";
 import { SectionHeader } from "@/components/section-header";
 import { SectionScrollLink } from "@/components/sections/section-scroll-link";
-import { landingPageV2Config } from "@/lib/landingPageV2Config";
+import { JARVIS_MONTHLY_TOKENS, landingPageV2Config } from "@/lib/landingPageV2Config";
 import automateBackdrop from "../../../public/landing/feature-automate.jpg";
 import connectBackdrop from "../../../public/landing/feature-connect-village.jpg";
 import exploreBackdrop from "../../../public/landing/feature-explore-lake.jpg";
@@ -117,8 +117,7 @@ const FAQ = [
   },
   {
     question: "I already subscribe to Lychee. Should I preregister?",
-    answer:
-      "No. If you're already on a Lychee subscription, monthly MCP tokens are accruing now and you'll have Jarvis as soon as it launches. Skip the $49 founding payment. A Black Friday annual purchase also includes 3 months of free Jarvis at launch.",
+    answer: `No. Every paid Lychee plan includes Jarvis when it launches, and your plan accrues tokens each month: ${JARVIS_MONTHLY_TOKENS.lite} on Lite, ${JARVIS_MONTHLY_TOKENS.researcher} on Pro, and ${JARVIS_MONTHLY_TOKENS.quant} on Max. Skip the ${PRICE} founding payment. A Black Friday annual purchase also includes 3 months of free Jarvis at launch.`,
   },
 ];
 

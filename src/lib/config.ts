@@ -133,16 +133,14 @@ export const siteConfig = {
       jarvis: {
         href: "/jarvis",
         text: "Meet Jarvis",
-        badge: "Coming",
-        title: "Jarvis is coming.",
-        description:
-          "Included in the Black Friday Special. Preorder or a Black Friday purchase includes 3 months of free Jarvis at launch.",
+        title: "Jarvis is coming to every plan.",
+        description: "Your AI chat, watching Polymarket and Kalshi for you.",
       },
     },
   },
   ctaSection: {
     title: "Get started with Lychee.",
-    subtext: "Free to explore here · Jarvis coming — included in Black Friday, 3 months free at launch",
+    subtext: "Free to explore here · Jarvis included in every paid plan at launch",
   },
   footerLinks: [
     {

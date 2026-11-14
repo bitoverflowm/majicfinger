@@ -1,6 +1,9 @@
 // Config for landing page v2 (MagicUI template)
 import { WORKSPACE_ENTRY_PATH } from "@/lib/workspaceEntry";
 
+/** Jarvis tokens each paid tier accrues per month, keyed by plan tier. */
+export const JARVIS_MONTHLY_TOKENS = { lite: "10K", researcher: "100K", quant: "10M" };
+
 export const landingPageV2Config = {
   name: "Lychee",
   description: "Your Quant in a Box. Built for Polymarket • Powerful for anyone who works with data. No CSVs, No Python, No copy-pasting. Just raw data to analysis and actionable insights. Real quantitative edge. 0 lines of code.",
@@ -61,8 +64,17 @@ export const landingPageV2Config = {
         { icon: "storage", text: "**1 GB saved workspace storage**" },
         { icon: "publish", text: "Publish charts and dashboards without Lychee branding" },
         { icon: "mail", text: "Email support" },
-        { icon: "fork", text: "**Jarvis included** — Black Friday annual includes 3 months free at launch" },
       ],
+      jarvis: {
+        label: "Jarvis, included at launch",
+        features: [
+          { icon: "tokens", text: `**${JARVIS_MONTHLY_TOKENS.lite} tokens** accrue every month` },
+          { icon: "jarvis", text: "Jarvis in ChatGPT, Claude, and Cursor through Lychee MCP" },
+          { icon: "pulse", text: "A pulse on what's moving across Polymarket and Kalshi" },
+          { icon: "trader", text: "Trader deep dives and full research workflows" },
+          { icon: "mention", text: "Replies when you tag **@lychee_data** on X" },
+        ],
+      },
     },
     {
       tier: "researcher",
@@ -81,6 +93,10 @@ export const landingPageV2Config = {
         { icon: "alert", text: "**500 custom alerts**" },
         { icon: "storage", text: "**10 GB saved workspace storage**" },
       ],
+      jarvis: {
+        label: "Jarvis, included at launch",
+        features: [{ icon: "tokens", text: `**${JARVIS_MONTHLY_TOKENS.researcher} tokens** accrue every month` }],
+      },
     },
     {
       tier: "quant",
@@ -99,6 +115,10 @@ export const landingPageV2Config = {
         { icon: "storage", text: "**25 GB saved workspace storage**" },
         { icon: "support", text: "**Priority support**" },
       ],
+      jarvis: {
+        label: "Jarvis, included at launch",
+        features: [{ icon: "tokens", text: `**${JARVIS_MONTHLY_TOKENS.quant} tokens** accrue every month` }],
+      },
     },
   ],
   enterprisePlan: {
@@ -359,9 +379,8 @@ export const landingPageV2Config = {
         "The free demo lets you try Lychee on the homepage before subscribing. You can run sample Kalshi and Polymarket pulls, explore charts and data sheets, fork one published workflow, and test limited historical requests without a credit card.",
     },
     {
-      question: "What is Jarvis, and is it included in Black Friday?",
-      answer:
-        "Jarvis is Lychee’s coming research assistant for ChatGPT, Claude, Cursor, and X. It is included in the Black Friday Special. Preorder Jarvis or buy during the Black Friday sale and you get 3 months of free Jarvis usage when it launches. Current Lychee subscribers already accrue MCP tokens and get Jarvis at launch without the $49 prereg.",
+      question: "What is Jarvis, and which plans include it?",
+      answer: `Jarvis is Lychee’s coming research assistant for ChatGPT, Claude, Cursor, and X. Every paid plan includes Jarvis when it launches, and each month your plan accrues tokens to spend on it: ${JARVIS_MONTHLY_TOKENS.lite} on Lite, ${JARVIS_MONTHLY_TOKENS.researcher} on Pro, and ${JARVIS_MONTHLY_TOKENS.quant} on Max. A Black Friday annual purchase also includes 3 months of free Jarvis usage at launch.`,
     },
     {
       question: "Why use Lychee instead of APIs, CSVs, or Python scripts?",
