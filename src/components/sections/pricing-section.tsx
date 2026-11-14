@@ -28,9 +28,13 @@ import {
   Sigma,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { BlackFridayPricingCard } from "@/components/promo/BlackFridayPricingCard";
 import { BLACK_FRIDAY_ANCHOR, SEE_BLACK_FRIDAY_EVENT, useBlackFridayActive } from "@/components/promo/useBlackFriday";
+import { getOrCreateVisitorSessionId } from "@/lib/analytics/visitorSession";
+import { prefetchCheckoutSession, warmCheckoutApi } from "@/lib/checkout/sessionClient";
+import { checkoutEntryPage } from "@/lib/checkout/trackCheckoutStep";
 import { BLACK_FRIDAY, blackFridayCents } from "@/lib/promo/blackFriday";
 import { VenueMark, type Venue } from "./venue-mark";
 
@@ -395,6 +399,34 @@ function warmStripeJs() {
   void import("@stripe/stripe-js").then(({ loadStripe }) => loadStripe(key));
 }
 
+function checkoutPrefetchBody(href: string) {
+  try {
+    const url = new URL(href, typeof window !== "undefined" ? window.location.origin : "https://lycheedata.com");
+    if (url.pathname !== "/checkout") return null;
+    const plan = url.searchParams.get("plan") || "";
+    if (!plan) return null;
+    return {
+      plan,
+      cycle: url.searchParams.get("cycle") || "",
+      from: typeof window !== "undefined" ? checkoutEntryPage() || window.location.pathname : undefined,
+      visitorSessionId: typeof window !== "undefined" ? getOrCreateVisitorSessionId() || undefined : undefined,
+      referral:
+        typeof window !== "undefined" && (window as Window & { promotekit_referral?: string }).promotekit_referral
+          ? String((window as Window & { promotekit_referral?: string }).promotekit_referral)
+          : url.searchParams.get("ref") || url.searchParams.get("client_reference_id") || undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Stripe.js + Checkout Session create overlap the hover/click before /checkout mounts. */
+function warmCheckout(href: string) {
+  warmStripeJs();
+  const body = checkoutPrefetchBody(href);
+  if (body) prefetchCheckoutSession(body);
+}
+
 function PlanButton({
   action,
   href,
@@ -427,33 +459,47 @@ function PlanButton({
     </>
   );
   const warmsCheckout = typeof href === "string" && href.startsWith("/checkout");
+  const warm = warmsCheckout ? () => warmCheckout(href) : undefined;
 
   if (!action) {
     return isCurrent ? (
       <button type="button" disabled className={className}>
         {content}
       </button>
-    ) : (
-      <a
+    ) : warmsCheckout ? (
+      <Link
         href={href}
+        prefetch
         onClick={onClick}
-        onPointerEnter={warmsCheckout ? warmStripeJs : undefined}
-        onFocus={warmsCheckout ? warmStripeJs : undefined}
+        onPointerEnter={warm}
+        onFocus={warm}
+        onPointerDown={warm}
         className={className}
       >
+        {content}
+      </Link>
+    ) : (
+      <a href={href} onClick={onClick} className={className}>
         {content}
       </a>
     );
   }
   if (action.href && !action.disabled) {
     const actionWarms = action.href.startsWith("/checkout");
-    return (
-      <a
+    const actionWarm = actionWarms ? () => warmCheckout(action.href!) : undefined;
+    return actionWarms ? (
+      <Link
         href={action.href}
-        onPointerEnter={actionWarms ? warmStripeJs : undefined}
-        onFocus={actionWarms ? warmStripeJs : undefined}
+        prefetch
+        onPointerEnter={actionWarm}
+        onFocus={actionWarm}
+        onPointerDown={actionWarm}
         className={className}
       >
+        {content}
+      </Link>
+    ) : (
+      <a href={action.href} className={className}>
         {content}
       </a>
     );
@@ -498,6 +544,11 @@ export function PricingSection({
 } = {}) {
   const [toggleCycle, setToggleCycle] = useState<BillingCycle>(defaultCycle ?? "monthly");
   const promoActive = useBlackFridayActive();
+
+  // Keep the checkout serverless function + Stripe price cache warm while pricing is on screen.
+  useEffect(() => {
+    warmCheckoutApi();
+  }, []);
 
   // The Black Friday banner links to the offer; arriving that way opens the annual plans it applies to.
   useEffect(() => {

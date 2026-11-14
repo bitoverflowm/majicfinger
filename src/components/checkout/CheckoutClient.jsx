@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { landingPageV2Config } from "@/lib/landingPageV2Config";
 import { flushJourneyQueue } from "@/lib/analytics/journeyClient";
 import { getOrCreateVisitorSessionId } from "@/lib/analytics/visitorSession";
+import { requestCheckoutSession } from "@/lib/checkout/sessionClient";
 import { checkoutEntryPage, msSinceCheckoutClick, trackCheckoutStep } from "@/lib/checkout/trackCheckoutStep";
 import { isKnownCheckoutQuery } from "@/lib/stripe/checkoutPlanQuery";
 
@@ -39,38 +40,16 @@ if (typeof window !== "undefined" && ENV_PUBLISHABLE_KEY) {
   stripeFor(ENV_PUBLISHABLE_KEY);
 }
 
-/** Past this, the buyer is offered Stripe's hosted checkout page instead. */
-const SLOW_FORM_MS = 5000;
+/**
+ * Past this, the buyer is offered Stripe's hosted checkout page instead.
+ * Stripe Elements regularly needs ~3–6s after a cold navigation; 5s was firing
+ * on healthy loads and the prior harden pass made that worse (8s → 5s).
+ */
+const SLOW_FORM_MS = 8000;
 
 function postCheckoutSession(body) {
-  return fetch("/api/checkout/session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }).then(async (res) => ({ ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) }));
+  return requestCheckoutSession(body);
 }
-
-/** One Elements session per plan for the life of the tab (avoids duplicate Stripe sessions on remount). */
-const sessionRequests = new Map();
-
-function requestCheckoutSession(body) {
-  const key = `${body.plan}:${body.cycle}:${body.hosted ? "hosted" : "elements"}`;
-  if (!sessionRequests.has(key)) {
-    const started = performance.now();
-    const request = postCheckoutSession(body).then((result) => ({
-      ...result,
-      ms: Math.round(performance.now() - started),
-    }));
-    sessionRequests.set(key, request);
-    // Hosted fallback should be allowed to retry; Elements stays cached for this tab.
-    if (body.hosted) {
-      request.finally(() => setTimeout(() => sessionRequests.delete(key), 1500));
-    }
-  }
-  return sessionRequests.get(key);
-}
-
-const STRIPE_FONTS = [{ cssSrc: "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" }];
 
 const THEME_COLORS = {
   light: {
@@ -106,7 +85,9 @@ function appearanceFor(theme) {
       colorTextSecondary: c.colorTextSecondary,
       colorTextPlaceholder: c.colorTextPlaceholder,
       colorDanger: c.colorDanger,
-      fontFamily: "Geist, ui-sans-serif, system-ui, -apple-system, sans-serif",
+      // System stack only — avoid a Google Fonts round trip inside Stripe's iframe
+      // on the critical path (Geist is already on the parent page via next/font).
+      fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
       fontSizeBase: "14px",
       borderRadius: "10px",
       spacingUnit: "4px",
@@ -342,7 +323,6 @@ export default function CheckoutClient({ plan, cycle, referral }) {
             clientSecret,
             elementsOptions: {
               appearance: appearanceFor(theme),
-              fonts: STRIPE_FONTS,
               // Keep Stripe's skeleton visible while the session Promise and iframe finish.
               loader: "always",
             },

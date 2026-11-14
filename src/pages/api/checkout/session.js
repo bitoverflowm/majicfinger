@@ -1,7 +1,5 @@
 import crypto from "crypto";
 import { waitUntil } from "@vercel/functions";
-import dbConnect from "@/lib/dbConnect";
-import CheckoutAttempt from "@/models/CheckoutAttempt";
 import {
   getCheckoutStripe,
   isStripeTestKey,
@@ -9,7 +7,6 @@ import {
   stripePublishableKey,
   stripeSecretKey,
 } from "@/lib/stripe/client";
-import { extractClientMeta } from "@/lib/analytics/requestClientMeta";
 import {
   planFromQuery,
   resolveCheckoutPrice,
@@ -19,11 +16,7 @@ import {
   checkoutPlanSummary,
 } from "@/lib/stripe/catalog";
 import { attemptCookieHeader } from "@/lib/stripe/checkoutCookies";
-import { buildCheckoutVisitorContext } from "@/lib/analytics/checkoutVisitorContext";
-import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
-import { publishCheckoutTelegram } from "@/lib/telegram/checkoutJourney";
-import { loadSessionMember } from "@/lib/requirePaidMember";
-import { userShouldSkipMcpPrereg } from "@/lib/mcp/access";
+import { getTokenCookie } from "@/lib/auth-cookies";
 import { BLACK_FRIDAY, blackFridayAppliesTo, blackFridayCents } from "@/lib/promo/blackFriday";
 
 /** A second Checkout would start a second subscription; these members change plans in billing. */
@@ -32,26 +25,46 @@ const ALREADY_BILLED_REASONS = new Set(["active", "legacy", "lifetime"]);
 /** Groups these sessions in the Stripe Dashboard. */
 const INTEGRATION_IDENTIFIER = "lychee-inapp-checkout-qmzrtkwe";
 
-function checkoutSource(req) {
-  const meta = extractClientMeta(req);
-  return {
-    from: String(req.body?.from || "").slice(0, 160) || undefined,
-    country: meta.country || undefined,
-    region: meta.region || undefined,
-    city: meta.city || undefined,
-    userAgent: meta.user_agent ? meta.user_agent.slice(0, 300) : undefined,
-    language: meta.accept_language || undefined,
-  };
-}
-
-/** Ops alert that must not delay the HTTP response. */
+/** Ops alert that must not delay the HTTP response — or the cold-start import graph. */
 function alertLater(opts) {
-  waitUntil(notifyCheckoutAlert(opts));
+  waitUntil(
+    import("@/lib/telegram/checkoutAlert")
+      .then(({ notifyCheckoutAlert }) => notifyCheckoutAlert(opts))
+      .catch(() => {}),
+  );
 }
 
-/** Runs after the response so the buyer isn't waiting on Mongo or Telegram. */
-async function recordAttempt({ attempt, visitorSessionId, plan, sessionId }) {
+/**
+ * Runs after the response so the buyer isn't waiting on Mongo, Telegram, or the
+ * heavy analytics import graph that previously inflated serverless cold starts.
+ */
+async function recordAttempt({ attempt, visitorSessionId, plan, sessionId, req }) {
   try {
+    const [
+      { default: dbConnect },
+      { default: CheckoutAttempt },
+      { buildCheckoutVisitorContext },
+      { publishCheckoutTelegram },
+      { extractClientMeta },
+    ] = await Promise.all([
+      import("@/lib/dbConnect"),
+      import("@/models/CheckoutAttempt"),
+      import("@/lib/analytics/checkoutVisitorContext"),
+      import("@/lib/telegram/checkoutJourney"),
+      import("@/lib/analytics/requestClientMeta"),
+    ]);
+
+    const meta = extractClientMeta(req);
+    attempt.source = {
+      from: String(attempt.sourceFrom || "").slice(0, 160) || undefined,
+      country: meta.country || undefined,
+      region: meta.region || undefined,
+      city: meta.city || undefined,
+      userAgent: meta.user_agent ? meta.user_agent.slice(0, 300) : undefined,
+      language: meta.accept_language || undefined,
+    };
+    delete attempt.sourceFrom;
+
     await dbConnect();
     const visitorContext = visitorSessionId
       ? buildCheckoutVisitorContext(visitorSessionId).catch(() => null)
@@ -62,6 +75,7 @@ async function recordAttempt({ attempt, visitorSessionId, plan, sessionId }) {
     // Open the live Telegram immediately so expire/abandon alerts aren't a blank slate.
     await publishCheckoutTelegram(attempt.attemptId);
   } catch (err) {
+    const { notifyCheckoutAlert } = await import("@/lib/telegram/checkoutAlert");
     await notifyCheckoutAlert({
       title: "Checkout session created but was not saved",
       fields: {
@@ -117,23 +131,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Member lookup and price resolve are independent — run together so checkout isn't waiting twice.
-    const memberPromise = loadSessionMember(req).catch(() => null);
+    // Price resolve is on the critical path. Member lookup only matters when a
+    // login cookie exists — skip the mongoose/auth import graph for anonymous buyers.
+    const hasLogin = Boolean(getTokenCookie(req));
+    const memberPromise = hasLogin
+      ? import("@/lib/requirePaidMember")
+          .then(({ loadSessionMember }) => loadSessionMember(req))
+          .catch(() => null)
+      : Promise.resolve(null);
     const resolvedPromise = resolveCheckoutPrice(plan);
 
     let loginEmail = "";
-    const member = await memberPromise;
+    const [member, resolved] = await Promise.all([memberPromise, resolvedPromise]);
     if (member) {
       const { session: login, user, state } = member;
       const renewalFailing = ["past_due", "unpaid"].includes(String(user?.subscriptionStatus || "").toLowerCase());
-      if (plan.key === "mcp_prereg" && login && userShouldSkipMcpPrereg(user)) {
-        return res.status(409).json({
-          code: "SUBSCRIBER_SKIP_PREREG",
-          reason: state.reason,
-          redirect: "/mcp",
-          message:
-            "You're already on a Lychee subscription. Monthly MCP tokens are accruing now, and you'll have Jarvis as soon as it launches. No need to preregister.",
-        });
+      if (plan.key === "mcp_prereg" && login) {
+        const { userShouldSkipMcpPrereg } = await import("@/lib/mcp/access");
+        if (userShouldSkipMcpPrereg(user)) {
+          return res.status(409).json({
+            code: "SUBSCRIBER_SKIP_PREREG",
+            reason: state.reason,
+            redirect: "/mcp",
+            message:
+              "You're already on a Lychee subscription. Monthly MCP tokens are accruing now, and you'll have Jarvis as soon as it launches. No need to preregister.",
+          });
+        }
       }
       // MCP/Jarvis prereg is a one-time product for people who are not already on a plan.
       if (
@@ -150,7 +173,6 @@ export default async function handler(req, res) {
       loginEmail = String(login?.email || user?.email || "").trim().toLowerCase();
     }
 
-    const resolved = await resolvedPromise;
     if (!resolved?.priceId) {
       return res.status(500).json({ error: "Could not start checkout", code: "PRICE_UNRESOLVED" });
     }
@@ -225,6 +247,7 @@ export default async function handler(req, res) {
         plan,
         sessionId: session.id,
         visitorSessionId,
+        req,
         attempt: {
           attemptId,
           stripeSessionId: session.id,
@@ -240,7 +263,7 @@ export default async function handler(req, res) {
           interval: plan.mode === "subscription" ? plan.interval : undefined,
           testMode: isStripeTestKey(),
           prefillEmail: loginEmail || undefined,
-          source: checkoutSource(req),
+          sourceFrom: String(req.body?.from || "").slice(0, 160) || undefined,
           visitorSessionId,
           steps: [
             {

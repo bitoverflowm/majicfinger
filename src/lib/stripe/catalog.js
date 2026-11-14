@@ -1,9 +1,15 @@
 import { landingPageV2Config } from "@/lib/landingPageV2Config";
 import { getStripe, isStripeTestKey } from "@/lib/stripe/client";
 import { normalizeCheckoutCycle } from "@/lib/stripe/checkoutPlanQuery";
-import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
 
 const pricing = landingPageV2Config.pricing;
+
+/** Never block price resolve on Telegram — import lazily. */
+function alertPriceIssue(opts) {
+  void import("@/lib/telegram/checkoutAlert")
+    .then(({ notifyCheckoutAlert }) => notifyCheckoutAlert(opts))
+    .catch(() => {});
+}
 
 function planHref(name, cycle) {
   const plan = pricing.find((item) => item.name.toLowerCase() === name);
@@ -173,7 +179,7 @@ async function priceFromLookupKey(stripe, plan) {
   if (!price) return null;
   const interval = price.recurring?.interval || null;
   if (price.unit_amount !== plan.amount || interval !== plan.interval) {
-    void notifyCheckoutAlert({
+    alertPriceIssue({
       title: "Stripe price doesn't match plan",
       fields: {
         Plan: plan.key,
@@ -184,8 +190,10 @@ async function priceFromLookupKey(stripe, plan) {
     });
     return null;
   }
-  cache.set(cacheKey, price.id);
-  return price.id;
+  // Same shape as env / payment-link resolves so promo codes stay available.
+  const resolved = { priceId: price.id, extras: { allow_promotion_codes: true } };
+  cache.set(cacheKey, resolved);
+  return resolved;
 }
 
 async function ensureTestPrice(stripe, plan) {
@@ -229,7 +237,7 @@ export async function resolveCheckoutPrice(plan) {
 
   // Hardcoded catalog priceIds skip a Stripe round trip on every cold start.
   if (plan.priceId && !isStripeTestKey()) {
-    return { priceId: plan.priceId, extras: {}, fallbackUrl };
+    return { priceId: plan.priceId, extras: { allow_promotion_codes: true }, fallbackUrl };
   }
 
   const stripe = getStripe();
@@ -239,8 +247,8 @@ export async function resolveCheckoutPrice(plan) {
       return { priceId, extras: { allow_promotion_codes: true }, fallbackUrl };
     }
     const fromLookup = await priceFromLookupKey(stripe, plan);
-    if (fromLookup) {
-      return { priceId: fromLookup, extras: { allow_promotion_codes: true }, fallbackUrl };
+    if (fromLookup?.priceId) {
+      return { priceId: fromLookup.priceId, extras: fromLookup.extras || { allow_promotion_codes: true }, fallbackUrl };
     }
     if (plan.href) {
       const fromLink = await priceFromPaymentLink(stripe, plan.href);
@@ -250,7 +258,7 @@ export async function resolveCheckoutPrice(plan) {
     }
   } catch (err) {
     // Don't await Telegram — checkout should fail fast to the buyer.
-    void notifyCheckoutAlert({
+    alertPriceIssue({
       title: "Could not resolve Stripe price",
       fields: {
         Plan: plan.key,
@@ -261,7 +269,7 @@ export async function resolveCheckoutPrice(plan) {
     return null;
   }
 
-  void notifyCheckoutAlert({
+  alertPriceIssue({
     title: "No Stripe price for plan",
     fields: {
       Plan: plan.key,
@@ -273,20 +281,37 @@ export async function resolveCheckoutPrice(plan) {
 
 /**
  * Best-effort warm of lookup-key prices for current plans that lack a hardcoded
- * priceId. Safe to fire from a checkout request via waitUntil — never throws.
+ * priceId. One Stripe round trip for all pending keys. Safe to fire from a
+ * checkout request via waitUntil — never throws.
  */
 export async function warmCheckoutPriceCache(plans = CHECKOUT_PLANS) {
   if (isStripeTestKey()) return;
   const pending = plans.filter((plan) => !plan.priceId && !envPriceId(plan.key) && plan.mode === "subscription");
-  await Promise.all(
-    pending.map(async (plan) => {
-      try {
-        await priceFromLookupKey(getStripe(), plan);
-      } catch {
-        // Warm only; failures surface on the real checkout path.
-      }
-    }),
-  );
+  if (!pending.length) return;
+
+  const cache = linkCache();
+  const uncached = pending.filter((plan) => !cache.has(`lookup:${planLookupKey(plan)}`));
+  if (!uncached.length) return;
+
+  try {
+    const stripe = getStripe();
+    const lookupKeys = uncached.map((plan) => planLookupKey(plan));
+    // Stripe accepts multiple lookup_keys in one list call.
+    const res = await stripe.prices.list({ lookup_keys: lookupKeys, active: true, limit: 100 });
+    const byKey = new Map((res.data || []).map((price) => [price.lookup_key, price]));
+    for (const plan of uncached) {
+      const price = byKey.get(planLookupKey(plan));
+      if (!price) continue;
+      const interval = price.recurring?.interval || null;
+      if (price.unit_amount !== plan.amount || interval !== plan.interval) continue;
+      cache.set(`lookup:${planLookupKey(plan)}`, {
+        priceId: price.id,
+        extras: { allow_promotion_codes: true },
+      });
+    }
+  } catch {
+    // Warm only; failures surface on the real checkout path.
+  }
 }
 
 export function requestOrigin(req) {
