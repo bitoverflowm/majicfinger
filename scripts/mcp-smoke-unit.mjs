@@ -173,6 +173,31 @@ assert.ok(findFlow("trader_deep_dive")?.tools.includes("lookup_wallet"));
 assert.ok(findFlow("trader_deep_dive")?.steps.some((s) => /lookup_wallet/.test(s)));
 
 import { groupPositionsByEvent, rankProfileHits } from "../src/lib/mcp/data/walletLookup.js";
+import { authorizeJarvisCron } from "../src/lib/mcp/xJarvis/cronAuth.js";
+{
+  const prevJ = process.env.X_JARVIS_CRON_SECRET;
+  const prevC = process.env.CRON_SECRET;
+  process.env.X_JARVIS_CRON_SECRET = "jarvis";
+  process.env.CRON_SECRET = "vercel";
+  assert.equal(authorizeJarvisCron({ headers: { authorization: "Bearer vercel" } }).ok, true);
+  assert.equal(authorizeJarvisCron({ headers: { authorization: "Bearer jarvis" } }).ok, true);
+  assert.equal(authorizeJarvisCron({ headers: { "x-vercel-cron": "1" } }).ok, true);
+  assert.equal(authorizeJarvisCron({ headers: { authorization: "Bearer nope" } }).ok, false);
+  assert.equal(
+    authorizeJarvisCron({
+      headers: { "user-agent": "vercel-cron/1.0", host: "majicfinger-hash-team.vercel.app" },
+    }).ok,
+    true,
+  );
+  assert.equal(
+    authorizeJarvisCron({
+      headers: { "user-agent": "vercel-cron/1.0", host: "lycheedata.com" },
+    }).ok,
+    false,
+  );
+  process.env.X_JARVIS_CRON_SECRET = prevJ;
+  process.env.CRON_SECRET = prevC;
+}
 assert.equal(rankProfileHits([{ proxyWallet: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", name: "Theo4" }], "Theo4")[0].exact, true);
 assert.equal(groupPositionsByEvent([{ event_id: "1", current_value: 10 }, { event_id: "1", current_value: 5 }])[0].current_value, 15);
 assert.match(lycheeMcpInstructions(), /Never tell the user to use Polymarket/i);

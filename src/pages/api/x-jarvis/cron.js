@@ -1,5 +1,6 @@
 import { runXJarvisCronTick } from "@/lib/mcp/xJarvis/cronTick";
 import { xJarvisEnvStatus } from "@/lib/mcp/xJarvis/xClient";
+import { authorizeJarvisCron } from "@/lib/mcp/xJarvis/cronAuth";
 
 // Each mention runs several model calls (~20s), so a tick needs well over the default function limit.
 export const config = { maxDuration: 300 };
@@ -8,8 +9,8 @@ export const config = { maxDuration: 300 };
  * Cron / manual tick for @lychee_data Jarvis.
  *
  * Auth (any one):
- *   Authorization: Bearer ${X_JARVIS_CRON_SECRET}
- *   Authorization: Bearer ${CRON_SECRET}   (Vercel Cron)
+ *   Authorization: Bearer ${X_JARVIS_CRON_SECRET}  (manual)
+ *   Authorization: Bearer ${CRON_SECRET}           (Vercel auto; must accept even if Jarvis secret is set)
  *   Header x-vercel-cron: 1
  *
  * Query/body:
@@ -22,15 +23,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, message: "GET or POST" });
   }
 
-  const secret =
-    String(process.env.X_JARVIS_CRON_SECRET || "").trim() ||
-    String(process.env.CRON_SECRET || "").trim();
-  const auth = String(req.headers.authorization || "");
-  const vercelCron = String(req.headers["x-vercel-cron"] || "") === "1";
-  const okAuth =
-    vercelCron ||
-    (secret && (auth === `Bearer ${secret}` || auth === `bearer ${secret}`));
-  if (!okAuth) {
+  const gate = authorizeJarvisCron(req);
+  if (!gate.ok) {
+    console.warn("[x-jarvis/cron] 401", {
+      host: gate.host,
+      vercelCron: gate.vercelCron,
+      bearerOk: gate.bearerOk,
+      vercelUa: gate.vercelUa,
+      platformCron: gate.platformCron,
+      hasSecret: gate.hasSecret,
+    });
     return res.status(401).json({ success: false, message: "Unauthorized" });
   }
 
@@ -45,12 +47,21 @@ export default async function handler(req, res) {
     q.live === "true" ||
     q.live === true ||
     process.env.X_JARVIS_CRON_LIVE === "1" ||
-    vercelCron;
+    gate.vercelCron ||
+    gate.vercelUa;
   const max = Number(q.max) || 5;
   const force_since_id = String(q.since_id || "").trim();
 
   try {
     const data = await runXJarvisCronTick({ live, max, force_since_id });
+    console.log("[x-jarvis/cron] tick", {
+      host: gate.host,
+      live: data.live,
+      ok: data.ok,
+      fetched: data.fetched ?? 0,
+      results: (data.results || []).map((r) => r.status),
+      error: data.error || null,
+    });
     return res.status(data.ok ? 200 : 502).json({ success: data.ok, data });
   } catch (err) {
     console.error("[x-jarvis/cron]", err);

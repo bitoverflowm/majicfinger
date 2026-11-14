@@ -2,6 +2,7 @@ import dbConnect from "@/lib/dbConnect";
 import XJarvisJob from "@/models/XJarvisJobs";
 import XJarvisCursor from "@/models/XJarvisCursor";
 import { xJarvisEnvStatus } from "@/lib/mcp/xJarvis/xClient";
+import { authorizeJarvisCron } from "@/lib/mcp/xJarvis/cronAuth";
 
 /**
  * Inspect recent Jarvis mention jobs (drafts + posts).
@@ -10,11 +11,7 @@ import { xJarvisEnvStatus } from "@/lib/mcp/xJarvis/xClient";
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ success: false, message: "GET only" });
 
-  const secret =
-    String(process.env.X_JARVIS_CRON_SECRET || "").trim() ||
-    String(process.env.CRON_SECRET || "").trim();
-  const auth = String(req.headers.authorization || "");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!authorizeJarvisCron(req).ok) {
     return res.status(401).json({ success: false, message: "Unauthorized" });
   }
 
