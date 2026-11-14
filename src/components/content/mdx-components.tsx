@@ -106,6 +106,14 @@ import {
   WhichHeadlineExplorer,
 } from "@/components/content/guide-animations/trade-before-news";
 import { KnessetTradeNewsChart } from "@/components/content/KnessetTradeNewsChart";
+import {
+  BothSidesMarketNet,
+  ContestablePnlByQuestionSnapshot,
+  PoliticsCategoryExplorer,
+  ProfitLossBookAnimation,
+  RemoveBiggestMarketExplorer,
+} from "@/components/content/guide-animations/pnl-by-market-animations";
+import { WalletPnlByQuestionLive } from "@/components/content/WalletPnlByQuestionLive";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -228,6 +236,8 @@ function MdxHr() {
  *   `<WatchlistAnimation />`
  * - Trade versus news guide: `<TradeNewsTimeline />`, `<WhichHeadlineExplorer />`, `<ContractQuestionAnimation />`,
  *   `<KnessetTradeNewsChart />`
+ * - PnL by market guide: `<BothSidesMarketNet />`, `<ProfitLossBookAnimation />`, `<ContestablePnlByQuestionSnapshot />`,
+ *   `<RemoveBiggestMarketExplorer />`, `<PoliticsCategoryExplorer />`, `<WalletPnlByQuestionLive />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -341,6 +351,12 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     WhichHeadlineExplorer,
     ContractQuestionAnimation,
     KnessetTradeNewsChart,
+    BothSidesMarketNet,
+    ProfitLossBookAnimation,
+    ContestablePnlByQuestionSnapshot,
+    RemoveBiggestMarketExplorer,
+    PoliticsCategoryExplorer,
+    WalletPnlByQuestionLive,
     ...components,
   };
 }

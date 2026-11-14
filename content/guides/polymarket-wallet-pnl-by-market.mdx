@@ -1,0 +1,104 @@
+---
+title: "Where Did This Polymarket Wallet Make Its Money?"
+seoTitle: "Polymarket Wallet P&L by Market: Where the Profit Came From"
+description: "One Polymarket wallet made $128,974 on a Brazilian election question. See what it earned on each side and how much profit remained without its biggest win."
+publishedAt: "2026-11-14"
+author: "misterrpink"
+topics:
+  [
+    "Polymarket",
+    "wallet research",
+    "profit and loss",
+    "holder research",
+    "whale research",
+    "whales",
+    "trader research",
+    "traders",
+    "holders",
+    "investigations",
+  ]
+tags:
+  [
+    "Polymarket",
+    "whale",
+    "whale analysis",
+    "whale research",
+    "whales",
+    "holder research",
+    "wallet analysis",
+    "trader research",
+    "traders",
+    "holders",
+    "PnL",
+    "profit attribution",
+    "elections",
+    "investigations",
+  ]
+integration: ["Polymarket", "Lychee"]
+contentType: "Guide"
+cluster: "Holder research"
+intent: "How-to"
+difficulty: "Beginner"
+coverImage: "/images/guides/polymarket-wallet-pnl-by-market/main.jpg"
+ogImage: "https://lycheedata.com/images/guides/polymarket-wallet-pnl-by-market/main.jpg"
+featured: false
+slug: "polymarket-wallet-pnl-by-market"
+readingTime: "4 min"
+keywords:
+  [
+    "Polymarket wallet PnL",
+    "Polymarket PnL by market",
+    "Polymarket profit and loss",
+    "Polymarket trader analysis",
+    "Polymarket whale analysis",
+  ]
+canonical: "https://lycheedata.com/guides/polymarket-wallet-pnl-by-market"
+twitterCard: "summary_large_image"
+---
+
+Contestable-Parfait made **$128,974** on one Polymarket question about Brazil’s presidential election. Take that question out and the wallet was still **$426,050 ahead** on November 14, 2026. To see how it got there, start with a curious detail about its biggest win. The same trader lost more than $16,000 on the very same question. [Explore Contestable-Parfait in Lychee](/dashboard?terminal=holder&wallet=0xc301c1e034e71e1a6ce9684f029c4674a00466aa)
+
+## How much did the wallet make on its biggest market?
+
+The question was *Will Flávio Bolsonaro win the 2026 Brazilian presidential election?* The wallet traded both sides. Its closed **No** position earned **$145,322**. Its closed **Yes** position lost **$16,348**. Put the two together and you get the **$128,974** that question contributed to the wallet.
+
+<BothSidesMarketNet />
+
+The same arithmetic changes how you read its worst market. On the question of whether Yashar would win the most seats in Israel’s legislative election, the wallet made **$1,633 on No** and lost **$37,572 on Yes**. Its loss on the question came to **$35,939**. When you research a whale, opening the other side of a position can change the story by thousands of dollars.
+
+## Which markets drove this wallet’s profit and loss?
+
+Lychee’s **PnL by question** view groups positions by market and adds the outcomes together. Across **573 questions**, the profitable questions contributed **$762,616**. The losing questions cost **$207,591**. Net P&L came to **$555,024**, including open positions valued at the prices in the snapshot. Dollar amounts here are rounded after calculation.
+
+<ProfitLossBookAnimation />
+
+So how much depended on Bolsonaro? That market accounted for **16.9% of the gains from profitable questions**. Subtract its $128,974 contribution from the wallet’s net P&L and the other questions still add up to **$426,050**.
+
+<ContestablePnlByQuestionSnapshot />
+
+Two of those questions are worth opening together. The wallet made **$66,594** on the Lula presidential question and **$59,513** on the Texas Senate race. Removing the Bolsonaro question still leaves the Lula result in the record. If you want to know how much depended on **one election**, group its related questions before you do the subtraction.
+
+<RemoveBiggestMarketExplorer />
+
+The donuts above freeze the November 14 snapshot used in this guide. The live Holder Terminal view for the same wallet is below. Prices and new fills can move the slices.
+
+<WalletPnlByQuestionLive />
+
+## Where did the election gains go?
+
+Open **By category and sub-category** and expand **Politics**. This view counts finished bets. In the November 14 snapshot, the wallet had **440 finished Politics positions** and **$255,289 in Politics P&L**. Yet the **US Election** row alone earned **$326,920**. How can one row earn more than the entire category?
+
+The other Politics rows together lost **$71,631**. The largest drag was **Global Elections**, down **$78,951**. **Midterms** added back **$9,639**. A reader looking only at the Politics total would miss both the size of the US Election gains and where much of that money went.
+
+<PoliticsCategoryExplorer />
+
+## How to check another Polymarket wallet
+
+1. **Open a trader.** Search for a wallet in the [Polymarket wallet tracker](/polymarket-wallet-tracker), or select a holder from a market you follow. [Open Contestable-Parfait](/dashboard?terminal=holder&wallet=0xc301c1e034e71e1a6ce9684f029c4674a00466aa)
+2. **Find the largest gain and loss.** In **PnL by question**, open the first market on each side. Check which outcomes the wallet traded. Use the combined question result when measuring that market’s contribution.
+3. **Remove the biggest winner.** Subtract the losing questions’ combined dollar loss from the winning questions’ combined gain. Then subtract the biggest winning question. Use figures from the same snapshot so a change in open prices doesn't slip into the comparison.
+4. **Follow the result one level deeper.** Open the category that interests you and expand its subcategories. Check how many finished bets sit behind each row. If several large results trace back to one event, look at those questions together.
+
+For a trade-level check against headlines, pair this with the wallet’s market chart. [How to check a Polymarket trade against the news](/guides/polymarket-trades-before-the-news) · [Find a market’s top holders](/guides/polymarket-top-holders)
+
+**About the figures.** We retrieved 489 closed and 379 open-status records directly from Lychee on November 14. Of the latter, 150 were already redeemable after resolution and 229 were still open. The market breakdown uses reported position P&L across all three groups. The category breakdown covers the 639 finished positions and uses Lychee’s event-tag groupings. The live wallet can change as the trader acts and markets move. [Inspect the wallet’s current positions and finished bets](/dashboard?terminal=holder&wallet=0xc301c1e034e71e1a6ce9684f029c4674a00466aa)
