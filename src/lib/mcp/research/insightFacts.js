@@ -161,8 +161,12 @@ export function insightFacts(insights = {}) {
   return out;
 }
 
-/** Insight id -> its lines, for pages that lay insights out themselves. */
+/**
+ * Insight id -> its lines, for pages that lay insights out themselves.
+ * @returns {Record<string, string[]>}
+ */
 export function insightLinesById(insights = {}) {
+  /** @type {Record<string, string[]>} */
   const out = {};
   for (const meta of INSIGHTS) {
     const value = insights[meta.id];

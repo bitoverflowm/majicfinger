@@ -25,9 +25,11 @@ const cap = (s) => String(s || "").replace(/^./, (c) => c.toUpperCase());
 /**
  * The few reads that headline the dashboard and its share card, most surprising kinds first.
  * `tone` is good / bad / neutral for colouring.
+ * @returns {{ label: string, value: string, tone: "good" | "bad" | "neutral" }[]}
  */
 export function reportHeadlines(report) {
   const i = report?.insights || {};
+  /** @type {{ label: string, value: string, tone: "good" | "bad" | "neutral" }[]} */
   const out = [];
   const ranks = i.category_ranks?.ranks || [];
   if (ranks.length) {
