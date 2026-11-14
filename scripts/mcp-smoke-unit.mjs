@@ -168,6 +168,13 @@ assert.match(lycheeMcpInstructions(), /get_lychee_skill_score/);
 assert.match(lycheeMcpInstructions(), /lesson snapshots/i);
 assert.match(lycheeMcpInstructions(), /lychee_call/);
 assert.match(lycheeMcpInstructions(), /lookup_trades/);
+assert.match(lycheeMcpInstructions(), /lookup_wallet/);
+assert.ok(findFlow("trader_deep_dive")?.tools.includes("lookup_wallet"));
+assert.ok(findFlow("trader_deep_dive")?.steps.some((s) => /lookup_wallet/.test(s)));
+
+import { groupPositionsByEvent, rankProfileHits } from "../src/lib/mcp/data/walletLookup.js";
+assert.equal(rankProfileHits([{ proxyWallet: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", name: "Theo4" }], "Theo4")[0].exact, true);
+assert.equal(groupPositionsByEvent([{ event_id: "1", current_value: 10 }, { event_id: "1", current_value: 5 }])[0].current_value, 15);
 assert.match(lycheeMcpInstructions(), /Never tell the user to use Polymarket/i);
 assert.match(lycheeMcpInstructions(), /runResearchPack/);
 assert.ok(guidancePreamble().hard_rules.some((r) => /lychee_call/i.test(r)));

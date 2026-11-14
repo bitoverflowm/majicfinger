@@ -138,7 +138,7 @@ export function guidancePreamble() {
     ],
     hard_rules: [
       "Never scrape Polymarket/Kalshi pages, and never tell the user to use those sites because Lychee 'didn't provide' the data.",
-      "If list_capabilities lists a tool that is missing from YOUR callable list, call lychee_call (tool=<name>, args_json) — do not invent a 'tool not exposed' gap unless the call failed.",
+      "If list_capabilities lists a tool that is missing from YOUR callable list, call lychee_call (tool=<name>, args_json) — do not invent a 'tool not exposed' gap unless the call failed. Wallet research: lookup_wallet (name/@handle/0x).",
       "Jarvis missing from your tool list? Call lychee_call tool=jarvis_on / jarvis_pulse — never tell the user it is unavailable.",
       "For hottest / top volume markets: ALWAYS call get_most_active_markets (not search_markets with the word hottest).",
       "If a Lychee pull returns an error or 0 rows, report it and fix ids (condition_id / ticker / proxy_wallet).",

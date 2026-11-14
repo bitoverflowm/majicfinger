@@ -29,6 +29,7 @@ const JARVIS_PROMPT = `Turn Jarvis mode on.
 3) Never say Jarvis tools are "not exposed" — use lychee_call or list_capabilities action=jarvis_on / jarvis_pulse
 3b) Never tell the user Lychee didn't provide the data or to use Polymarket/Kalshi directly — call lychee_call for hidden tools
 3c) For a specific fill: lookup_trades with market + wallet + UTC start/end (not a 20-row recent preview)
+3d) For a named trader: lookup_wallet (or lychee_call tool=lookup_wallet) — never say wallet lookup is not callable
 4) Keep pulsing at the start of every later message while Jarvis stays on
 5) When I bite: pull_market_bundle, SHOW charts inline, analyze full rows
 Only Lychee tools. Start a new chat if your tool list looks stale.`;
@@ -40,7 +41,7 @@ const TOOL_ROWS = [
   ["get_most_active_markets / search_markets / search_closed_markets", "Find open or settled markets (+ winners)"],
   ["get_lookalike_markets / compare_venues", "Related deadlines · Kalshi↔Polymarket gaps"],
   ["preview_holders / preview_market_activity / lookup_trades / preview_prices / preview_orderbook", "Full analysis pulls; lookup_trades = market + wallet + UTC range"],
-  ["preview_trader / preview_kalshi_market / preview_open_interest", "Trader + Kalshi + OI samples"],
+  ["lookup_wallet / preview_trader / preview_kalshi_market / preview_open_interest", "Name→wallet + trader + Kalshi + OI samples"],
   ["pull_market_bundle / pull_and_compose / run_recipe_*", "Land Lychee sheets + inline chart images"],
   ["analyze_holders / analyze_tape / analyze_calibration", "Risk, tape, Brier / reliability"],
   ["add_sheet_with_chart / add_insight_blocks / publish_project", "Compose + shareable URL + OG preview"],
