@@ -4,6 +4,7 @@ import { orderProfileSuggestions } from "@/lib/polymarketLive/polymarketPublicSe
 import { flattenPolymarketHoldersV2 } from "@/lib/mcp/data/holdersFlatten";
 import { filterTradesByRange, toUnixSeconds, tradeUnixSeconds } from "@/lib/mcp/data/tradeTime";
 import { getFlowsCatalog, findDataset } from "@/lib/mcp/data/flowsCatalog";
+import { groupPositionsByEvent, isProxyWallet, rankProfileHits } from "@/lib/mcp/data/walletLookup";
 
 export { flattenPolymarketHoldersV2 };
 
@@ -703,18 +704,91 @@ async function fetchTraderJson(url) {
   return body;
 }
 
+async function searchPolymarketProfiles(query) {
+  const q = String(query || "").trim().replace(/^@/, "");
+  if (q.length < 2) return [];
+  const body = await fetchJson(
+    `${GAMMA_BASE}/public-search?q=${encodeURIComponent(q)}&limit_per_type=10&search_profiles=true`,
+  );
+  return rankProfileHits(Array.isArray(body?.profiles) ? body.profiles : [], q);
+}
+
 /** Polymarket profile whose username (or pseudonym) is exactly `name`, else the first profile hit. */
 export async function findPolymarketProfile(name) {
-  const q = String(name || "").trim().replace(/^@/, "");
-  if (q.length < 2) return null;
-  const body = await fetchJson(`${GAMMA_BASE}/public-search?q=${encodeURIComponent(q)}&limit_per_type=10&search_profiles=true`);
-  const profiles = (Array.isArray(body?.profiles) ? body.profiles : []).filter((p) => p?.proxyWallet);
-  const lower = q.toLowerCase();
-  const exact = profiles.find(
-    (p) => String(p.name || "").toLowerCase() === lower || String(p.pseudonym || "").toLowerCase() === lower,
-  );
-  const hit = exact || profiles[0];
-  return hit ? { wallet: String(hit.proxyWallet).toLowerCase(), name: hit.name || hit.pseudonym || q, exact: Boolean(exact) } : null;
+  const looked = await lookupPolymarketWallets({ query: name, include_positions: false, limit: 8 });
+  if (!looked.found) return null;
+  return { wallet: looked.proxy_wallet, name: looked.profile?.name || name, exact: Boolean(looked.profile?.exact) };
+}
+
+/**
+ * Callable wallet research: resolve a display name / @handle / 0x proxy, then
+ * (optionally) live positions grouped by parent event the way Holder Terminal does.
+ */
+export async function lookupPolymarketWallets({
+  query = "",
+  include_positions = true,
+  include_closed = false,
+  limit = 8,
+} = {}) {
+  const q = String(query || "").trim().replace(/^@/, "");
+  if (q.length < 2) {
+    throw new Error("lookup_wallet needs query: display name, @handle, or 0x proxy wallet");
+  }
+  const cap = Math.min(20, Math.max(1, Number(limit) || 8));
+  let matches = [];
+  if (isProxyWallet(q)) {
+    matches = [{ proxy_wallet: q.toLowerCase(), name: null, exact: true, via: "wallet" }];
+  } else {
+    matches = (await searchPolymarketProfiles(q)).slice(0, cap);
+  }
+  const best = matches.find((m) => m.exact) || matches[0] || null;
+  if (!best?.proxy_wallet) {
+    return {
+      query: q,
+      found: false,
+      matches: [],
+      note: "No Polymarket profile on Lychee for that name. Try another spelling or a 0x proxy from preview_holders. Stay on Lychee — do not send the user to Polymarket.",
+    };
+  }
+
+  let trader = null;
+  let trader_error = null;
+  if (include_positions) {
+    try {
+      trader = await getPolymarketTrader(best.proxy_wallet, {
+        limit: 80,
+        includeClosed: !!include_closed,
+      });
+    } catch (err) {
+      trader_error = err?.message || String(err);
+    }
+  }
+
+  const open = trader?.positions || [];
+  const events = groupPositionsByEvent(open);
+  return {
+    query: q,
+    found: true,
+    proxy_wallet: best.proxy_wallet,
+    profile: best,
+    matches,
+    terminal_url: `https://lycheedata.com/jarvis/holder/${best.proxy_wallet}`,
+    grouping: "Holder Terminal: live positions grouped by event_id (else event_slug), then outcomes",
+    events,
+    open_position_count: open.length,
+    event_count: events.length,
+    preview_outcomes: events.flatMap((e) => e.outcomes).slice(0, 24),
+    portfolio_value: trader?.portfolio_value ?? null,
+    pnl_summary: trader?.pnl_summary ?? null,
+    trader_error,
+    source: "lychee:gamma-public-search+data-api-v2/positions",
+    next: {
+      preview_trader: { proxy_wallet: best.proxy_wallet, include_closed: true },
+      pull_trader_bundle: { proxy_wallet: best.proxy_wallet, include_closed: true },
+      skill: "get_lychee_skill_score",
+      theme: "analyze_trader_theme",
+    },
+  };
 }
 
 /**
@@ -1072,6 +1146,7 @@ export function catalogCapabilities() {
     tools: [
       { name: "list_capabilities", stage: "orient", purpose: "Short catalog + best practices (+ action=platform / call)" },
       { name: "lychee_call", stage: "orient", purpose: "Run any catalog tool by name if ChatGPT hid it" },
+      { name: "lookup_wallet", stage: "sample", purpose: "Name/@handle/0x → proxy_wallet + live positions grouped by event" },
       { name: "explain_lychee_platform", stage: "orient", purpose: "Attributes, filters, joins, Skill Score, news archive" },
       { name: "list_research_flows", stage: "orient", purpose: "Named composable research paths" },
       { name: "list_crazy_workflows", stage: "orient", purpose: "Ambitious workflows to pitch on first turn" },

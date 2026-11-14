@@ -1,12 +1,13 @@
 import { jarvisPowerUpPayload, jarvisPulse } from "@/lib/mcp/data/jarvis";
 import { lycheePlatformGuide } from "@/lib/mcp/data/platformGuide";
 import { searchNewsHeadlines } from "@/lib/mcp/data/news";
-import { getPolymarketTrader, lookupPolymarketTrades } from "@/lib/mcp/data/providers";
+import { getPolymarketTrader, lookupPolymarketTrades, lookupPolymarketWallets } from "@/lib/mcp/data/providers";
 import { runTradeHistoryRecipe } from "@/lib/mcp/data/recipes";
 import { runResearchPack } from "@/lib/mcp/research/pack";
 
 export const LYCHEE_CALL_TOOLS = [
   "search_news",
+  "lookup_wallet",
   "preview_trader",
   "preview_market_activity",
   "lookup_trades",
@@ -62,9 +63,24 @@ export async function dispatchLycheeTool(actor, toolName, rawArgs) {
   if (tool === "search_news") {
     return searchNewsHeadlines(args);
   }
+  if (tool === "lookup_wallet" || tool === "search_wallets" || tool === "search_profiles") {
+    return lookupPolymarketWallets({
+      query: args.query || args.name || args.handle || args.q || args.proxy_wallet || "",
+      include_positions: args.include_positions !== false,
+      include_closed: !!args.include_closed,
+      limit: args.limit || 8,
+    });
+  }
   if (tool === "preview_trader") {
-    const wallet = args.proxy_wallet || args.proxyWallet || args.user;
-    if (!wallet) throw new Error("preview_trader needs proxy_wallet");
+    let wallet = args.proxy_wallet || args.proxyWallet || args.user || "";
+    if (!/^0x[a-fA-F0-9]{40}$/.test(String(wallet))) {
+      const looked = await lookupPolymarketWallets({
+        query: args.query || args.name || args.handle || wallet,
+        include_positions: false,
+      });
+      wallet = looked.proxy_wallet || "";
+    }
+    if (!wallet) throw new Error("preview_trader needs proxy_wallet — call lookup_wallet with the trader name first");
     return getPolymarketTrader(wallet, {
       limit: args.limit || 50,
       includeClosed: args.include_closed !== false,

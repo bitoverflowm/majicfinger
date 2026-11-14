@@ -48,7 +48,8 @@ export const RESEARCH_FLOWS = [
     when: "User names a wallet, trader handle, or wants follow-the-smart-money / Fed win-rate history.",
     steps: [
       "explain_lychee_platform if the agent is tempted to treat pulls as metadata-only",
-      "preview_trader include_closed=true (0x… proxy) — skip protocol/contract addresses",
+      "lookup_wallet with the display name / @handle / 0x (callable even if ChatGPT hid it — lychee_call tool=lookup_wallet). Positions are grouped by parent event like Holder Terminal.",
+      "preview_trader include_closed=true on the returned proxy_wallet — skip protocol/contract addresses",
       "pull_trader_bundle (preferred) OR pull_and_compose dataset=polymarket.trader_positions|activity|pnl",
       "get_lychee_skill_score for −100…100 skill z on finished positions",
       "analyze_trader_theme for Fed/rates (or other theme) hit-rates on settled markets",
@@ -57,6 +58,7 @@ export const RESEARCH_FLOWS = [
     ],
     tools: [
       "explain_lychee_platform",
+      "lookup_wallet",
       "preview_trader",
       "pull_trader_bundle",
       "get_lychee_skill_score",
@@ -266,7 +268,7 @@ export const DATASETS = [
     status: "live",
     key: "proxy_wallet",
     chart_view: "treemap",
-    tools: ["preview_trader", "pull_and_compose"],
+    tools: ["lookup_wallet", "preview_trader", "pull_and_compose"],
   },
   {
     id: "polymarket.trader_activity",

@@ -51,7 +51,7 @@ Only Lychee tools.`,
     vibe: "Smart-money stalker",
     hook: "Pick a wallet from holders → positions, tape, PnL → stalk their next moves.",
     flow_ids: ["holder_concentration", "trader_deep_dive", "shareable_research"],
-    tools: ["get_most_active_markets", "preview_holders", "preview_trader", "pull_and_compose", "publish_project"],
+    tools: ["get_most_active_markets", "preview_holders", "lookup_wallet", "preview_trader", "pull_and_compose", "publish_project"],
     prompt: `Be my Lychee research assistant. Stalk smart money:
 1) get_most_active_markets → pull holders on #1
 2) Pick the most interesting proxy_wallet (size, both-sides, or recent aggressor)

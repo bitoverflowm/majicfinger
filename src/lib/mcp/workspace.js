@@ -420,7 +420,7 @@ export async function pullMarketBundleIntoProject(
     "SHOW each chart_snapshot inline (Lychee-styled). Prefer publish_project for shareable viewing — dashboard_url is the owner's editor, not a magic-link for chat guests.";
   results.next = {
     publish: "publish_project",
-    traders: "preview_trader / pull_trader_bundle / analyze_trader_theme on top wallets",
+    traders: "lookup_wallet / preview_trader / pull_trader_bundle / analyze_trader_theme on top wallets",
     news: "search_news for headline overlay",
   };
   return results;

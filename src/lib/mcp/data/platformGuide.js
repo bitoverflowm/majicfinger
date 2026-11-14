@@ -53,6 +53,7 @@ export function lycheePlatformGuide() {
     },
     wallet_depth: {
       layers: [
+        "Resolve name/@handle → proxy_wallet with lookup_wallet (live positions grouped by event_id like Holder Terminal).",
         "Open positions — current_size, unrealized_pnl, markets held (preview_trader / polymarket.trader_positions).",
         "Activity / tape — buys/sells with price, usdc_size, timestamps (polymarket.trader_activity).",
         "PnL equity curve — economic_pnl over time (polymarket.trader_pnl / portfolio chart).",
