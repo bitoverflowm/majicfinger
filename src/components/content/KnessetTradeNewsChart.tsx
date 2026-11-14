@@ -24,6 +24,7 @@ export function KnessetTradeNewsChart() {
           positions={NONE}
           bets={NONE}
           lastTrade={null}
+          onPickMarket={undefined}
         />
       </div>
       <figcaption className="mx-auto mt-3 max-w-[42rem] text-center text-xs leading-relaxed text-muted-foreground">
