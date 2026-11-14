@@ -100,6 +100,12 @@ import {
   WinnersVsLosersAnimation,
   WinStreakAnimation,
 } from "@/components/university/trader-quality-animations";
+import {
+  ContractQuestionAnimation,
+  TradeNewsTimeline,
+  WhichHeadlineExplorer,
+} from "@/components/content/guide-animations/trade-before-news";
+import { KnessetTradeNewsChart } from "@/components/content/KnessetTradeNewsChart";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -220,6 +226,8 @@ function MdxHr() {
  * - Good trader lesson: `<WinStreakAnimation />`, `<BreakEvenExplorer />`, `<WinnersVsLosersAnimation />`,
  *   `<SameCheckmarkAnimation />`, `<ScenarioPayoffExplorer />`, `<EntryGapAnimation />`, `<RemoveBiggestWinExplorer />`,
  *   `<WatchlistAnimation />`
+ * - Trade versus news guide: `<TradeNewsTimeline />`, `<WhichHeadlineExplorer />`, `<ContractQuestionAnimation />`,
+ *   `<KnessetTradeNewsChart />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -329,6 +337,10 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     EntryGapAnimation,
     RemoveBiggestWinExplorer,
     WatchlistAnimation,
+    TradeNewsTimeline,
+    WhichHeadlineExplorer,
+    ContractQuestionAnimation,
+    KnessetTradeNewsChart,
     ...components,
   };
 }

@@ -1,0 +1,104 @@
+---
+title: "Did This Polymarket Trader Buy Before the News? How to Check"
+seoTitle: "How to Check a Polymarket Trade Against News Headlines"
+description: "A wallet bought 215 YES shares minutes before a Knesset speaker report. Rebuild the timeline in Lychee and see what had already been reported."
+publishedAt: "2026-11-14"
+author: "misterrpink"
+topics:
+  [
+    "Polymarket",
+    "wallet research",
+    "trade history",
+    "news",
+    "whale research",
+    "whales",
+    "trader research",
+    "traders",
+    "holders",
+    "holder research",
+    "investigations",
+    "insider trading investigations",
+  ]
+tags:
+  [
+    "polymarket",
+    "holders",
+    "whale research",
+    "whales",
+    "trader research",
+    "traders",
+    "holder research",
+    "investigations",
+    "insider trading investigations",
+  ]
+integration: ["Polymarket", "Lychee"]
+contentType: "Guide"
+cluster: "Holder research"
+intent: "How-to"
+difficulty: "Beginner"
+coverImage: "/images/guides/polymarket-trades-before-the-news/main.jpg"
+ogImage: "https://lycheedata.com/images/guides/polymarket-trades-before-the-news/main.jpg"
+featured: false
+slug: "polymarket-trades-before-the-news"
+readingTime: "5 min"
+keywords:
+  [
+    "Polymarket trades before the news",
+    "Polymarket wallet trade history",
+    "Polymarket trade timestamps",
+    "Polymarket holder research",
+    "Polymarket insider trading investigation",
+  ]
+canonical: "https://lycheedata.com/guides/polymarket-trades-before-the-news"
+twitterCard: "summary_large_image"
+---
+
+At **08:16:28 UTC on November 10, 2026**, a Polymarket wallet bought **215 YES shares for $152.50** on whether Israel’s parliament would elect a new speaker by November 13. About ten minutes later, *The Times of Israel* reported that opposition leaders had agreed on a nominee.
+
+Did the trader beat the news? **They beat that particular report.** The push to replace the speaker was already public. And the contract had a deadline: agreeing on a nominee was only one step toward electing a speaker. [November 9 coverage](https://www.timesofisrael.com/liveblog-november-9-2026/) · [November 10 nomination report](https://www.timesofisrael.com/liveblog_entry/eisenkot-led-bloc-agrees-on-matan-kahana-as-next-knesset-speaker-liberman-to-head-powerful-defense-committee/)
+
+<TradeNewsTimeline />
+
+The position is $152.50. Pinning the fill, then reading the headline on either side of it, is the same check for a much larger holder.
+
+## Which came first, the trade or the headline?
+
+Here’s the sequence for the November 13 contract. All times below are UTC on November 10, except the earlier YES buys.
+
+- **03:08:58 — The existing story.** Lychee’s Google News feed lists an Anadolu Agency report on Eisenkot’s bloc seeking to oust the incumbent speaker. Someone researching the contest that morning already had a public lead.
+- **08:16:28 — The YES buy.** Contestable-Parfait bought 215 shares at about 70.93¢ each. It was an addition to a position: the wallet also bought YES the previous evening, at 17:13:21 UTC on November 9, and again at 06:45:28 that morning. [Inspect the 215-share transaction](https://polygonscan.com/tx/0xa16641c86525cd6b6fd28b31049a69117506c9da5979c849648f647ea3936e3c)
+- **08:26 — The named nominee.** In a live update stamped 10:26 a.m. Israel time, *The Times of Israel* reported that the bloc had agreed to nominate Matan Kahana. The publisher displays minutes. Lychee’s Google News record for that same item shows **08:28:21 UTC**. Using the publisher puts the gap at about ten minutes; using the feed puts it at **11 minutes and 53 seconds**. [Read the timestamped live update](https://www.timesofisrael.com/liveblog_entry/eisenkot-led-bloc-agrees-on-matan-kahana-as-next-knesset-speaker-liberman-to-head-powerful-defense-committee/)
+- **09:35:00 — The same wallet bought NO.** It bought 108 NO shares at 88¢, costing $95.04. A screenshot ending at the YES buy would leave out the wallet’s next recorded trade in this market. [Inspect the NO transaction](https://polygonscan.com/tx/0x002b146fb702f083cc1cdd1f6dc76babd72915996637325966b5edba628e4f65)
+- **09:35:10 — It merged 108 pairs.** Ten seconds later the wallet merged 108 YES with 108 NO, receiving $108 back. Merging a pair is not another directional bet. It left the extra YES shares still open. [Inspect the merge](https://polygonscan.com/tx/0x3bf00be8f6de5c72c85d16a03200b8260371f2e041b5ca29d68e531118771a64)
+
+<WhichHeadlineExplorer />
+
+The date in the market question mattered as much as the name in the headline. Later that day, the speaker said the vote would be held the following Tuesday, beyond the November 13 deadline. The November 13 contract resolved **NO**. The public sequence establishes when this wallet traded relative to specific coverage. What the trader read or knew remains unknown. [Read the vote-scheduling report](https://www.timesofisrael.com/liveblog_entry/ohana-says-vote-to-elect-new-knesset-speaker-to-be-held-next-tuesday-after-majority-of-mks-demand-it/)
+
+<ContractQuestionAnimation />
+
+Polymarket’s public profile for this wallet lists the name Contestable-Parfait and an account created on October 10, 2026. Age is context for a holder investigation. It is not evidence about what the trader knew. The address is `0xc301c1e034e71e1a6ce9684f029c4674a00466aa`.
+
+## Read the trades and the headlines on one chart
+
+This is the Holder Terminal view for that wallet on the November 13 contract. **Around their moves** frames the chart on this wallet’s orders. Each dot is an order, sized by dollars. Amber marks are headlines that mention every word in the search bar. The search starts from the market title, which here is **Knesset** and **Speaker**.
+
+Zoom into the morning of November 10 and pin the 08:16 dot. The tooltip names the closest headline before it and the closest one after it. Add **Kahana** if you want the nomination report rather than every speaker story. Switch to **Whole market** when you need coverage from before the wallet’s first fill on November 9. Drag the news bars underneath the chart to jump to a busy stretch.
+
+The **Bought** tile adds the USDC on each activity record. The dollar amounts in the timeline are shares times the displayed fill price, which comes out a little lower.
+
+<KnessetTradeNewsChart />
+
+The chart is the investigation. A large holder, a new wallet, or a wallet someone suspects of trading on a headline gets the same two layers: its fills, and the stories that were already public.
+
+## How to check another wallet in Lychee Holder Terminal
+
+1. **Choose the exact contract.** Open Holder Terminal and select **Search market**. If an event has several deadlines, match the date in the original trade. In this case, November 6, November 13, November 30, and December 31 were separate contracts. [Open Holder Terminal](/polymarket-holder-terminal)
+2. **Find the wallet and pin the fill.** Select the trader from the market’s trade feed, or use **Search trader** and paste its address. In the wallet’s market chart, choose the contract and **Around their moves**. Pin a marker and record time, outcome, buy or sell, shares, and fill price. [Open this wallet](/dashboard?terminal=holder&wallet=0xc301c1e034e71e1a6ce9684f029c4674a00466aa)
+3. **Search broadly, then narrow.** Start with **Knesset** and **Speaker**. Then try the nominee’s name. A name-only search can miss earlier reporting about the contest before journalists knew whom the bloc would nominate. Zoom out to the previous day and open the relevant stories on either side of the fill.
+4. **Read the next action, not only the eye-catching buy.** This wallet’s next trade was NO, and the next action after that was a merge. A both-sides balance answers a different question from a single YES print. [How a wallet can hold YES and NO](/university/polymarket-buy-both-yes-and-no)
+5. **Read the timestamp at the source.** A publisher’s original post time, an update time, a feed-supplied publication time, and the time GDELT first saw an article can differ. Convert the fill and the report to the same time zone. If all you have is a first-seen time, write “before this article appeared in the feed.” An earlier publication is still possible.
+
+For a larger book of holders, start from who holds the market and then open the wallets that matter. [Find a market’s top holders](/guides/polymarket-top-holders)
+
+Try ending your investigation with one sentence another person can check: **“This wallet bought 215 YES shares about ten minutes before this outlet reported the nomination, hours after coverage of the replacement effort.”** Give them the fill and the article. Now they can inspect the same evidence themselves.
