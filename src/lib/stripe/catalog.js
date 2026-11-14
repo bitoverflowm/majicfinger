@@ -65,7 +65,8 @@ export const CHECKOUT_PLANS = [
     amount: 4900,
     interval: null,
     label: "Lychee MCP + Jarvis prereg",
-    href: landingPageV2Config.mcpPrereg?.href || "",
+    // The prereg CTA links to /checkout, not a Stripe Payment Link, so there's no link to read a price from.
+    href: "",
     priceId: "",
   },
 ];

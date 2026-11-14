@@ -638,7 +638,11 @@ async function handleCheckoutCompleted(session) {
       console.warn("Skipping payment with amount_total 0 (trial may use subscription mode)");
       return { ok: true, skipped: "zero_amount" };
     }
-    const mapping = resolvePlan({ amount, mode: "payment" });
+    // A promo code changes the amount, so prereg sessions are matched by their checkout plan first.
+    const mapping =
+      session.metadata?.planKey === "mcp_prereg"
+        ? PLAN_MAP["4900:one-time"]
+        : resolvePlan({ amount, mode: "payment" });
     if (!mapping) {
       console.error(
         `[Stripe Webhook] Unrecognized one-time payment amount: ${amount} cents. ` +

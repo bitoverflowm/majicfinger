@@ -88,7 +88,18 @@ const PRODUCTS = [
       { key: "quant_annual", amount: 99000, interval: "year", nickname: "Quant annual" },
     ],
   },
+  {
+    tier: "mcp",
+    name: "Lychee MCP + Jarvis prereg",
+    description: "Founding access to Lychee MCP and Jarvis, with 3 months of free Jarvis at launch.",
+    // One-time: the billing portal only switches between recurring prices.
+    portal: false,
+    prices: [{ key: "mcp_prereg", amount: 4900, interval: null, nickname: "MCP + Jarvis prereg" }],
+  },
 ];
+
+const per = (interval) => (interval ? `/${interval}` : " one-time");
+const recurringFor = (interval) => (interval ? { recurring: { interval } } : {});
 
 const WEBHOOK_EVENTS = [
   "checkout.session.async_payment_failed",
@@ -184,6 +195,7 @@ async function ensurePrices() {
 
   for (const def of PRODUCTS) {
     let product = products.find((item) => item.metadata?.lychee_tier === def.tier);
+    const addPortalPrice = def.portal === false ? () => {} : addPrice;
 
     for (const price of def.prices) {
       const lookupKey = `lychee_${price.key}`;
@@ -193,24 +205,24 @@ async function ensurePrices() {
         const interval = found.recurring?.interval || null;
         if (found.unit_amount === price.amount && interval === price.interval && found.currency === "usd") {
           console.log(`  ok:    ${lookupKey} -> ${found.id}`);
-          addPrice(foundProduct, found.id);
+          addPortalPrice(foundProduct, found.id);
           continue;
         }
         const replaced = await change(
-          `replace ${lookupKey} ${found.id} ($${found.unit_amount / 100} ${found.currency}/${interval}) with $${price.amount / 100}/${price.interval}; ${found.id} stays active for existing subscribers`,
+          `replace ${lookupKey} ${found.id} ($${found.unit_amount / 100} ${found.currency}${per(interval)}) with $${price.amount / 100}${per(price.interval)}; ${found.id} stays active for existing subscribers`,
           () =>
             stripe("POST", "prices", {
               product: foundProduct,
               currency: "usd",
               unit_amount: price.amount,
-              recurring: { interval: price.interval },
+              ...recurringFor(price.interval),
               lookup_key: lookupKey,
               transfer_lookup_key: true,
               nickname: price.nickname,
               metadata: { lychee_plan: price.key },
             }),
         );
-        addPrice(foundProduct, replaced ? replaced.id : `(new ${lookupKey})`);
+        addPortalPrice(foundProduct, replaced ? replaced.id : `(new ${lookupKey})`);
         continue;
       }
 
@@ -223,18 +235,18 @@ async function ensurePrices() {
           }),
         )) || { id: `(new ${def.name})` };
       }
-      const created = await change(`create price ${lookupKey} ($${price.amount / 100}/${price.interval})`, () =>
+      const created = await change(`create price ${lookupKey} ($${price.amount / 100}${per(price.interval)})`, () =>
         stripe("POST", "prices", {
           product: product.id,
           currency: "usd",
           unit_amount: price.amount,
-          recurring: { interval: price.interval },
+          ...recurringFor(price.interval),
           lookup_key: lookupKey,
           nickname: price.nickname,
           metadata: { lychee_plan: price.key },
         }),
       );
-      addPrice(product.id, created ? created.id : `(new ${lookupKey})`);
+      addPortalPrice(product.id, created ? created.id : `(new ${lookupKey})`);
     }
   }
   return priceIdsByProduct;
