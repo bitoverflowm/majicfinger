@@ -3,6 +3,7 @@ import XJarvisJob from "@/models/XJarvisJobs";
 import { runXJarvisJob } from "@/lib/mcp/xJarvis/runJob";
 import { postPublicReply } from "@/lib/mcp/xJarvis/deliver";
 import { xJarvisEnvStatus } from "@/lib/mcp/xJarvis/xClient";
+import { authorizeJarvisCron } from "@/lib/mcp/xJarvis/cronAuth";
 
 export const config = { maxDuration: 300 };
 
@@ -16,9 +17,7 @@ export const config = { maxDuration: 300 };
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ success: false, message: "POST only" });
 
-  const secret = String(process.env.X_JARVIS_CRON_SECRET || process.env.CRON_SECRET || "").trim();
-  const auth = String(req.headers.authorization || "");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!authorizeJarvisCron(req).ok) {
     return res.status(401).json({ success: false, message: "Unauthorized" });
   }
 
