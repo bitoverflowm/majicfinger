@@ -68,10 +68,16 @@ export function gdeltArticles(json) {
     out.push({
       title,
       url: String(row.url),
+      google_url: null,
+      publisher_url: String(row.url),
+      publisher_home: row.domain ? `https://${row.domain}` : null,
       source: String(row.domain || ""),
       domain: String(row.domain || ""),
       t,
+      timezone: "UTC",
+      timestamp_type: "gdelt_seendate",
       precision: "seen",
+      timestamp_note: "GDELT seendate is when the article was crawled (usually within ~15 minutes of publish), not the publisher byline.",
       provider: "gdelt",
     });
   }
@@ -130,6 +136,30 @@ function hostOf(url) {
 }
 
 /**
+ * Google News RSS `<link>` is a google.com wrapper. Try to recover the publisher article URL
+ * from the base64 article id so agents can quote the byline timestamp.
+ */
+export function decodeGoogleNewsUrl(link) {
+  const google_url = String(link || "").trim();
+  if (!google_url) return { google_url: null, publisher_url: null };
+  try {
+    const parsed = new URL(google_url);
+    if (!/(^|\.)news\.google\.com$/i.test(parsed.hostname)) {
+      return { google_url, publisher_url: google_url };
+    }
+    const id = parsed.pathname.split("/").filter(Boolean).pop() || "";
+    const b64 = id.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const decoded = Buffer.from(padded, "base64").toString("utf8");
+    const match = decoded.match(/https?:\/\/[^\s\x00"<>]+/);
+    const publisher_url = match ? match[0].replace(/[\x00-\x1f].*$/, "").replace(/[.,;]+$/, "") : null;
+    return { google_url, publisher_url };
+  } catch {
+    return { google_url, publisher_url: null };
+  }
+}
+
+/**
  * Google News stamps older articles with only their date, at midnight US Pacific
  * (07:00 or 08:00 UTC on the dot). Those can't be lined up against a trade to the minute.
  */
@@ -150,13 +180,21 @@ export function parseGoogleNewsRss(xml) {
     const suffix = source ? ` - ${source}` : "";
     const title = suffix && rawTitle.endsWith(suffix) ? rawTitle.slice(0, -suffix.length).trim() : rawTitle;
     if (!title || !link || !Number.isFinite(t)) continue;
+    const decoded = decodeGoogleNewsUrl(link);
     out.push({
       title,
-      url: link,
+      url: decoded.publisher_url || link,
+      google_url: decoded.google_url,
+      publisher_url: decoded.publisher_url,
+      publisher_home: sourceUrl || null,
       source,
-      domain: hostOf(sourceUrl),
+      domain: hostOf(decoded.publisher_url || sourceUrl || link),
       t,
-      precision: dayOnly(t) ? "day" : "exact",
+      timezone: "UTC",
+      timestamp_type: "google_rss_pubDate",
+      precision: dayOnly(t) ? "day" : "second",
+      timestamp_note:
+        "Google RSS pubDate is Google's stamp in UTC and can differ from the publisher byline by minutes. Confirm on publisher_url.",
       provider: "google",
     });
   }

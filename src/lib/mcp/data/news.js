@@ -101,14 +101,32 @@ export async function searchNewsHeadlines({
     }
   }
 
-  const clipped = articles.slice(0, Math.min(80, Math.max(5, limit))).map((a) => ({
-    title: a.title || null,
-    url: a.url || null,
-    source: a.source || a.domain || null,
-    published_at: a.t || a.published_at || null,
-    provider: a.provider || provider,
-    copies: a.copies || null,
-  }));
+  const clipped = articles.slice(0, Math.min(80, Math.max(5, limit))).map((a) => {
+    const t = a.t || a.published_at || null;
+    let iso = null;
+    if (t != null) {
+      const ms = typeof t === "number" ? t : Date.parse(t);
+      if (Number.isFinite(ms)) iso = new Date(ms).toISOString();
+    }
+    return {
+      title: a.title || null,
+      url: a.publisher_url || a.url || null,
+      google_url: a.google_url || (String(a.url || "").includes("news.google.com") ? a.url : null),
+      publisher_url: a.publisher_url || null,
+      publisher_home: a.publisher_home || null,
+      source: a.source || a.domain || null,
+      published_at: t,
+      published_at_iso: iso,
+      timezone: a.timezone || "UTC",
+      timestamp_type: a.timestamp_type || (provider === "google_news" ? "google_rss_pubDate" : provider === "gdelt_live" ? "gdelt_seendate" : "archive"),
+      precision: a.precision || null,
+      timestamp_note:
+        a.timestamp_note ||
+        "Treat this as a source-labeled UTC stamp. Publisher bylines can differ by minutes — open publisher_url to quote the byline.",
+      provider: a.provider || provider,
+      copies: a.copies || null,
+    };
+  });
 
   return {
     source: `lychee:news/${provider}`,
@@ -123,8 +141,13 @@ export async function searchNewsHeadlines({
     rows: clipped.map((a) => ({
       title: a.title,
       source: a.source,
-      published_at: a.published_at,
+      published_at_iso: a.published_at_iso,
+      timezone: a.timezone,
+      timestamp_type: a.timestamp_type,
+      precision: a.precision,
       url: a.url,
+      publisher_url: a.publisher_url,
+      google_url: a.google_url,
       provider: a.provider,
     })),
     next: {

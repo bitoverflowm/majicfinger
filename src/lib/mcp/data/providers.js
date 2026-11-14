@@ -2,6 +2,7 @@ import { fetchKalshiLiveSearchSuggestions } from "@/lib/kalshiLive/kalshiLiveSea
 import { kalshiLiveSocialUrl, kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
 import { orderProfileSuggestions } from "@/lib/polymarketLive/polymarketPublicSearch";
 import { flattenPolymarketHoldersV2 } from "@/lib/mcp/data/holdersFlatten";
+import { filterTradesByRange, toUnixSeconds, tradeUnixSeconds } from "@/lib/mcp/data/tradeTime";
 import { getFlowsCatalog, findDataset } from "@/lib/mcp/data/flowsCatalog";
 
 export { flattenPolymarketHoldersV2 };
@@ -423,50 +424,145 @@ export async function getPolymarketHolders(conditionId, { limit = 500, includePn
   };
 }
 
-export async function getPolymarketTradesPreview(conditionId, { limit = 500, start = null, end = null } = {}) {
-  const condition = String(conditionId || "").trim();
-  if (!condition) throw new Error("condition_id required");
-  const params = new URLSearchParams();
-  params.set("condition", condition);
-  params.set("limit", String(Math.min(2000, Math.max(1, limit))));
-  if (start != null) params.set("start", String(Math.floor(start)));
-  if (end != null) params.set("end", String(Math.floor(end)));
-  const body = await fetchJson(`${DATA_API_BASE}/v2/trades?${params}`);
-  const rowsRaw = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
-  const rows = rowsRaw.map((row) => ({
-    condition_id: condition,
+function mapTradeRow(row, condition) {
+  const timestamp = row.timestamp || row.createdAt || row.time || null;
+  return {
+    condition_id: condition || row.conditionId || row.condition_id || null,
     side: row.side || null,
     price: row.price != null ? Number(row.price) : null,
     size: row.size != null ? Number(row.size) : row.amount != null ? Number(row.amount) : null,
-    timestamp: row.timestamp || row.createdAt || row.time || null,
+    timestamp,
+    timestamp_unix: tradeUnixSeconds({ timestamp }),
     proxy_wallet: row.proxyWallet || row.proxy_wallet || row.user || null,
     outcome: row.outcome || null,
-  }));
+  };
+}
+
+async function fetchTradesPage(params, pageSize) {
+  const attempt = new URLSearchParams(params);
+  attempt.set("limit", String(pageSize));
+  try {
+    return await fetchJson(`${DATA_API_BASE}/v2/trades?${attempt}`);
+  } catch (err) {
+    if (pageSize > 20) {
+      return fetchTradesPage(params, 20);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Paginated Lychee trades pull. Use proxy_wallet + UTC start/end to hit a specific fill —
+ * a 20-row "recent" preview is newest-first and will not walk back to an older day.
+ */
+export async function lookupPolymarketTrades({
+  conditionId = "",
+  proxyWallet = "",
+  start = null,
+  end = null,
+  limit = 200,
+} = {}) {
+  const condition = String(conditionId || "").trim();
+  const user = String(proxyWallet || "").trim();
+  if (!condition && !user) throw new Error("condition_id or proxy_wallet required");
+  const startSec = toUnixSeconds(start);
+  const endSec = toUnixSeconds(end);
+  const want = Math.min(2000, Math.max(1, Number(limit) || 200));
+  const params = new URLSearchParams();
+  if (condition) params.set("condition", condition);
+  if (/^0x[0-9a-fA-F]{40}$/.test(user)) params.set("user", user);
+  if (startSec != null) params.set("start", String(startSec));
+  if (endSec != null) params.set("end", String(endSec));
+
+  const collected = [];
+  let cursor = "";
+  let pageSize = Math.min(50, want);
+  let pages = 0;
+  let lastError = null;
+  while (pages < 40 && collected.length < Math.max(want * 4, 80)) {
+    pages += 1;
+    if (cursor) params.set("cursor", cursor);
+    else params.delete("cursor");
+    let body;
+    try {
+      body = await fetchTradesPage(params, pageSize);
+      lastError = null;
+    } catch (err) {
+      lastError = err;
+      break;
+    }
+    const raw = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
+    if (!raw.length) break;
+    collected.push(...raw);
+    const oldest = raw.reduce((min, row) => {
+      const t = tradeUnixSeconds(row);
+      if (t == null) return min;
+      return min == null ? t : Math.min(min, t);
+    }, null);
+    if (startSec != null && oldest != null && oldest < startSec) break;
+    const next = body?.pagination?.next_cursor || body?.next_cursor || "";
+    if (!next || body?.pagination?.has_more === false) break;
+    cursor = String(next);
+  }
+
+  const mapped = collected.map((row) => mapTradeRow(row, condition));
+  const ranged = filterTradesByRange(mapped, startSec, endSec);
+  const rows = ranged.slice(0, want);
   if (!rows.length) {
-    throw new Error(
-      `Lychee trades pull returned 0 rows for ${condition}. Verify condition_id; do not scrape Polymarket as a fallback.`,
-    );
+    const hint =
+      lastError?.message ||
+      "No fills in that window on Lychee. Widen start_utc/end_utc, confirm proxy_wallet + condition_id, then retry lookup_trades — do not query Polymarket or Kalshi outside Lychee.";
+    if (startSec == null && endSec == null && !user) {
+      throw new Error(`Lychee trades pull returned 0 rows for ${condition}. ${hint}`);
+    }
+    return {
+      condition_id: condition || null,
+      proxy_wallet: user || null,
+      source: "lychee:polymarket-data-api-v2/trades",
+      window: { start_unix: startSec, end_unix: endSec },
+      pages,
+      trade_count: 0,
+      rows: [],
+      preview: [],
+      analysis_ready: true,
+      note: hint,
+      next: { retry: "lookup_trades with a wider UTC window", never: "Do not use Polymarket's site or API as a fallback." },
+    };
   }
   const prices = rows.map((r) => r.price).filter((n) => Number.isFinite(n));
   const sizes = rows.map((r) => r.size).filter((n) => Number.isFinite(n));
   const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null;
   const vol = sizes.length ? sizes.reduce((a, b) => a + b, 0) : null;
   return {
-    condition_id: condition,
+    condition_id: condition || null,
+    proxy_wallet: user || null,
     source: "lychee:polymarket-data-api-v2/trades",
+    window: { start_unix: startSec, end_unix: endSec },
+    pages,
     trade_count: rows.length,
+    fetched_before_filter: mapped.length,
     avg_price: avg,
     size_sum: vol,
     rows,
-    preview: rows.slice(0, Math.min(25, limit)),
+    preview: rows.slice(0, Math.min(25, want)),
     analysis_ready: true,
     next: {
       compose: "add_sheet_with_chart",
       sheet_kind: "trades",
       analyze: "analyze_tape",
-      note: "Use rows (full pull) for analyze_tape / compose — not just preview.",
+      note: "Rows are filtered to the requested UTC window. Use this list, not a recent-only preview.",
     },
   };
+}
+
+export async function getPolymarketTradesPreview(conditionId, { limit = 500, start = null, end = null, proxyWallet = "" } = {}) {
+  return lookupPolymarketTrades({
+    conditionId,
+    proxyWallet,
+    start,
+    end,
+    limit,
+  });
 }
 
 export async function estimatePullSize({ venue, query, rowsRequested = 5000 }) {
@@ -966,7 +1062,7 @@ export function catalogCapabilities() {
   const catalog = getFlowsCatalog();
   return {
     role: catalog.role,
-    rule: "Never scrape Polymarket/Kalshi HTML when a Lychee tool/dataset exists. If a pull errors, fix ids — do not silently switch to outside scraping.",
+    rule: "Never scrape Polymarket/Kalshi HTML or send the user to those sites for data Lychee can pull. If a named tool is missing from your callable list, call lychee_call (or list_capabilities action=call). If a pull errors, fix ids — do not silently switch to outside scraping.",
     best_practices: catalog.best_practices,
     ids: catalog.ids,
     live_count: catalog.live_count,
@@ -974,7 +1070,8 @@ export function catalogCapabilities() {
     first_turn_hint:
       "Open-ended users: list_crazy_workflows → pitch 3 → wait for pick. Named market/wallet/theme: skip pitch and execute.",
     tools: [
-      { name: "list_capabilities", stage: "orient", purpose: "Short catalog + best practices (+ action=platform)" },
+      { name: "list_capabilities", stage: "orient", purpose: "Short catalog + best practices (+ action=platform / call)" },
+      { name: "lychee_call", stage: "orient", purpose: "Run any catalog tool by name if ChatGPT hid it" },
       { name: "explain_lychee_platform", stage: "orient", purpose: "Attributes, filters, joins, Skill Score, news archive" },
       { name: "list_research_flows", stage: "orient", purpose: "Named composable research paths" },
       { name: "list_crazy_workflows", stage: "orient", purpose: "Ambitious workflows to pitch on first turn" },
@@ -991,7 +1088,8 @@ export function catalogCapabilities() {
       { name: "get_lookalike_markets", stage: "orient", purpose: "Related deadlines / same-event contracts" },
       { name: "compare_venues", stage: "orient", purpose: "Kalshi ↔ Polymarket gap scan with pull hints" },
       { name: "preview_holders", stage: "sample", purpose: "Flattened holders" },
-      { name: "preview_market_activity", stage: "sample", purpose: "Recent trades" },
+      { name: "preview_market_activity", stage: "sample", purpose: "Recent trades (add wallet + UTC range to go past the latest tape)" },
+      { name: "lookup_trades", stage: "sample", purpose: "Market + wallet + UTC date-range fills (pages; filters extra timestamps)" },
       { name: "preview_prices", stage: "sample", purpose: "CLOB price history (callable — use it)" },
       { name: "preview_orderbook", stage: "sample", purpose: "CLOB book levels" },
       { name: "preview_open_interest", stage: "sample", purpose: "Open interest" },
