@@ -1,0 +1,93 @@
+---
+title: "A 90% Prediction Lost. Was It Wrong?"
+seoTitle: "Prediction Market Calibration: What a 90% Forecast Means"
+description: "Learn prediction market calibration with a simple example: why a 90% forecast can lose, how to compare probabilities with outcomes, and what to check."
+publishedAt: "2026-11-15"
+author: "misterrpink"
+topics: ["prediction markets", "forecasting", "calibration"]
+integration: []
+featured: false
+lesson: 9
+cluster: prediction-market-mechanics
+slug: "prediction-market-calibration"
+readingTime: "3 min"
+keywords: ["prediction market calibration","prediction calibration","prediction markets accuracy","are prediction markets accurate"]
+canonical: "https://lycheedata.com/university/prediction-market-calibration"
+ogTitle: "Prediction Market Calibration Explained"
+ogDescription: "Learn prediction market calibration with a simple example: why a 90% forecast can lose, how to compare probabilities with outcomes, and what to check."
+twitterCard: "summary_large_image"
+---
+
+# A 90% Prediction Lost. Was It Wrong?
+
+**Lychee University · Lesson 9**
+
+A market gives an event a 90% chance. The event doesn't happen. Someone posts the screenshot: “Prediction markets got it wrong again.”
+
+The favored outcome lost. But a 90% forecast left room for that result.
+
+<NinetyPercentLossAnimation />
+
+**Calibration asks whether events assigned a given probability happen at roughly that frequency across many forecasts.** If forecasts are well calibrated, events assigned 90% should happen about nine times in ten over a sufficiently large, relevant set. It doesn't tell you which tenth will fail.
+
+## What does a calibrated prediction market look like?
+
+Imagine a hypothetical collection of binary markets. We record each forecast exactly one day before its event and later check the resolved outcome.
+
+| Recorded probability | Number of forecasts | Events that happened |
+| --- | ---: | ---: |
+| 50% | 100 | 50 |
+| 70% | 100 | 70 |
+| 90% | 100 | 90 |
+
+<CalibrationBucketsAnimation />
+
+The probabilities match the observed frequencies in this constructed example. Among the 90% forecasts, ten events failed to occur. Those losses are compatible with the group's calibration.
+
+Drag the hit count for a hundred 90% forecasts on the toy reliability plot. Real data won't usually sit so neatly on the diagonal.
+
+<ReliabilityPlotExplorer />
+
+Sampling variation matters, especially with few forecasts. Ninety successes out of 100 is a useful observation, not proof that the forecasting process is perfectly calibrated. [Metaculus explains calibration in terms of probabilities matching observed frequencies.](https://www.metaculus.com/labor-hub/)
+
+## Can one result prove a forecast was good or bad?
+
+One result gives you information, but cannot establish calibration.
+
+A 99% forecast that fails deserves scrutiny: it expressed much more confidence than a 60% forecast. Yet neither one alone tells you whether a forecaster systematically overstates probabilities. You need the record, including ordinary successes and other failures.
+
+<OneResultVsRecordExplorer />
+
+The same applies in reverse. One successful 1% prediction doesn't establish exceptional forecasting skill. Highlighting only the most surprising win or loss selects the story after seeing the ending.
+
+## How is calibration different from picking winners?
+
+Imagine a forecaster who assigns 51% to a hundred outcomes and gets all hundred right. It picked every winner, yet its 51% forecasts occurred far more often than stated.
+
+Another forecaster assigns 90% to a hundred outcomes and gets ninety right. It picks fewer winners, but its probabilities match the observed frequency in this example.
+
+<WinnersVsCalibrationExplorer />
+
+A forecast can therefore have an impressive winner-picking record while describing uncertainty poorly. Calibration evaluates the probability attached to the prediction.
+
+## What should you check before comparing markets?
+
+Start with **the forecast time**. A price recorded a month before an election answers a harder question than one recorded after most votes have been counted. Kalshi's calibration research explicitly examines time to resolution rather than treating every timestamp as equivalent. [Read Kalshi's study summary.](https://kalshi.com/research/publications/calibration)
+
+<ForecastTimingAnimation />
+
+Then check the sample. Keep the market category, probability bands, number of observations, and treatment of related contracts visible. A hundred contracts tied to one election are not a hundred unrelated elections. Broad averages can also conceal differences between categories.
+
+<SampleCompositionExplorer />
+
+For real prices, group nearby probabilities into stated ranges and report how many observations fall in each. Leave room for uncertainty rather than treating every deviation from the diagonal as a discovery.
+
+## How can you investigate it yourself?
+
+Keep a dated record of the question, forecast probability, observation time, resolution criteria, and eventual result. Decide those rules before selecting examples.
+
+<CalibrationRecordAnimation />
+
+For a deeper research application, explore [Lychee's Kalshi political-market calibration study](/guides/kalshi-political-prediction-market-accuracy).
+
+The next time a 90% favorite loses, ask a better follow-up: **what happened across the other forecasts made with the same confidence?**

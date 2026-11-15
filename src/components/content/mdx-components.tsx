@@ -119,6 +119,16 @@ import {
   TightSpreadDepthExplorer,
 } from "@/components/university/polymarket-bid-ask-spread-animations";
 import {
+  CalibrationBucketsAnimation,
+  CalibrationRecordAnimation,
+  ForecastTimingAnimation,
+  NinetyPercentLossAnimation,
+  OneResultVsRecordExplorer,
+  ReliabilityPlotExplorer,
+  SampleCompositionExplorer,
+  WinnersVsCalibrationExplorer,
+} from "@/components/university/prediction-market-calibration-animations";
+import {
   ContractQuestionAnimation,
   TradeNewsTimeline,
   WhichHeadlineExplorer,
@@ -258,6 +268,9 @@ function MdxHr() {
  * - Polymarket bid–ask spread lesson: `<ThreePricesAnimation />`, `<BidAskMidpointAnimation />`, `<RoundTripCostExplorer />`,
  *   `<SpreadVsFeeAnimation />`, `<LimitAtMidpointAnimation />`, `<TightSpreadDepthExplorer />`,
  *   `<LivePolymarketSpreadExplorer />`
+ * - Prediction market calibration lesson: `<NinetyPercentLossAnimation />`, `<CalibrationBucketsAnimation />`,
+ *   `<ReliabilityPlotExplorer />`, `<OneResultVsRecordExplorer />`, `<WinnersVsCalibrationExplorer />`,
+ *   `<ForecastTimingAnimation />`, `<SampleCompositionExplorer />`, `<CalibrationRecordAnimation />`
  * - Trade versus news guide: `<TradeNewsTimeline />`, `<WhichHeadlineExplorer />`, `<ContractQuestionAnimation />`,
  *   `<KnessetTradeNewsChart />`
  * - PnL by market guide: `<BothSidesMarketNet />`, `<ProfitLossBookAnimation />`, `<ContestablePnlByQuestionSnapshot />`,
@@ -385,6 +398,14 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     LimitAtMidpointAnimation,
     TightSpreadDepthExplorer,
     LivePolymarketSpreadExplorer,
+    NinetyPercentLossAnimation,
+    CalibrationBucketsAnimation,
+    ReliabilityPlotExplorer,
+    OneResultVsRecordExplorer,
+    WinnersVsCalibrationExplorer,
+    ForecastTimingAnimation,
+    SampleCompositionExplorer,
+    CalibrationRecordAnimation,
     TradeNewsTimeline,
     WhichHeadlineExplorer,
     ContractQuestionAnimation,
