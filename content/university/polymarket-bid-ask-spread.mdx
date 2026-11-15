@@ -1,0 +1,90 @@
+---
+title: "Polymarket Shows 65¢. Why Does Buying Cost 67¢?"
+seoTitle: "Polymarket Bid–Ask Spread: Why Buy and Sell Prices Differ"
+description: "Understand Polymarket's bid–ask spread, why the displayed price differs from buy and sell quotes, and what a round trip costs before fees."
+publishedAt: "2026-11-15"
+author: "misterrpink"
+topics: ["prediction markets", "Polymarket", "order books"]
+integration: ["Polymarket"]
+featured: false
+lesson: 8
+cluster: prediction-market-mechanics
+slug: "polymarket-bid-ask-spread"
+readingTime: "3 min"
+keywords: ["polymarket bid ask spread","polymarket spread","polymarket buy sell price difference","polymarket displayed price"]
+canonical: "https://lycheedata.com/university/polymarket-bid-ask-spread"
+ogTitle: "Polymarket Bid–Ask Spread Explained"
+ogDescription: "Understand Polymarket's bid–ask spread, why the displayed price differs from buy and sell quotes, and what a round trip costs before fees."
+twitterCard: "summary_large_image"
+---
+
+# Polymarket Shows 65¢. Why Does Buying Cost 67¢?
+
+**Lychee University · Lesson 8**
+
+You open a Polymarket question at 65¢. Buying costs 67¢. Selling pays 63¢.
+
+Three prices. One market. What happened?
+
+<ThreePricesAnimation />
+
+**The bid–ask spread is the gap between the highest price a buyer offers and the lowest price a seller accepts.** The displayed price can sit between them, where nobody is currently offering to trade.
+
+## Which price can you actually trade at?
+
+Imagine this hypothetical YES order book, with enough contracts at each quote for our small example:
+
+| Price | What it means |
+| --- | --- |
+| **63¢ bid** | The best current offer to buy your YES shares |
+| **67¢ ask** | The cheapest current offer to sell you YES shares |
+| **65¢ midpoint** | Halfway between those quotes |
+| **4¢ spread** | The difference between the bid and ask |
+
+<BidAskMidpointAnimation />
+
+To buy immediately against those offers, you pay 67¢. To sell immediately, you accept 63¢. A 65¢ midpoint describes the middle of the quotes; it doesn't create a seller at 65¢.
+
+Polymarket documents that it normally displays the midpoint. When the spread exceeds 10¢, it displays the last traded price instead. Neither display guarantees that your order can execute there. [Polymarket's prices and order book documentation](https://docs.polymarket.com/concepts/prices-orderbook)
+
+## What does the spread cost on a round trip?
+
+Buy 100 YES shares at 67¢: **$67 spent**.
+
+Immediately sell those same 100 shares at 63¢, assuming the quotes and quantities haven't changed: **$63 received**.
+
+You lose **$4 before fees**, about **5.97% of the $67 entry cost**. That's the full 4¢ spread crossed in this buy-then-sell example. Don't count another full spread for each leg.
+
+<RoundTripCostExplorer />
+
+If you instead hold to settlement, there is no sale at 63¢. Your result depends on the contract's payout, your 67¢ purchase price, and applicable fees. The round-trip example measures one particular exit, not every possible trading strategy.
+
+## Does Polymarket collect the spread as a fee?
+
+The spread itself is the gap between traders' quotes. It isn't automatically a platform charge. Trading fees, where applicable, are a separate part of the calculation. [Polymarket's trading-fee explanation](https://help.polymarket.com/en/articles/13364478-trading-fees)
+
+<SpreadVsFeeAnimation />
+
+A market maker may try to buy at 63¢ and sell at 67¢. But both trades must fill to capture that difference. If only the purchase fills and the market falls, the maker is left holding shares that have lost value.
+
+## Can a limit order get you the midpoint?
+
+You can offer to buy at 65¢ instead of accepting 67¢. Someone still has to sell to you. Your order may fill, fill partly, or remain unfilled.
+
+<LimitAtMidpointAnimation />
+
+A limit order specifies your acceptable price. If you submit a buy limit at 67¢ against an available 67¢ ask, it can execute immediately: you are taking an existing offer. Simply choosing a limit order doesn't guarantee you become a maker. [Polymarket's order lifecycle](https://docs.polymarket.com/concepts/order-lifecycle)
+
+## Is a tighter spread always better?
+
+It gives you closer quotes at the top of the book. It doesn't tell you how many shares are available there. A large order may reach worse prices after consuming the first offers.
+
+<TightSpreadDepthExplorer />
+
+For a small trade, compare the bid and ask. For a larger one, also check quantity at each level. Keep fees separate, and distinguish a price someone last paid from a price offered now.
+
+Load a live YES book below. Switch between looking, buying, and selling to see which number matters.
+
+<LivePolymarketSpreadExplorer />
+
+[Explore Polymarket live market data in Lychee](/polymarket-live-data) to inspect the book behind a quote. The useful question is more specific than “What's the price?”: **am I buying, selling, or just looking?**

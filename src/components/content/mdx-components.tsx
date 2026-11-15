@@ -110,6 +110,15 @@ import {
   WalkTheBookAnimation,
 } from "@/components/university/kalshi-slippage-animations";
 import {
+  BidAskMidpointAnimation,
+  LimitAtMidpointAnimation,
+  LivePolymarketSpreadExplorer,
+  RoundTripCostExplorer,
+  SpreadVsFeeAnimation,
+  ThreePricesAnimation,
+  TightSpreadDepthExplorer,
+} from "@/components/university/polymarket-bid-ask-spread-animations";
+import {
   ContractQuestionAnimation,
   TradeNewsTimeline,
   WhichHeadlineExplorer,
@@ -246,6 +255,9 @@ function MdxHr() {
  * - Kalshi slippage lesson: `<QuoteHasQuantityAnimation />`, `<WalkTheBookAnimation />`, `<SizeSlippageExplorer />`,
  *   `<ReferencePriceExplorer />`, `<SpreadDepthFeesAnimation />`, `<LimitOrderPartialFillAnimation />`,
  *   `<LiveKalshiBookExplorer />`
+ * - Polymarket bid–ask spread lesson: `<ThreePricesAnimation />`, `<BidAskMidpointAnimation />`, `<RoundTripCostExplorer />`,
+ *   `<SpreadVsFeeAnimation />`, `<LimitAtMidpointAnimation />`, `<TightSpreadDepthExplorer />`,
+ *   `<LivePolymarketSpreadExplorer />`
  * - Trade versus news guide: `<TradeNewsTimeline />`, `<WhichHeadlineExplorer />`, `<ContractQuestionAnimation />`,
  *   `<KnessetTradeNewsChart />`
  * - PnL by market guide: `<BothSidesMarketNet />`, `<ProfitLossBookAnimation />`, `<ContestablePnlByQuestionSnapshot />`,
@@ -366,6 +378,13 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     SpreadDepthFeesAnimation,
     LimitOrderPartialFillAnimation,
     LiveKalshiBookExplorer,
+    ThreePricesAnimation,
+    BidAskMidpointAnimation,
+    RoundTripCostExplorer,
+    SpreadVsFeeAnimation,
+    LimitAtMidpointAnimation,
+    TightSpreadDepthExplorer,
+    LivePolymarketSpreadExplorer,
     TradeNewsTimeline,
     WhichHeadlineExplorer,
     ContractQuestionAnimation,
