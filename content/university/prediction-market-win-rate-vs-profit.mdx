@@ -1,0 +1,107 @@
+---
+title: "You Won 90% of Your Bets. Why Are You Still Losing?"
+seoTitle: "Polymarket Win Rate vs Profit: Expected Value Explained"
+description: "A 90% win rate can lose money. Calculate prediction market expected value, break-even prices, and how entry costs change the economics of a likely winner."
+publishedAt: "2026-11-15"
+author: "misterrpink"
+topics: ["prediction markets", "forecasting", "expected value"]
+integration: []
+coverImage: "/images/university/prediction-market-win-rate-vs-profit/main.jpg"
+ogImage: "https://lycheedata.com/images/university/prediction-market-win-rate-vs-profit/main.jpg"
+featured: false
+lesson: 11
+cluster: prediction-market-mechanics
+slug: "prediction-market-win-rate-vs-profit"
+readingTime: "3 min"
+keywords: ["polymarket win rate","kalshi win rate","prediction market expected value","high win rate losing money","prediction market win rate"]
+canonical: "https://lycheedata.com/university/prediction-market-win-rate-vs-profit"
+ogTitle: "Why a High Win Rate Can Still Lose Money"
+ogDescription: "A 90% win rate can lose money. Calculate prediction market expected value, break-even prices, and how entry costs change the economics of a likely winner."
+twitterCard: "summary_large_image"
+---
+
+# You Won 90% of Your Bets. Why Are You Still Losing?
+
+**Lychee University · Lesson 11**
+
+You buy 100 contracts across different markets, one contract at a time. Each costs 92¢. Ninety win.
+
+A 90% win rate sounds impressive. Your bill was $92. Your winning contracts pay $90.
+
+<HighWinRateLossAnimation />
+
+**You're down $2 before fees.** Winning often and earning a profit are different measurements. To understand the difference before an outcome is known, calculate expected value.
+
+This example assumes standard binary contracts paying $1 for a winning outcome and $0 for a losing one, all held to settlement. [Polymarket documents binary resolution and redemption.](https://docs.polymarket.com/concepts/resolution)
+
+## What does win rate leave out?
+
+Win rate counts winners relative to the observations being counted. It leaves out the dollars paid and received.
+
+In our hypothetical record:
+
+| Result | Contracts | Profit or loss per contract | Total |
+| --- | ---: | ---: | ---: |
+| Win | 90 | +8¢ | +$7.20 |
+| Lose | 10 | −92¢ | −$9.20 |
+| **Net** | **100** | | **−$2.00** |
+
+<WinRateCashExplorer />
+
+The winners earned a little each. Each loser cost much more. Different position sizes, early exits, and fees would change the calculation further.
+
+Also check what a tracker calls a “win”: a fill, a closed position, a resolved market, or a whole event. Those counts need not describe the same record.
+
+<WhatCountsAsWinExplorer />
+
+## What is expected value in a prediction market?
+
+Expected value weights each possible profit or loss by its probability. It describes a probability-weighted average, not the result promised on your next trade.
+
+Suppose you estimate a YES contract has a **90% chance of paying $1**, and you can buy it at **92¢**.
+
+Your expected profit per contract, before fees, is:
+
+$$
+\mathrm{EV} = 0.90(1 - 0.92) + 0.10(0 - 0.92) = -0.02
+$$
+
+That's **−2¢ per contract under your probability estimate**, even though YES is very likely to win. The price asks you to pay more than the $0.90 expected payout.
+
+<ExpectedValueExplorer />
+
+## How do you calculate the break-even price?
+
+For a binary share paying $1 or $0, held to settlement:
+
+$$
+\mathrm{Expected\ profit} = p - c - f
+$$
+
+Here, **p** is your estimated probability, **c** is the actual purchase price in dollars, and **f** is a known per-contract entry fee in dollars. This simple version assumes no other costs or credits.
+
+With a 90% probability and no fees, the break-even purchase price is 90¢. Paying 88¢ gives **+2¢ expected profit**; paying 92¢ gives **−2¢**. Any applicable entry fee lowers what you can pay while retaining positive expected value.
+
+<BreakEvenPriceExplorer />
+
+That doesn't make an 88¢ purchase automatically good. Your 90% estimate might be wrong, and the quoted 88¢ might not be available for your full order.
+
+## Does positive expected value guarantee a profit?
+
+No. A positive-EV trade can lose, and a negative-EV trade can win.
+
+<PositiveEvCanLoseAnimation />
+
+Even repeated favorable opportunities can produce losses over a limited record. Shared risks and large position sizes also affect how damaging those losses become. A calculation is only as useful as its probabilities, fill assumptions, and cost accounting.
+
+For the broader task of judging a wallet's track record, see [what makes a good Polymarket or Kalshi trader](/university/what-makes-a-good-prediction-market-trader). That lesson examines risk, entry prices, and what happens after you start watching.
+
+## What should you record alongside win rate?
+
+Record the actual cost, quantity, fees, and final sale proceeds or settlement payout. Separate realized results from open positions valued at a stated price and time.
+
+<RecordBesideWinRateAnimation />
+
+Then compare total money earned with total money lost. If you estimate EV before entry, save that estimate too, so later research doesn't quietly replace your original belief with hindsight.
+
+A likely winner can still be expensive. **How often you win matters only alongside what those wins pay—and what the losses cost.**

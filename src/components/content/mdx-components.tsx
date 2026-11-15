@@ -138,6 +138,15 @@ import {
   WhoResolvesExplorer,
 } from "@/components/university/polymarket-resolution-rules-animations";
 import {
+  BreakEvenPriceExplorer,
+  ExpectedValueExplorer,
+  HighWinRateLossAnimation,
+  PositiveEvCanLoseAnimation,
+  RecordBesideWinRateAnimation,
+  WhatCountsAsWinExplorer,
+  WinRateCashExplorer,
+} from "@/components/university/win-rate-vs-profit-animations";
+import {
   ContractQuestionAnimation,
   TradeNewsTimeline,
   WhichHeadlineExplorer,
@@ -283,6 +292,9 @@ function MdxHr() {
  * - Polymarket resolution rules lesson: `<HeadlineVsRulesAnimation />`, `<ResolutionChecklistAnimation />`,
  *   `<TwoContractsSameGameExplorer />`, `<WhoResolvesExplorer />`, `<ResolutionPipelineAnimation />`,
  *   `<AmbiguousWordingAnimation />`, `<ResolutionSentenceExplorer />`
+ * - Win rate vs profit lesson: `<HighWinRateLossAnimation />`, `<WinRateCashExplorer />`, `<ExpectedValueExplorer />`,
+ *   `<BreakEvenPriceExplorer />`, `<PositiveEvCanLoseAnimation />`, `<WhatCountsAsWinExplorer />`,
+ *   `<RecordBesideWinRateAnimation />`
  * - Trade versus news guide: `<TradeNewsTimeline />`, `<WhichHeadlineExplorer />`, `<ContractQuestionAnimation />`,
  *   `<KnessetTradeNewsChart />`
  * - PnL by market guide: `<BothSidesMarketNet />`, `<ProfitLossBookAnimation />`, `<ContestablePnlByQuestionSnapshot />`,
@@ -425,6 +437,13 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     ResolutionPipelineAnimation,
     AmbiguousWordingAnimation,
     ResolutionSentenceExplorer,
+    HighWinRateLossAnimation,
+    WinRateCashExplorer,
+    ExpectedValueExplorer,
+    BreakEvenPriceExplorer,
+    PositiveEvCanLoseAnimation,
+    WhatCountsAsWinExplorer,
+    RecordBesideWinRateAnimation,
     TradeNewsTimeline,
     WhichHeadlineExplorer,
     ContractQuestionAnimation,
