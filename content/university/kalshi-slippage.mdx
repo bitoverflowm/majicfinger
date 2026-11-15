@@ -1,0 +1,104 @@
+---
+title: "Kalshi Shows 40¢. Why Did Your Order Average 42.8¢?"
+seoTitle: "What Does Slippage Mean on Kalshi? A Simple Example"
+description: "Learn what slippage means on Kalshi, why larger orders can fill at worse prices, and how to read average execution prices and use limit orders."
+publishedAt: "2026-11-15"
+author: "misterrpink"
+topics: ["Kalshi", "prediction markets", "slippage", "order books"]
+integration: ["Kalshi"]
+coverImage: "/images/university/kalshi-slippage/main.jpg"
+ogImage: "https://lycheedata.com/images/university/kalshi-slippage/main.jpg"
+featured: false
+lesson: 7
+cluster: prediction-market-mechanics
+slug: "kalshi-slippage"
+readingTime: "3 min"
+keywords: ["what does slippage mean on kalshi", "kalshi slippage", "kalshi slippage meaning", "what is slippage in kalshi", "kalshi price slippage"]
+canonical: "https://lycheedata.com/university/kalshi-slippage"
+ogTitle: "40¢ on the screen. 42.8¢ on your order."
+ogDescription: "The first price has a quantity attached. Follow one order through the book to see why size changes the bill."
+twitterCard: "summary_large_image"
+---
+
+# Kalshi Shows 40¢. Why Did Your Order Average 42.8¢?
+
+**Lychee University · Lesson 7**
+
+You find YES offered at 40¢. You want 500 contracts. That should cost $200 before fees.
+
+Except only 100 contracts are available at 40¢.
+
+<QuoteHasQuantityAnimation />
+
+**Slippage on Kalshi means your execution price differs from the price you expected.** One reason is order book depth: there may be too few contracts at the best price to fill your whole order. Buying the rest at higher prices raises your average cost.
+
+The price has a quantity attached. That's the detail worth checking.
+
+## Why can a larger order cost more?
+
+Imagine this hypothetical order book. These are offers to sell YES, not prices taken from a live market:
+
+| YES ask price | Contracts available | Cost to buy that level |
+| --- | ---: | ---: |
+| 40¢ | 100 | $40 |
+| 42¢ | 200 | $84 |
+| 45¢ | 200 | $90 |
+| **Total** | **500** | **$214** |
+
+If you buy all 500 immediately and these offers remain available, you spend **$214 before fees**. Divide by 500 and your average execution price is **42.8¢**.
+
+<WalkTheBookAnimation />
+
+That is 2.8¢ per contract above the best ask you first saw: **$14 more** than filling everything at 40¢. The order has *walked the book*, consuming offers at successive prices.
+
+Drag the size below on the same hypothetical book. Stay at or under 100 contracts and the average stays 40¢. Push past that and the average rises.
+
+<SizeSlippageExplorer />
+
+Kalshi documents this behavior for Quick Orders: a larger purchase can span several price levels, and the order panel accounts for the average price. [Read Kalshi's Quick Orders explanation.](https://help.kalshi.com/en/articles/13823810-quick-orders)
+
+## Was that an unexpected price change?
+
+It depends on what you compared.
+
+Against the initial **40¢ best ask**, our order averaged 2.8¢ more. Against an order preview already showing **42.8¢**, an actual 42.8¢ fill has no additional price difference.
+
+<ReferencePriceExplorer />
+
+The first comparison measures the cost of reaching deeper offers. The second checks whether execution changed from the preview. Prices and available quantities can also change before an order fills.
+
+Write down your reference price when measuring slippage. Otherwise, two people can report different numbers for the same trade.
+
+## Is slippage the same as the spread or a fee?
+
+They measure different things.
+
+The **bid–ask spread** is the gap between the highest current buy offer and the lowest current sell offer. **Depth** is the quantity available at each price. **Trading fees** are separate charges.
+
+<SpreadDepthFeesAnimation />
+
+Suppose YES has a 39¢ bid and a 40¢ ask. That 1¢ spread tells you little about whether 500 contracts are available at 40¢. Our example has the same best ask, but only enough there for 100 contracts.
+
+Likewise, heavy past trading doesn't tell you how much is offered right now. [Trading volume measures activity](/guides/what-does-volume-mean-on-kalshi); the current book shows available orders.
+
+## Can a limit order prevent you from paying more?
+
+A buy limit order sets the maximum contract price you will accept. Set it at 40¢ and it cannot fill at 42¢ or 45¢. That controls the price, but does not guarantee you get all 500 contracts. [See Kalshi's limit-order purchase documentation.](https://help.kalshi.com/en/articles/13823813-limit-order-purchase)
+
+<LimitOrderPartialFillAnimation />
+
+In our unchanged example, 100 could fill at 40¢. The rest would need more sellers at your price, or you could cancel the unfilled portion. Fees remain separate from that price limit.
+
+A limit order can also execute immediately when its price matches available offers. “Limit” describes your price constraint; it doesn't automatically mean you're waiting or paying no fees.
+
+## What should you check before placing the order?
+
+Check **your quantity, the available offers, the average price in the preview, and the total including fees**. If you plan to sell before settlement, examine the bids too: buying easily doesn't guarantee an equally easy exit.
+
+Load a live Kalshi book below. Drag a hypothetical buy size against the YES asks inferred from NO bids, and compare the best ask with the average if you lift that size.
+
+<LiveKalshiBookExplorer />
+
+To keep exploring in Lychee, [open Kalshi live market data](/kalshi-live-data) and inspect a market's order book. Compare the best offer with the contracts available at that level.
+
+Then return to the question our 40¢ quote couldn't answer on its own: **40¢ for how many?**

@@ -101,6 +101,15 @@ import {
   WinStreakAnimation,
 } from "@/components/university/trader-quality-animations";
 import {
+  LimitOrderPartialFillAnimation,
+  LiveKalshiBookExplorer,
+  QuoteHasQuantityAnimation,
+  ReferencePriceExplorer,
+  SizeSlippageExplorer,
+  SpreadDepthFeesAnimation,
+  WalkTheBookAnimation,
+} from "@/components/university/kalshi-slippage-animations";
+import {
   ContractQuestionAnimation,
   TradeNewsTimeline,
   WhichHeadlineExplorer,
@@ -234,6 +243,9 @@ function MdxHr() {
  * - Good trader lesson: `<WinStreakAnimation />`, `<BreakEvenExplorer />`, `<WinnersVsLosersAnimation />`,
  *   `<SameCheckmarkAnimation />`, `<ScenarioPayoffExplorer />`, `<EntryGapAnimation />`, `<RemoveBiggestWinExplorer />`,
  *   `<WatchlistAnimation />`
+ * - Kalshi slippage lesson: `<QuoteHasQuantityAnimation />`, `<WalkTheBookAnimation />`, `<SizeSlippageExplorer />`,
+ *   `<ReferencePriceExplorer />`, `<SpreadDepthFeesAnimation />`, `<LimitOrderPartialFillAnimation />`,
+ *   `<LiveKalshiBookExplorer />`
  * - Trade versus news guide: `<TradeNewsTimeline />`, `<WhichHeadlineExplorer />`, `<ContractQuestionAnimation />`,
  *   `<KnessetTradeNewsChart />`
  * - PnL by market guide: `<BothSidesMarketNet />`, `<ProfitLossBookAnimation />`, `<ContestablePnlByQuestionSnapshot />`,
@@ -347,6 +359,13 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     EntryGapAnimation,
     RemoveBiggestWinExplorer,
     WatchlistAnimation,
+    QuoteHasQuantityAnimation,
+    WalkTheBookAnimation,
+    SizeSlippageExplorer,
+    ReferencePriceExplorer,
+    SpreadDepthFeesAnimation,
+    LimitOrderPartialFillAnimation,
+    LiveKalshiBookExplorer,
     TradeNewsTimeline,
     WhichHeadlineExplorer,
     ContractQuestionAnimation,
