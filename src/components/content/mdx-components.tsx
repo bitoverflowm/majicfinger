@@ -129,6 +129,15 @@ import {
   WinnersVsCalibrationExplorer,
 } from "@/components/university/prediction-market-calibration-animations";
 import {
+  AmbiguousWordingAnimation,
+  HeadlineVsRulesAnimation,
+  ResolutionChecklistAnimation,
+  ResolutionPipelineAnimation,
+  ResolutionSentenceExplorer,
+  TwoContractsSameGameExplorer,
+  WhoResolvesExplorer,
+} from "@/components/university/polymarket-resolution-rules-animations";
+import {
   ContractQuestionAnimation,
   TradeNewsTimeline,
   WhichHeadlineExplorer,
@@ -271,6 +280,9 @@ function MdxHr() {
  * - Prediction market calibration lesson: `<NinetyPercentLossAnimation />`, `<CalibrationBucketsAnimation />`,
  *   `<ReliabilityPlotExplorer />`, `<OneResultVsRecordExplorer />`, `<WinnersVsCalibrationExplorer />`,
  *   `<ForecastTimingAnimation />`, `<SampleCompositionExplorer />`, `<CalibrationRecordAnimation />`
+ * - Polymarket resolution rules lesson: `<HeadlineVsRulesAnimation />`, `<ResolutionChecklistAnimation />`,
+ *   `<TwoContractsSameGameExplorer />`, `<WhoResolvesExplorer />`, `<ResolutionPipelineAnimation />`,
+ *   `<AmbiguousWordingAnimation />`, `<ResolutionSentenceExplorer />`
  * - Trade versus news guide: `<TradeNewsTimeline />`, `<WhichHeadlineExplorer />`, `<ContractQuestionAnimation />`,
  *   `<KnessetTradeNewsChart />`
  * - PnL by market guide: `<BothSidesMarketNet />`, `<ProfitLossBookAnimation />`, `<ContestablePnlByQuestionSnapshot />`,
@@ -406,6 +418,13 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     ForecastTimingAnimation,
     SampleCompositionExplorer,
     CalibrationRecordAnimation,
+    HeadlineVsRulesAnimation,
+    ResolutionChecklistAnimation,
+    TwoContractsSameGameExplorer,
+    WhoResolvesExplorer,
+    ResolutionPipelineAnimation,
+    AmbiguousWordingAnimation,
+    ResolutionSentenceExplorer,
     TradeNewsTimeline,
     WhichHeadlineExplorer,
     ContractQuestionAnimation,

@@ -1,0 +1,99 @@
+---
+title: "The Headline Says It Happened. Why Did Your YES Lose?"
+seoTitle: "Polymarket Resolution Rules: What Actually Counts as YES?"
+description: "Learn how Polymarket resolution rules define the outcome: the source, deadline, and edge cases that can make a correct headline the wrong contract."
+publishedAt: "2026-11-15"
+author: "misterrpink"
+topics: ["prediction markets", "Polymarket", "resolution rules"]
+integration: ["Polymarket"]
+coverImage: "/images/university/polymarket-resolution-rules/main.jpg"
+ogImage: "https://lycheedata.com/images/university/polymarket-resolution-rules/main.jpg"
+featured: false
+lesson: 10
+cluster: prediction-market-mechanics
+slug: "polymarket-resolution-rules"
+readingTime: "3 min"
+keywords: ["polymarket resolution rules","polymarket resolution","polymarket market rules","how does polymarket resolve markets"]
+canonical: "https://lycheedata.com/university/polymarket-resolution-rules"
+ogTitle: "Polymarket Resolution Rules Explained"
+ogDescription: "Learn how Polymarket resolution rules define the outcome: the source, deadline, and edge cases that can make a correct headline the wrong contract."
+twitterCard: "summary_large_image"
+---
+
+# The Headline Says It Happened. Why Did Your YES Lose?
+
+**Lychee University · Lesson 10**
+
+Northbridge scores 102 points. You bought YES on “Will Northbridge score at least 100?” Time to celebrate?
+
+Read the rules first. In this hypothetical contract, only regulation-time points count. Northbridge had 98 before overtime.
+
+<HeadlineVsRulesAnimation />
+
+**Polymarket resolution rules define the specific outcome being settled.** A headline can accurately describe what happened while leaving out a condition your contract requires. The title gets you to the question; the rules tell you what counts.
+
+## What should you look for in resolution rules?
+
+Polymarket's documentation identifies the resolution source, end date, and treatment of edge cases as core parts of a market's rules. It explicitly tells traders to read beyond the title. [Polymarket's resolution documentation](https://docs.polymarket.com/concepts/resolution)
+
+Turn the rules into a short checklist:
+
+| Check | Question to answer |
+| --- | --- |
+| **Condition** | What exactly must happen for YES? |
+| **Source** | Which record, announcement, or data provider determines it? |
+| **Time** | Which deadline, time zone, or observation window applies? |
+| **Exceptions** | What happens after a postponement, correction, tie, or ambiguity? |
+
+<ResolutionChecklistAnimation />
+
+The examples relevant to each checklist item depend on the particular market. Don't assume that a condition from one contract carries into the next.
+
+## Can two similar questions have different outcomes?
+
+Return to our invented basketball game:
+
+| Hypothetical contract | Counted score | Result |
+| --- | ---: | --- |
+| At least 100 points, regulation only | 98 | NO |
+| At least 100 points, including overtime | 102 | YES |
+
+<TwoContractsSameGameExplorer />
+
+Both can resolve consistently with their rules. Neither headline score alone tells you which contract you own.
+
+The same distinction can arise when markets use different official sources, reporting windows, or definitions. Before treating a price difference across venues as an opportunity, check whether the contracts promise the same payout under the same circumstances.
+
+## Who decides how Polymarket resolves?
+
+The process depends on the market type.
+
+Polymarket documents UMA's proposal-and-dispute process for its UMA-resolved markets. It separately describes Chainlink TWAP resolution for Up/Down markets, where specified reference-price observations determine the result.
+
+<WhoResolvesExplorer />
+
+That distinction matters: “Polymarket uses UMA” is not a complete explanation for every contract. Start with the market's own source and rules. A full explanation of oracle governance is a separate lesson.
+
+## Does the event ending mean I get paid immediately?
+
+The end of the real-world event, the end of trading, final resolution, and redemption are different steps. An outcome may still need confirmation or a dispute may delay finalization.
+
+<ResolutionPipelineAnimation />
+
+Polymarket's [resolution guide](https://docs.polymarket.com/concepts/resolution) describes those mechanisms and how winning tokens become redeemable. Check the actual market status rather than treating a news alert as proof that settlement is complete.
+
+## What if the wording is ambiguous?
+
+Look for published additional context and the platform's clarification or dispute process. Don't substitute your preferred interpretation for a settled answer. Polymarket documents that clarifications can be issued after trading begins, subject to limits on changing the question's fundamental intent.
+
+<AmbiguousWordingAnimation />
+
+Keep the rules and observation date with your research notes. When explaining a disputed result, distinguish what the contract said, what evidence was available, and what the resolution process decided.
+
+If you're comparing venues, [Lychee's Kalshi–Polymarket comparison guide](/guides/how-to-compare-kalshi-polymarket-odds) provides a starting point for researching matching questions. Read each contract's rules before calling them equivalent.
+
+Before buying YES, finish this sentence in plain English:
+
+<ResolutionSentenceExplorer />
+
+**“I get the winning payout if this exact condition is met, according to this source, within this window.”**
