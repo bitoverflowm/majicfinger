@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mergePulsePairs, pickKalshiMatch } from "./newsPulseFormat.js";
+import { mergePulsePairs, pickKalshiMatch, pulseArticleUrl } from "./newsPulseFormat.js";
 
 {
   const best = pickKalshiMatch("Fed decision in June?", [
@@ -66,6 +66,47 @@ import { mergePulsePairs, pickKalshiMatch } from "./newsPulseFormat.js";
     items[0].markets.map((m) => m.venue).sort(),
     ["kalshi", "polymarket"],
   );
+}
+
+{
+  assert.equal(
+    pulseArticleUrl({
+      publisher_url: null,
+      url: "https://news.google.com/rss/articles/CBMiOPAQUE",
+    }),
+    null,
+  );
+  assert.equal(
+    pulseArticleUrl({
+      publisher_url: "https://www.reuters.com/world/example/",
+      url: "https://news.google.com/rss/articles/CBMiOPAQUE",
+    }),
+    "https://www.reuters.com/world/example/",
+  );
+
+  const items = mergePulsePairs([
+    {
+      article: {
+        title: "Fed signals June cut",
+        url: "https://news.google.com/rss/articles/CBMiOPAQUE",
+        google_url: "https://news.google.com/rss/articles/CBMiOPAQUE",
+        publisher_url: null,
+        source: "Reuters",
+        t: 4_000,
+      },
+      markets: [
+        {
+          venue: "polymarket",
+          title: "Fed decision in June?",
+          url: "https://polymarket.com/event/fed",
+          condition_id: "0x1",
+        },
+      ],
+    },
+  ]);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].url, null);
+  assert.equal(items[0].headline, "Fed signals June cut");
 }
 
 console.log("newsPulse.test.js: ok");

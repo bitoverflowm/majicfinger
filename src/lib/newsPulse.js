@@ -9,7 +9,7 @@ import { pickMarkets } from "@/lib/holderLanding/featuredSubjects";
 import { holderTerminalHref } from "@/lib/holderLanding/pages";
 import { searchKalshi } from "@/lib/mcp/data/providers";
 import { headlineHits, marketNewsTerms } from "@/lib/newsQuery";
-import { googleNewsUrl, parseGoogleNewsRss, withinWindow } from "@/lib/newsSources";
+import { googleNewsUrl, parseGoogleNewsRss, resolveArticlePublisherUrls, withinWindow } from "@/lib/newsSources";
 import { FEED_LIMIT, mergePulsePairs, pickKalshiMatch } from "@/lib/newsPulseFormat";
 
 export { mergePulsePairs, pickKalshiMatch } from "@/lib/newsPulseFormat";
@@ -92,10 +92,13 @@ async function googleHeadlines(terms, start, end) {
   });
   if (!res.ok) return [];
   // Prefer second-precision stamps so the feed isn't all day-bucketed Google rows.
-  return withinWindow(parseGoogleNewsRss(await res.text()), start, end)
+  const parsed = withinWindow(parseGoogleNewsRss(await res.text()), start, end)
     .filter((article) => article.precision !== "day")
     .sort((a, b) => b.t - a.t)
     .slice(0, ARTICLES_PER_MARKET);
+  // Post-2024 Google RSS links are opaque; resolve to publisher origins before the UI sees them.
+  // On resolve failure we keep the headline with url=null (no news.google.com click target).
+  return resolveArticlePublisherUrls(parsed, { concurrency: 3, timeoutMs: 5_000 });
 }
 
 async function archiveHeadlines(terms, start, end) {

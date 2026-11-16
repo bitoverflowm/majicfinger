@@ -3,9 +3,19 @@
  */
 import { articleKey } from "@/lib/newsQuery";
 import { relevanceScore } from "@/lib/mcp/research/relevance";
+import { isGoogleNewsUrl } from "@/lib/newsSources";
 
 export const KALSHI_RELEVANCE_MIN = 0.32;
 export const FEED_LIMIT = 24;
+
+/** Pulse click target: publisher origin only — never a Google News redirect. */
+export function pulseArticleUrl(article) {
+  for (const cand of [article?.publisher_url, article?.url]) {
+    const href = String(cand || "").trim();
+    if (href && !isGoogleNewsUrl(href)) return href;
+  }
+  return null;
+}
 
 function kalshiUrl(ticker) {
   const t = String(ticker || "").trim();
@@ -53,7 +63,7 @@ export function mergePulsePairs(pairs, { limit = FEED_LIMIT } = {}) {
       byKey.set(key, {
         id: key,
         headline: article.title,
-        url: article.publisher_url || article.url || null,
+        url: pulseArticleUrl(article),
         source: article.source || article.domain || null,
         t: article.t,
         markets: [...markets],
@@ -63,7 +73,8 @@ export function mergePulsePairs(pairs, { limit = FEED_LIMIT } = {}) {
     if (article.t > prev.t) {
       prev.t = article.t;
       prev.headline = article.title;
-      prev.url = article.publisher_url || article.url || prev.url;
+      prev.url = pulseArticleUrl(article) || prev.url;
+      if (isGoogleNewsUrl(prev.url)) prev.url = null;
       if (article.source || article.domain) prev.source = article.source || article.domain;
     }
     for (const m of markets) {
