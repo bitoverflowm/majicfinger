@@ -16,6 +16,7 @@ export const siteConfig = {
   ...coreSiteConfig,
   nav: {
     links: [
+      { id: "news", name: "News", href: "/news" },
       { id: "guides", name: "Research", href: "/#guides" },
       { id: "university", name: "University", href: "/university" },
       { id: "changelog", name: "What's New", href: "/changelog" },
@@ -152,7 +153,7 @@ export const siteConfig = {
         { id: 4, title: "Charts", url: "/charts" },
         { id: 26, title: "MCP + Jarvis", url: "/jarvis" },
         { id: 20, title: "Kalshi vs Polymarket", url: "/kalshi-vs-polymarket-odds" },
-        { id: 27, title: "lychee_news", url: "/news" },
+        { id: 27, title: "News", url: "/news" },
         { id: 25, title: "News archive", url: "/news-archive" },
       ],
     },
