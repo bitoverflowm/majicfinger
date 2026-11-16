@@ -186,7 +186,7 @@ export function RecipePreviewPanel({ recipeId, onOpen, onOpenTerminal, onHover }
       onMouseLeave={() => onHover?.(null)}
       onClick={openShown}
       className={cn(
-        "absolute inset-y-0 left-1/4 right-0 z-[5] hidden bg-background transition-[clip-path] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:block",
+        "absolute inset-y-0 left-1/4 right-0 z-[5] hidden bg-background transition-[clip-path] duration-500 ease-panel md:block",
         open ? "cursor-pointer [clip-path:inset(0_0_0_0)]" : "pointer-events-none [clip-path:inset(0_100%_0_0)]",
       )}
     >

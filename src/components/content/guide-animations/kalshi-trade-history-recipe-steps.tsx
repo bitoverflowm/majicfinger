@@ -902,7 +902,7 @@ function SheetBlockMock({
   const grid = (
     <div
       style={{ width: gridWidth, transform: sheet.scrolls && scrolled ? `translateX(-${sheet.scrollTo}px)` : undefined }}
-      className={cn(sheet.scrolls && "transition-transform duration-[1400ms] ease-[cubic-bezier(.32,.72,0,1)]")}
+      className={cn(sheet.scrolls && "transition-transform duration-1400 ease-panel")}
     >
       <div className="grid border-b border-border/70 bg-muted/60 font-medium text-muted-foreground" style={{ gridTemplateColumns: template }}>
         {header.map((c, i) => (

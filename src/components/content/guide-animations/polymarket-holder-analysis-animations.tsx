@@ -415,7 +415,7 @@ function HolderSheetBlock({
         <div className="min-w-0 flex-1 overflow-hidden">
           <div
             style={{ width: HOLDER_GRID_W, transform: scrolled ? `translateX(-${shift}px)` : undefined }}
-            className="transition-transform duration-[1400ms] ease-[cubic-bezier(.32,.72,0,1)]"
+            className="transition-transform duration-1400 ease-panel"
           >
             <div className="grid border-b border-border/70 bg-muted/60 font-medium text-muted-foreground" style={{ gridTemplateColumns: template }}>
               {HOLDER_SHEET_COLUMNS.map((c) => (

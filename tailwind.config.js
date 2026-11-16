@@ -17,8 +17,13 @@ module.exports = {
   		}
   	},
   	extend: {
+  			transitionDuration: {
+  				1400: '1400ms',
+  			},
   			transitionTimingFunction: {
   				'landing-smooth': 'cubic-bezier(0.165, 0.84, 0.44, 1)',
+  				/** Sheet/panel reveal & horizontal sheet scroll (recipe demos, landing tips sibling) */
+  				panel: 'cubic-bezier(0.32, 0.72, 0, 1)',
   			},
   		colors: {
   			lychee_black: '#151515',
