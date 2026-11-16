@@ -67,9 +67,13 @@ export function NewsXDryRun({ items, account = "lychee_news" }: Props) {
         </Link>
       </div>
       <div className="mt-6 flex flex-col gap-4">
-        {drafts.map((draft) => (
-          <DraftCard key={draft.id || draft.headline || JSON.stringify(draft.thread?.main)} draft={draft} />
-        ))}
+        {drafts.map((draft, index) => {
+          const key =
+            (typeof draft.id === "string" && draft.id) ||
+            (typeof draft.headline === "string" && draft.headline) ||
+            `draft-${index}`;
+          return <DraftCard key={key} draft={draft} />;
+        })}
       </div>
     </section>
   );
