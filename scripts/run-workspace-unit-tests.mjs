@@ -37,6 +37,7 @@ import "@/lib/chartLineFilters.test.js";
 import "@/lib/chartSnapshotDataDeps.test.js";
 import "@/lib/newsQuery.test.js";
 import "@/lib/newsArchive.test.js";
+import "@/lib/newsPulse.test.js";
 import "@/components/chartView/buildHeatmapRows.test.js";
 import "@/components/chartView/axisRangeDomain.test.js";
 import "@/components/chartView/scatterOverlay.test.js";

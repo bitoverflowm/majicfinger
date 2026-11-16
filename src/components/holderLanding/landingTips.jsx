@@ -83,7 +83,7 @@ function TipHighlight({ el, overlayRef }) {
     <div
       ref={ringRef}
       aria-hidden
-      className="pointer-events-none absolute left-0 top-0 z-10 rounded-[10px] opacity-0 ring-2 ring-[#0d99ff] ring-offset-0 transition-[transform,width,height,opacity] duration-500 ease-[cubic-bezier(.165,.84,.44,1)] motion-reduce:transition-none"
+      className="pointer-events-none absolute left-0 top-0 z-10 rounded-[10px] opacity-0 ring-2 ring-[#0d99ff] ring-offset-0 transition-[transform,width,height,opacity] duration-500 ease-landing-smooth motion-reduce:transition-none"
       style={{ boxShadow: "0 0 0 4px rgba(13,153,255,.18)" }}
     />
   );

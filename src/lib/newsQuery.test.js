@@ -1,16 +1,33 @@
 import assert from "node:assert/strict";
 import { articleKey, cleanTerms, gapLabel, headlineHits, marketNewsTerms, mergeArticles, newsAround, newsQuery } from "./newsQuery.js";
-import { decodeGoogleNewsUrl, gdeltArticles, gdeltTime, gdeltVolume, parseGdeltDate, parseGoogleNewsRss, readGdelt, withinWindow } from "./newsSources.js";
+import {
+  decodeGoogleNewsUrl,
+  gdeltArticles,
+  gdeltTime,
+  gdeltVolume,
+  isGoogleNewsUrl,
+  parseGdeltDate,
+  parseGoogleNewsRss,
+  readGdelt,
+  resolveArticlePublisherUrls,
+  resolveGoogleNewsUrl,
+  withinWindow,
+} from "./newsSources.js";
 import { filterTradesByRange, toUnixSeconds } from "./mcp/data/tradeTime.js";
 
+const pendingTests = [];
+
 function test(name, fn) {
-  try {
-    fn();
-    console.log(`ok ${name}`);
-  } catch (err) {
-    console.error(`FAIL ${name}`);
-    throw err;
-  }
+  const run = async () => {
+    try {
+      await fn();
+      console.log(`ok ${name}`);
+    } catch (err) {
+      console.error(`FAIL ${name}`);
+      throw err;
+    }
+  };
+  pendingTests.push(run());
 }
 
 test("market titles lead with their first name", () => {
@@ -127,6 +144,86 @@ test("Google News wrapper URLs decode to the publisher article", () => {
   assert.equal(decoded.google_url, wrapped);
 });
 
+test("legacy protobuf Google News ids decode offline", () => {
+  const publisher = "https://techcrunch.com/2022/10/27/example/";
+  const payload = Buffer.concat([
+    Buffer.from([0x08, 0x13, 0x22, publisher.length]),
+    Buffer.from(publisher, "utf8"),
+    Buffer.from([0xd2, 0x01, 0x00]),
+  ]);
+  const wrapped = `https://news.google.com/rss/articles/${payload.toString("base64url")}?oc=5`;
+  const decoded = decodeGoogleNewsUrl(wrapped);
+  assert.equal(decoded.publisher_url, publisher);
+  assert.ok(isGoogleNewsUrl(decoded.google_url));
+});
+
+test("opaque Google News ids stay unresolved in sync decode", () => {
+  // Live-shaped post-2024 token (AU_yqL… after base64) — no embedded http URL.
+  const opaque =
+    "CBMinAFBVV95cUxQQ3daeDNPVnBBam5nRFZiZEltR3lUUU1iUGFLakhvVmJoLVBEbWhiUHRRcnlLcnFjMGtqWEdoOWVEd21QNlpfdzdGc0dhczNQcENxbnNpeHNyMTZtR1FkaEx6aG1RYVNuWGhKSHpFa0Z0R2RYbVNxWlhjbzNmN1RNNDE4d2hCS1h2YWtuWFhrRTJiSzhlNWUtMXZLVGg";
+  const wrapped = `https://news.google.com/rss/articles/${opaque}?oc=5`;
+  const decoded = decodeGoogleNewsUrl(wrapped);
+  assert.equal(decoded.publisher_url, null);
+  assert.equal(decoded.google_url, wrapped);
+});
+
+test("parseGoogleNewsRss never uses news.google.com as the article url", () => {
+  const opaque =
+    "CBMinAFBVV95cUxQQ3daeDNPVnBBam5nRFZiZEltR3lUUU1iUGFLakhvVmJoLVBEbWhiUHRRcnlLcnFjMGtqWEdoOWVEd21QNlpfdzdGc0dhczNQcENxbnNpeHNyMTZtR1FkaEx6aG1RYVNuWGhKSHpFa0Z0R2RYbVNxWlhjbzNmN1RNNDE4d2hCS1h2YWtuWFhrRTJiSzhlNWUtMXZLVGg";
+  const xml = `<rss><channel>
+    <item><title>Opaque link story - Reuters</title>
+      <link>https://news.google.com/rss/articles/${opaque}?oc=5</link>
+      <pubDate>Sun, 08 Nov 2026 19:36:41 GMT</pubDate>
+      <source url="https://www.reuters.com">Reuters</source></item>
+  </channel></rss>`;
+  const [item] = parseGoogleNewsRss(xml);
+  assert.equal(item.url, null);
+  assert.equal(item.publisher_url, null);
+  assert.ok(isGoogleNewsUrl(item.google_url));
+  assert.equal(item.domain, "reuters.com");
+  assert.equal(item.source, "Reuters");
+});
+
+test("resolveGoogleNewsUrl uses batchexecute when sync decode fails", async () => {
+  const publisher = "https://www.example.com/story";
+  const opaque = "CBMiOPAQUEARTICLEIDFORTEST";
+  const google = `https://news.google.com/rss/articles/${opaque}`;
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url: String(url), method: init?.method || "GET" });
+    if (String(url).includes("/articles/")) {
+      return {
+        ok: true,
+        text: async () => `<div data-n-a-sg="sig123" data-n-a-ts="1794000000"></div>`,
+      };
+    }
+    if (String(url).includes("batchexecute")) {
+      const payload = JSON.stringify(["garturlres", publisher, 1]);
+      const body = `)]}'\n${JSON.stringify([["wrb.fr", "Fbv4je", payload]])}`;
+      return { ok: true, text: async () => body };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+  const resolved = await resolveGoogleNewsUrl(google, { fetchImpl, timeoutMs: 2_000 });
+  assert.equal(resolved.publisher_url, publisher);
+  assert.equal(resolved.google_url, google);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].method, "POST");
+});
+
+test("resolveArticlePublisherUrls leaves url null when resolve fails", async () => {
+  const google = "https://news.google.com/rss/articles/CBMiFAIL";
+  const fetchImpl = async () => ({ ok: false, text: async () => "" });
+  const [row] = await resolveArticlePublisherUrls(
+    [{ title: "x", google_url: google, url: google, publisher_url: null, domain: "news.google.com", publisher_home: "https://www.bbc.com" }],
+    { fetchImpl, concurrency: 1, timeoutMs: 500 },
+  );
+  assert.equal(row.url, null);
+  assert.equal(row.publisher_url, null);
+  assert.equal(row.domain, "bbc.com");
+  assert.ok(!isGoogleNewsUrl(row.url));
+});
+
 test("trade date filter drops rows outside the UTC window", () => {
   assert.equal(toUnixSeconds("2026-11-04T08:00:00Z"), Math.floor(Date.parse("2026-11-04T08:00:00Z") / 1000));
   const rows = [
@@ -138,3 +235,5 @@ test("trade date filter drops rows outside the UTC window", () => {
   const kept = filterTradesByRange(rows, "2026-11-04T00:00:00Z", "2026-11-04T23:59:59Z");
   assert.deepEqual(kept.map((row) => row.id), ["hit", "hit-ms"]);
 });
+
+await Promise.all(pendingTests);

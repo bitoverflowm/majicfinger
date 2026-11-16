@@ -194,6 +194,14 @@ export function getProductsNavData(): ProductsNavData {
         badge: "New",
       },
       {
+        id: "news-pulse",
+        label: "lychee_news",
+        href: "/news",
+        description:
+          "Live pulse of headlines with the Polymarket and Kalshi markets they can move.",
+        badge: "New",
+      },
+      {
         id: "news-archive",
         label: "News archive",
         href: "/news-archive",

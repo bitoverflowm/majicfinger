@@ -1,4 +1,7 @@
-import { fetchPolymarketLiveFeaturedMarkets } from "@/lib/polymarketLive/fetchPolymarketLiveFeaturedMarkets";
+import {
+  featuredOutcomePriceDollars,
+  fetchPolymarketLiveFeaturedMarkets,
+} from "@/lib/polymarketLive/fetchPolymarketLiveFeaturedMarkets";
 
 const DATA_API_BASE = (process.env.POLYMARKET_DATA_API_URL || "https://data-api.polymarket.com").trim().replace(/\/$/, "");
 
@@ -43,13 +46,18 @@ export async function pickMarkets() {
   });
   const curated = (market) => CURATED.test(`${market.title} ${market.eventTitle || ""} ${(market.tags || []).join(" ")}`);
   const ranked = [...usable.filter(curated), ...usable.filter((market) => !curated(market))];
-  return ranked.map((market) => ({
-    kind: "market",
-    conditionId: market.conditionId,
-    title: market.title,
-    slug: market.slug,
-    volume24h: market.volume24h,
-  }));
+  return ranked.map((market) => {
+    const yes = market.outcomes?.[0];
+    return {
+      kind: "market",
+      conditionId: market.conditionId,
+      title: market.title,
+      slug: market.slug,
+      volume24h: market.volume24h,
+      yesTokenId: yes?.tokenId || null,
+      yesPrice: featuredOutcomePriceDollars(yes?.lastPrice),
+    };
+  });
 }
 
 async function pickTrader() {
