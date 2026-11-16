@@ -37,8 +37,10 @@ function PulseItemTime({ t, now }: { t: number; now: number | null }) {
           <span className="mt-0.5 block text-[13px] leading-snug text-muted-foreground">
             {formatRelativeAgo(t, now)}
           </span>
-          <span className="mt-0.5 block text-[11px] leading-snug tabular-nums text-muted-foreground/65">
-            {TIME_LOCAL.format(t)}
+          <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground/65">
+            <span className="tabular-nums">{TIME_LOCAL.format(t)}</span>
+            <span aria-hidden="true"> · </span>
+            <span>local</span>
           </span>
         </>
       ) : null}
