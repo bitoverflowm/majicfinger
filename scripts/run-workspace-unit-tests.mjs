@@ -39,6 +39,7 @@ import "@/lib/newsQuery.test.js";
 import "@/lib/newsArchive.test.js";
 import "@/lib/newsPulse.test.js";
 import "@/lib/lycheeNews/format.test.js";
+import "@/lib/lycheeNews/watermark.test.js";
 import "@/components/chartView/buildHeatmapRows.test.js";
 import "@/components/chartView/axisRangeDomain.test.js";
 import "@/components/chartView/scatterOverlay.test.js";

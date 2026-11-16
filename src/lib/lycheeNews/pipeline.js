@@ -2,24 +2,33 @@
  * lychee_news X pipeline: news pulse item → formatted thread → dry-run payload.
  * Never posts unless deliver is explicitly asked AND live gates pass
  * (kill-switch off, X_NEWS_LIVE=1, warmup unlock for @lychee_news).
+ *
+ * Live candidates always respect the enablement watermark — no historical dump.
  */
 import { getNewsPulseFeed, NEWS_PULSE_DEMO_ITEMS } from "@/lib/newsPulse";
 import { formatNewsThread, formatNewsThreads } from "./format.js";
+import { filterLivePostCandidates, resolveLiveWatermark } from "./watermark.js";
 import { xNewsEnvStatus, xNewsLiveGate } from "./xClient.js";
 
 /**
  * Build X thread payloads from the current pulse feed (or provided items).
- * Always dry-run unless opts.live === true AND gates allow — and even then
- * callers must invoke deliver separately; this function never creates tweets.
+ * Always dry-run — this function never creates tweets.
  *
  * @param {{
  *   items?: Array<Record<string, unknown>>,
  *   limit?: number,
  *   force?: boolean,
  *   live?: boolean,
+ *   cursor?: { live_since_ms?: number, last_posted_item_t?: number, last_posted_id?: string } | null,
  * }} [opts]
  */
-export async function buildLycheeNewsXPreview({ items, limit = 8, force = false, live = false } = {}) {
+export async function buildLycheeNewsXPreview({
+  items,
+  limit = 8,
+  force = false,
+  live = false,
+  cursor = null,
+} = {}) {
   const env = xNewsEnvStatus();
   const gate = xNewsLiveGate();
 
@@ -33,20 +42,28 @@ export async function buildLycheeNewsXPreview({ items, limit = 8, force = false,
     as_of = feed.as_of || as_of;
   }
 
+  // Dry-run drafts: full pulse slice (formatting preview) — not a post queue.
   const drafts = formatNewsThreads(feedItems, { limit });
+  // Live eligibility: watermarked subset only (empty until LN-7 stamps live_since).
+  const liveSlice = filterLivePostCandidates(feedItems, cursor);
+  const live_drafts = formatNewsThreads(liveSlice.eligible, { limit });
   const wantLive = live === true;
-  // Hard rule: this module never flips to live posting. deliver.js is the only path,
-  // and it re-checks gates. Preview always reports dry_run.
-  const dry_run = true;
 
   return {
     as_of,
     demo,
     account: env.username,
-    dry_run,
+    dry_run: true,
     live_requested: wantLive,
     live_allowed: gate.allowed,
     gate_reasons: gate.reasons,
+    watermark: {
+      live_since_ms: resolveLiveWatermark(cursor),
+      floor_ms: liveSlice.floor_ms ?? null,
+      skipped_history: liveSlice.skipped_history,
+      reason: liveSlice.reason,
+      note: liveSlice.note,
+    },
     env: {
       kill_switch: env.kill_switch,
       live_flag: env.live_flag,
@@ -56,9 +73,11 @@ export async function buildLycheeNewsXPreview({ items, limit = 8, force = false,
     },
     count: drafts.length,
     drafts,
+    live_candidate_count: live_drafts.length,
+    live_drafts,
     note: wantLive
-      ? "Live requested but preview never posts. Use deliver only after warmup (LN-7): X_NEWS_KILL_SWITCH=0, X_NEWS_LIVE=1, X_NEWS_ALLOW_LYCHEE_NEWS=1."
-      : "Dry-run preview. No create-tweet. @lychee_news live posting is gated until warmup ends (LN-7).",
+      ? "Live requested but preview never posts. After warmup (LN-7): stamp live_since watermark, then only post items newer than enablement — no backlog dump."
+      : "Dry-run preview. No create-tweet. Live path will use watermark so /news history is never queued to X.",
   };
 }
 

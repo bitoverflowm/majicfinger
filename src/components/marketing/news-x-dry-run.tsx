@@ -54,7 +54,8 @@ export function NewsXDryRun({ items, account = "lychee_news" }: Props) {
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             Formatted threads from the pulse above. Live create-tweet for @lychee_news stays off until
-            account warmup ends — kill-switch on, no credentials required for this preview.
+            account warmup ends. When posting starts, only items after the enablement watermark go to X —
+            this history is never dumped as a backlog.
           </p>
         </div>
         <Link

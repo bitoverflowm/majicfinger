@@ -92,7 +92,7 @@ export function xNewsEnvStatus() {
     can_post: gate.allowed,
     gate_reasons: gate.reasons,
     note:
-      "Dry-run by default. Live create-tweet requires X_NEWS_KILL_SWITCH=0, X_NEWS_LIVE=1, OAuth, and X_NEWS_ALLOW_LYCHEE_NEWS=1 for @lychee_news (warmup).",
+      "Dry-run by default. Live create-tweet requires X_NEWS_KILL_SWITCH=0, X_NEWS_LIVE=1, OAuth, X_NEWS_ALLOW_LYCHEE_NEWS=1 for @lychee_news (warmup), and a live_since watermark so /news history is never dumped to X.",
   };
 }
 

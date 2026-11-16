@@ -5,10 +5,12 @@
  * - Default path is dry-run; this module is the only place that may call the X API to post.
  * - Refuse unless kill-switch is OFF, X_NEWS_LIVE=1, OAuth present, and
  *   X_NEWS_ALLOW_LYCHEE_NEWS=1 when posting as @lychee_news.
+ * - Never post pulse items at/before the enablement watermark (no historical dump).
  * - Until LN-7, callers should not invoke this; dry-run APIs never import post side-effects
  *   into the happy path beyond this gate.
  */
 import { formatNewsThread } from "./format.js";
+import { isLivePostEligible } from "./watermark.js";
 import { getNewsUserClient, xNewsEnvStatus, xNewsLiveGate } from "./xClient.js";
 
 /**
@@ -67,8 +69,22 @@ export async function postNewsThread(thread, { forceLive = false } = {}) {
   };
 }
 
-/** Convenience: format a pulse item then run the gated deliver path (still dry-run until LN-7). */
-export async function deliverPulseItem(item, { forceLive = false } = {}) {
+/**
+ * Format a pulse item then run the gated deliver path (still dry-run until LN-7).
+ * @param {Record<string, unknown>} item
+ * @param {{ forceLive?: boolean, cursor?: object | null }} [opts]
+ */
+export async function deliverPulseItem(item, { forceLive = false, cursor = null } = {}) {
+  if (forceLive && !isLivePostEligible(item, cursor)) {
+    return {
+      dry_run: true,
+      posted: false,
+      skipped: true,
+      reason: "before_watermark",
+      tweets: [],
+      note: "Item at/before live_since watermark — not posted (no backlog dump).",
+    };
+  }
   const thread = formatNewsThread(item);
   if (thread.skipped && !thread.main) {
     return { dry_run: true, posted: false, skipped: true, reason: thread.reason, tweets: [] };
