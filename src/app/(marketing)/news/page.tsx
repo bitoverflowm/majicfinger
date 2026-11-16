@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { NewsPulseLive, type PulseItem } from "@/components/marketing/news-pulse-live";
+import { NewsXDryRun } from "@/components/marketing/news-x-dry-run";
 import { FooterSection } from "@/components/sections/footer-section";
 import { JarvisComingPromo } from "@/components/marketing/jarvis-coming-promo";
 import { getNewsPulseFeed } from "@/lib/newsPulse";
@@ -102,6 +103,7 @@ export default async function NewsPulsePage() {
       <section className="w-full px-4 py-10 sm:px-8 md:py-14">
         <div className="mx-auto w-full max-w-3xl">
           <NewsPulseLive initialItems={items} initialAsOf={feed.as_of ?? null} demo={Boolean(feed.demo)} />
+          <NewsXDryRun items={items} />
         </div>
       </section>
 

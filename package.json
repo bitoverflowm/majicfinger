@@ -17,7 +17,8 @@
     "stripe:reconcile": "node scripts/reconcile-stripe-entitlements.cjs",
     "test:mcp-unit": "node scripts/mcp-smoke-unit.mjs && node --import ./scripts/register-alias.mjs scripts/mcp-access-unit.mjs && node scripts/x-jarvis-smoke.mjs",
     "jarvis:eval": "node scripts/jarvis-eval.mjs",
-    "jarvis:ask": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-alias.mjs ./scripts/jarvis-ask.mjs"
+    "jarvis:ask": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-alias.mjs ./scripts/jarvis-ask.mjs",
+    "x-news:dry-run": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-alias.mjs ./scripts/x-news-dry-run.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-athena": "^3.826.0",

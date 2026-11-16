@@ -53,6 +53,7 @@ export const NEWS_PULSE_DEMO_ITEMS = [
         price_change: 0.035,
         price_change_window: "since_article",
         price_as_of: Date.parse("2026-03-12T15:00:00Z"),
+        volume_24h: 2_400_000,
       },
       {
         venue: "kalshi",
@@ -62,6 +63,7 @@ export const NEWS_PULSE_DEMO_ITEMS = [
         price_change: 0.02,
         price_change_window: "trailing_6h",
         price_as_of: Date.parse("2026-03-12T15:00:00Z"),
+        volume_24h: 890_000,
       },
     ],
   },
@@ -81,6 +83,7 @@ export const NEWS_PULSE_DEMO_ITEMS = [
         price_change: -0.04,
         price_change_window: "since_article",
         price_as_of: Date.parse("2026-03-12T15:00:00Z"),
+        volume_24h: 1_100_000,
       },
     ],
   },
@@ -97,6 +100,7 @@ function polyUrl(market) {
 
 function asPolyMarket(market) {
   const price = asProb(market.yesPrice);
+  const volume24h = Number(market.volume24h);
   return {
     venue: "polymarket",
     title: String(market.title || "").trim(),
@@ -110,6 +114,7 @@ function asPolyMarket(market) {
       title: market.title,
     }),
     ...(price != null ? { price } : {}),
+    ...(Number.isFinite(volume24h) && volume24h > 0 ? { volume_24h: volume24h } : {}),
   };
 }
 
