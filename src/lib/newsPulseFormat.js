@@ -8,6 +8,26 @@ import { isGoogleNewsUrl } from "@/lib/newsSources";
 export const KALSHI_RELEVANCE_MIN = 0.32;
 export const FEED_LIMIT = 24;
 
+/** Format 0–1 YES as compact cents for the pulse UI. */
+export function formatPulsePrice(price) {
+  if (typeof price !== "number" || !Number.isFinite(price)) return null;
+  const p = price > 1 && price <= 100 ? price / 100 : price;
+  if (p < 0 || p > 1) return null;
+  const cents = p * 100;
+  if (cents >= 10) return `${Math.round(cents)}¢`;
+  return `${cents.toFixed(1)}¢`;
+}
+
+/** Signed change in cents (e.g. +4.5¢ / −2¢). */
+export function formatPulsePriceChange(delta) {
+  if (typeof delta !== "number" || !Number.isFinite(delta)) return null;
+  const cents = delta * 100;
+  const abs = Math.abs(cents);
+  const body = abs >= 10 ? `${Math.round(abs)}` : abs.toFixed(1);
+  const sign = cents > 0 ? "+" : cents < 0 ? "−" : "";
+  return `${sign}${body}¢`;
+}
+
 /** Pulse click target: publisher origin only — never a Google News redirect. */
 export function pulseArticleUrl(article) {
   for (const cand of [article?.publisher_url, article?.url]) {
@@ -28,7 +48,14 @@ function asKalshiMarket(row) {
   const ticker = row?.ticker || null;
   const url = kalshiUrl(ticker);
   if (!title || !url) return null;
-  return { venue: "kalshi", title, ticker, url };
+  const price = Number(row?.yes_price);
+  return {
+    venue: "kalshi",
+    title,
+    ticker,
+    url,
+    ...(Number.isFinite(price) ? { price } : {}),
+  };
 }
 
 /** Keep the best Kalshi hit for a Polymarket title (lexical relevance, no LLM). */

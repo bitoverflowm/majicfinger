@@ -1,13 +1,21 @@
 import assert from "node:assert/strict";
-import { mergePulsePairs, pickKalshiMatch, pulseArticleUrl } from "./newsPulseFormat.js";
+import {
+  formatPulsePrice,
+  formatPulsePriceChange,
+  mergePulsePairs,
+  pickKalshiMatch,
+  pulseArticleUrl,
+} from "./newsPulseFormat.js";
+import { kalshiCandlesToHistory, priceChangeFromHistory } from "./newsPulsePrices.js";
 
 {
   const best = pickKalshiMatch("Fed decision in June?", [
-    { title: "Will bitcoin hit 150k?", ticker: "BTC" },
-    { title: "Fed funds rate after June FOMC", ticker: "KXFED" },
+    { title: "Will bitcoin hit 150k?", ticker: "BTC", yes_price: 0.1 },
+    { title: "Fed funds rate after June FOMC", ticker: "KXFED", yes_price: 0.44 },
   ]);
   assert.equal(best?.ticker, "KXFED");
   assert.equal(best?.venue, "kalshi");
+  assert.equal(best?.price, 0.44);
   assert.match(best.url, /kalshi\.com\/markets\/KXFED/);
 }
 
@@ -107,6 +115,52 @@ import { mergePulsePairs, pickKalshiMatch, pulseArticleUrl } from "./newsPulseFo
   assert.equal(items.length, 1);
   assert.equal(items[0].url, null);
   assert.equal(items[0].headline, "Fed signals June cut");
+}
+
+{
+  assert.equal(formatPulsePrice(0.255), "26¢");
+  assert.equal(formatPulsePrice(0.042), "4.2¢");
+  assert.equal(formatPulsePriceChange(0.035), "+3.5¢");
+  assert.equal(formatPulsePriceChange(-0.04), "−4.0¢");
+}
+
+{
+  const article = Date.parse("2026-03-12T14:00:00Z");
+  const points = [
+    { tMs: article - 3_600_000, p: 0.4 },
+    { tMs: article - 60_000, p: 0.42 },
+    { tMs: article + 3_600_000, p: 0.47 },
+  ];
+  const sinceArticle = priceChangeFromHistory(points, article, article + 3_600_000);
+  assert.equal(sinceArticle.price_change_window, "since_article");
+  assert.equal(sinceArticle.price, 0.47);
+  assert.equal(sinceArticle.price_change, 0.05);
+
+  const trailing = priceChangeFromHistory(
+    [
+      { tMs: article - 8 * 3_600_000, p: 0.3 },
+      { tMs: article - 7 * 3_600_000, p: 0.31 },
+      { tMs: article + 1_000, p: 0.4 },
+    ],
+    article - 48 * 3_600_000,
+    article + 1_000,
+  );
+  assert.equal(trailing.price_change_window, "trailing_6h");
+  assert.equal(trailing.price, 0.4);
+}
+
+{
+  const map = kalshiCandlesToHistory([
+    {
+      market_ticker: "kxfed",
+      candlesticks: [
+        { end_period_ts: 100, price: { close_dollars: "0.40" } },
+        { end_period_ts: 200, yes_bid: { close_dollars: "0.45" } },
+      ],
+    },
+  ]);
+  assert.equal(map.get("KXFED")?.length, 2);
+  assert.equal(map.get("KXFED")[1].p, 0.45);
 }
 
 console.log("newsPulse.test.js: ok");
