@@ -5,11 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { formatPulsePrice, formatPulsePriceChange } from "@/lib/newsPulseFormat";
+import { formatRelativeAgo } from "@/lib/newsPulseTime";
 
 const POLL_MS = 30_000;
 const REFRESH_EVERY_N = 2; // every other poll asks for a memo bypass (~60s)
+const RELATIVE_TICK_MS = 1_000;
 
-const TIME = new Intl.DateTimeFormat("en-US", {
+const TIME_UTC = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
   hour: "numeric",
@@ -17,6 +19,32 @@ const TIME = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
   timeZoneName: "short",
 });
+
+/** Browser-local clock — subtle companion so UTC alone is not confusing. */
+const TIME_LOCAL = new Intl.DateTimeFormat(undefined, {
+  hour: "numeric",
+  minute: "2-digit",
+  timeZoneName: "short",
+});
+
+function PulseItemTime({ t, now }: { t: number; now: number | null }) {
+  const iso = new Date(t).toISOString();
+  return (
+    <time dateTime={iso} className="shrink-0 pt-0.5 sm:w-44">
+      <span className="block text-sm tabular-nums text-muted-foreground">{TIME_UTC.format(t)}</span>
+      {now != null ? (
+        <>
+          <span className="mt-0.5 block text-[13px] leading-snug text-muted-foreground">
+            {formatRelativeAgo(t, now)}
+          </span>
+          <span className="mt-0.5 block text-[11px] leading-snug tabular-nums text-muted-foreground/65">
+            {TIME_LOCAL.format(t)}
+          </span>
+        </>
+      ) : null}
+    </time>
+  );
+}
 
 export type PulseMarket = {
   venue: string;
@@ -106,10 +134,18 @@ type Props = {
 export function NewsPulseLive({ initialItems, initialAsOf = null, demo = false }: Props) {
   const [items, setItems] = useState<PulseItem[]>(initialItems);
   const [asOf, setAsOf] = useState<string | null>(initialAsOf);
+  const [now, setNow] = useState<number | null>(null);
   const knownIds = useRef(new Set(initialItems.map((item) => item.id)));
   const etagRef = useRef<string | null>(null);
   const pollCount = useRef(0);
   const maxT = useRef(initialItems.reduce((m, item) => Math.max(m, Number(item.t) || 0), 0));
+
+  // Client-only clock so relative labels tick and hydration stays stable (UTC is SSR-safe).
+  useEffect(() => {
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), RELATIVE_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,12 +240,7 @@ export function NewsPulseLive({ initialItems, initialAsOf = null, demo = false }
         {items.map((item) => (
           <li key={item.id}>
             <article className="flex flex-col gap-1 px-1 py-6 sm:flex-row sm:items-start sm:gap-6 sm:px-2">
-              <time
-                dateTime={new Date(item.t).toISOString()}
-                className="shrink-0 pt-0.5 text-sm tabular-nums text-muted-foreground sm:w-40"
-              >
-                {TIME.format(item.t)}
-              </time>
+              <PulseItemTime t={item.t} now={now} />
               <div className="min-w-0 flex-1">
                 <h2 className="text-balance text-base font-medium leading-snug text-foreground sm:text-[1.05rem]">
                   {item.url ? (
@@ -240,7 +271,7 @@ export function NewsPulseLive({ initialItems, initialAsOf = null, demo = false }
             {" "}
             · as of{" "}
             <time dateTime={asOf} className="tabular-nums">
-              {TIME.format(Date.parse(asOf))}
+              {TIME_UTC.format(Date.parse(asOf))}
             </time>
           </>
         ) : null}
