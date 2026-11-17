@@ -1,0 +1,101 @@
+---
+title: "What Did YES and NO Holders Pay on Polymarket?"
+seoTitle: "Polymarket Holder Entry Prices: What YES and NO Holders Paid"
+description: "YES traded at 30.5¢ in a Fed market. Holders averaged 24.54¢. Compare YES and NO entry prices, inspect a wallet’s buys, and spot missing cost data."
+publishedAt: "2026-11-17"
+author: "misterrpink"
+topics:
+  [
+    "Polymarket",
+    "holder research",
+    "entry prices",
+    "whale research",
+    "whales",
+    "trader research",
+    "traders",
+    "holders",
+  ]
+tags:
+  [
+    "Polymarket",
+    "whale",
+    "whale analysis",
+    "whale research",
+    "whales",
+    "holder research",
+    "average entry price",
+    "cost basis",
+    "market holders",
+    "Federal Reserve",
+    "traders",
+    "holders",
+  ]
+integration: ["Polymarket", "Lychee"]
+contentType: "Guide"
+cluster: "Holder research"
+intent: "How-to"
+difficulty: "Beginner"
+coverImage: "/images/guides/polymarket-holder-entry-prices/main.jpg"
+ogImage: "https://lycheedata.com/images/guides/polymarket-holder-entry-prices/main.jpg"
+featured: false
+slug: "polymarket-holder-entry-prices"
+canonical: "https://lycheedata.com/guides/polymarket-holder-entry-prices"
+readingTime: "3 min"
+keywords:
+  [
+    "Polymarket average entry price",
+    "Polymarket whale entry price",
+    "Polymarket holder entry prices",
+    "what YES and NO holders paid",
+  ]
+twitterCard: "summary_large_image"
+---
+
+YES was priced at **30.5¢** when we opened a Polymarket contract on three consecutive Fed rate hikes. The people still holding YES had paid **24.54¢ per share on average**. Most of those shares belonged to one wallet. Open its trade history and you can see how much of the chart comes down to a single buyer. [Explore the Fed market in Holder Terminal](/dashboard?terminal=holder&market=0xc98928904d91c44bdc4af3d70d0e08f1199aa8aae3e879e197ae38f0e93eab44)
+
+<YesNowVsEntryAnimation />
+
+## What did holders on each side pay?
+
+The contract asked whether the Fed would hike rates at all three decisions in December, January, and March. At **14:11 UTC on November 17, 2026**, Lychee returned 12 YES holder positions and 20 NO holder positions.
+
+- **YES averaged 24.54¢ across 3,664.37 shares.** Every YES position had a recorded entry. At the snapshot price of 30.5¢, the shares were worth about 6¢ more apiece than their average entry.
+- **NO averaged 69.58¢ across 2,848.18 shares with a recorded entry.** NO was priced at 69.5¢, putting that group within a tenth of a cent of its average cost. Another **816.18 NO shares** had no recorded entry price.
+
+<YesNoEntrySidesAnimation />
+
+Those missing entries change the story. If you count the 816.18 shares as though someone paid zero for them, the NO average falls to **54.08¢**. That would make NO holders look comfortably ahead. We can establish that the holders with recorded costs were near break-even. What the remaining shares cost is unknown.
+
+<MissingEntryExplorer />
+
+## Where did most holders get in?
+
+In **Where the supply was bought**, select **Shares**. Each bar groups current shares by their holder’s average entry in one-cent intervals. A tall bar can come from one large wallet.
+
+On YES, **82.2% of shares** fell in the **23–24¢** band. Every share in that bar belonged to **puravida**. On NO, **65.1% of shares with a known entry** fell in the **67–68¢** band. Knowing who owns a bar changes how you read it: that big YES bar tells you a great deal about one buyer and very little about where the other eleven holders entered.
+
+<SupplyBandExplorer />
+
+The panels below are the live Holder Terminal views for the same contract. Prices and new fills can move the averages and the bars away from the November 17 snapshot.
+
+<FedHolderEntryPricesLive />
+
+## What did the largest YES holder actually pay?
+
+Puravida held **3,011.22 YES shares** at a reported **23.71¢ average entry**, below the YES side’s 24.54¢ average. Its most recent YES purchase in Lychee’s trade history was **3,084.47 shares at 22.78¢**. Before that, it bought **52 shares at 27¢**. Three later trades were sales, the last for **53 shares at 35¢**. [Inspect puravida’s wallet](/dashboard?terminal=holder&wallet=0x80a4552cdcde3b861b8adc146ab1fbd4711022cc) · [Inspect the 3,084-share purchase](https://polygonscan.com/tx/0xdf79cce1f02d81a5eec726b19c10b2468019ef6da5bbbf2e9bd48680d9405d54)
+
+<PuravidaFillVsAvgAnimation />
+
+That explains an easy-to-miss detail about the chart. The big purchase went through below 23¢, yet the wallet’s remaining shares sit in the 23–24¢ bar. Lychee places the current holding at the position record’s average entry. To answer what the trader paid on a particular purchase, open that fill.
+
+<PuravidaFedMarketFocus />
+
+## How to check holder entry prices in another market
+
+1. **Choose the exact contract.** An event can contain several questions with different deadlines or outcomes. Open the one whose YES and NO prices you want to compare. [Search a Polymarket market in Holder Terminal](/polymarket-holder-terminal)
+2. **Read each side against its own price.** In **Profit, loss and ownership**, compare YES entry with current YES, then NO entry with current NO. Check the histogram’s missing-entry note. The overview’s average can include shares with a zero entry field. For a known-cost average, multiply each recorded entry by the shares still held, add those values, and divide by the shares with recorded entries.
+3. **Follow the tallest bar to the holders table.** Find the wallets whose average entries sit in that band. Open a large holder and check its buys and sells in the same market. If one wallet dominates a band, the next question is how much that holding matters to the wallet itself. [See how to measure a position against a wallet’s open portfolio](/guides/polymarket-whale-position-size)
+
+<EntryPriceCheckStepsAnimation />
+
+**About the snapshot.** We used the complete holder response for this contract and the wallet’s market-specific trade records from Lychee. The averages describe shares still held at the snapshot. The fill prices come from individual trade records, and the wallet average comes from its position record. All figures are rounded for display. The linked terminal shows the latest available data.

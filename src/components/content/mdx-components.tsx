@@ -167,11 +167,20 @@ import {
   MeasurePositionStepsAnimation,
   PortfolioShareCalculator,
 } from "@/components/content/guide-animations/whale-position-size-animations";
+import {
+  EntryPriceCheckStepsAnimation,
+  MissingEntryExplorer,
+  PuravidaFillVsAvgAnimation,
+  SupplyBandExplorer,
+  YesNoEntrySidesAnimation,
+  YesNowVsEntryAnimation,
+} from "@/components/content/guide-animations/holder-entry-prices-animations";
 import { WalletPnlByQuestionLive } from "@/components/content/WalletPnlByQuestionLive";
 import {
   BestpredictPositionsLive,
   BtcGamblerPositionsLive,
 } from "@/components/content/WalletActivePositionsShareLive";
+import { FedHolderEntryPricesLive, PuravidaFedMarketFocus } from "@/components/content/FedHolderEntryPricesLive";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -314,6 +323,9 @@ function MdxHr() {
  * - Whale position size guide: `<DollarVsShareAnimation />`, `<CelticsNbaExposureExplorer />`, `<BitcoinConcentrationAnimation />`,
  *   `<PortfolioShareCalculator />`, `<HowShareGrewExplorer />`, `<MeasurePositionStepsAnimation />`,
  *   `<BtcGamblerPositionsLive />`, `<BestpredictPositionsLive />`
+ * - Holder entry prices guide: `<YesNowVsEntryAnimation />`, `<YesNoEntrySidesAnimation />`, `<MissingEntryExplorer />`,
+ *   `<SupplyBandExplorer />`, `<PuravidaFillVsAvgAnimation />`, `<EntryPriceCheckStepsAnimation />`,
+ *   `<FedHolderEntryPricesLive />`, `<PuravidaFedMarketFocus />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -477,6 +489,14 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     MeasurePositionStepsAnimation,
     BtcGamblerPositionsLive,
     BestpredictPositionsLive,
+    YesNowVsEntryAnimation,
+    YesNoEntrySidesAnimation,
+    MissingEntryExplorer,
+    SupplyBandExplorer,
+    PuravidaFillVsAvgAnimation,
+    EntryPriceCheckStepsAnimation,
+    FedHolderEntryPricesLive,
+    PuravidaFedMarketFocus,
     ...components,
   };
 }
