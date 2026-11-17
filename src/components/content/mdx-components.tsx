@@ -159,7 +159,19 @@ import {
   ProfitLossBookAnimation,
   RemoveBiggestMarketExplorer,
 } from "@/components/content/guide-animations/pnl-by-market-animations";
+import {
+  BitcoinConcentrationAnimation,
+  CelticsNbaExposureExplorer,
+  DollarVsShareAnimation,
+  HowShareGrewExplorer,
+  MeasurePositionStepsAnimation,
+  PortfolioShareCalculator,
+} from "@/components/content/guide-animations/whale-position-size-animations";
 import { WalletPnlByQuestionLive } from "@/components/content/WalletPnlByQuestionLive";
+import {
+  BestpredictPositionsLive,
+  BtcGamblerPositionsLive,
+} from "@/components/content/WalletActivePositionsShareLive";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -299,6 +311,9 @@ function MdxHr() {
  *   `<KnessetTradeNewsChart />`
  * - PnL by market guide: `<BothSidesMarketNet />`, `<ProfitLossBookAnimation />`, `<ContestablePnlByQuestionSnapshot />`,
  *   `<RemoveBiggestMarketExplorer />`, `<PoliticsCategoryExplorer />`, `<WalletPnlByQuestionLive />`
+ * - Whale position size guide: `<DollarVsShareAnimation />`, `<CelticsNbaExposureExplorer />`, `<BitcoinConcentrationAnimation />`,
+ *   `<PortfolioShareCalculator />`, `<HowShareGrewExplorer />`, `<MeasurePositionStepsAnimation />`,
+ *   `<BtcGamblerPositionsLive />`, `<BestpredictPositionsLive />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -454,6 +469,14 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     RemoveBiggestMarketExplorer,
     PoliticsCategoryExplorer,
     WalletPnlByQuestionLive,
+    DollarVsShareAnimation,
+    CelticsNbaExposureExplorer,
+    BitcoinConcentrationAnimation,
+    PortfolioShareCalculator,
+    HowShareGrewExplorer,
+    MeasurePositionStepsAnimation,
+    BtcGamblerPositionsLive,
+    BestpredictPositionsLive,
     ...components,
   };
 }

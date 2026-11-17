@@ -1,0 +1,103 @@
+---
+title: "How Big Is a Polymarket Whale’s Bet Compared With Its Portfolio?"
+seoTitle: "Polymarket Whale Positions: How to Measure Portfolio Share"
+description: "A $29,925 Celtics position was 20% of one wallet. A $6,361 Bitcoin position was 68% of another. See how to check a Polymarket whale’s largest holdings."
+publishedAt: "2026-11-17"
+author: "misterrpink"
+topics:
+  [
+    "Polymarket",
+    "wallet research",
+    "portfolio concentration",
+    "holder research",
+    "whale research",
+    "whales",
+    "trader research",
+    "traders",
+    "holders",
+  ]
+tags:
+  [
+    "Polymarket",
+    "whale",
+    "whale analysis",
+    "whale research",
+    "whales",
+    "holder research",
+    "wallet holdings",
+    "position size",
+    "portfolio concentration",
+    "NBA",
+    "Bitcoin",
+    "traders",
+    "holders",
+  ]
+integration: ["Polymarket", "Lychee"]
+contentType: "Guide"
+cluster: "Holder research"
+intent: "How-to"
+difficulty: "Beginner"
+coverImage: "/images/guides/polymarket-whale-position-size/main.jpg"
+ogImage: "https://lycheedata.com/images/guides/polymarket-whale-position-size/main.jpg"
+featured: false
+slug: "polymarket-whale-position-size"
+canonical: "https://lycheedata.com/guides/polymarket-whale-position-size"
+readingTime: "3 min"
+keywords:
+  [
+    "Polymarket whale positions",
+    "Polymarket wallet holdings",
+    "Polymarket position size",
+    "Polymarket whale portfolio",
+  ]
+twitterCard: "summary_large_image"
+---
+
+Which would catch your eye in a whale tracker: $29,925 on the Boston Celtics or $6,361 on Bitcoin? The Celtics position was worth nearly five times as much. Yet it accounted for just under a fifth of its wallet’s open Polymarket holdings. The Bitcoin position accounted for more than two-thirds of its wallet’s.
+
+Both were their wallet’s largest position when we checked on November 17, 2026. Here’s what you could learn by opening each wallet.
+
+<DollarVsShareAnimation />
+
+## What else did the Celtics holder own?
+
+BTCGambler247 held **315,000 Yes shares** on Boston winning the 2027 NBA Finals. At 9.5¢ a share, the position was worth **$29,925**. Across all 55 open positions, the wallet held **$150,153**. Boston’s portfolio share was **19.9%**.
+
+Scroll down two rows and the NBA story changes. The wallet also held **$23,030 on San Antonio** to win the same championship. Boston and San Antonio can’t both win the Finals. Together, those two Yes positions accounted for **35.3%** of the wallet’s open holdings. If you’re investigating conviction in *Boston*, the Spurs row is worth seeing. If you’re investigating exposure to the *NBA championship*, both rows belong in the calculation. [Open BTCGambler247 in Lychee](/dashboard?terminal=holder&wallet=0x31c518f864d1394361fec967b3daa9093a86ede4)
+
+<CelticsNbaExposureExplorer />
+
+The donuts and bars above freeze the November 17 snapshot. The live Active positions view for the same wallet is below. Prices and new fills can move the shares.
+
+<BtcGamblerPositionsLive />
+
+## How much of the Bitcoin wallet was in one contract?
+
+Bestpredict0101 held **7,168 No shares** on the question “Will the price of Bitcoin be above $66,000 on November 17?” Those shares were worth **$6,361**. The wallet had only two other open positions: **$2,686** on Bahrain to win and **$273** on a separate Bitcoin Up or Down market.
+
+That put **68.3%** of its **$9,320** open portfolio in the $66,000 question alone. A feed filtered to individual trades above $10,000 could easily miss a holding like this. A look at the wallet reveals why a researcher might care about it. [Open Bestpredict0101 in Lychee](/dashboard?terminal=holder&wallet=0xf1da56e58fb35f99987c87db50a3a1ae0d86ce2a)
+
+<BitcoinConcentrationAnimation />
+
+<BestpredictPositionsLive />
+
+## How to measure a Polymarket position as a share of a wallet
+
+1. **Choose a wallet.** Search for a trader, or open a holder from the market you’re researching. [Open Lychee Holder Terminal](/polymarket-holder-terminal)
+2. **Read two values from Active positions.** Take the **Value** on the position’s row and the total **Value** above the table. They use the same basis: what the shares still held were worth at that snapshot. Cash, closed bets, and lifetime trading volume sit outside that denominator.
+3. **Divide the row by the total.** For the Bitcoin wallet, $6,361 divided by $9,320 gives **68.3%**. For a question with holdings on both Yes and No, adding their values gives the share tied to the question. Keep each side visible if you also want to know which outcome the wallet favored.
+4. **Check related markets.** Search the other open positions for the same election, game, asset, or deadline. Decide whether your question is about one contract or the wider event before adding them together.
+
+<MeasurePositionStepsAnimation />
+
+<PortfolioShareCalculator />
+
+## Does a large portfolio share mean high conviction?
+
+It tells you where the wallet’s open value was concentrated. To investigate how it got there, open the position’s trade history. Did the trader keep buying as the position grew? Did the price rise while the share count stayed flat? Did they close other positions, leaving this one a larger share of a smaller portfolio?
+
+<HowShareGrewExplorer />
+
+Those paths can produce the same percentage today. To measure how aggressively someone sized the **original purchase**, you need the fill and the wallet’s portfolio value at entry. For the next question about a whale’s record, trace which markets actually contributed its gains and losses. [See a Polymarket wallet’s P&L broken down by market](/guides/polymarket-wallet-pnl-by-market)
+
+**Source and scope.** Lychee’s November 17 wallet snapshots included the complete lists of open positions for both addresses. We used positions still trading with a positive share balance, calculated percentages before rounding, and rounded dollar figures to the nearest dollar. The linked wallets show their current records, which can change after a trade, price move, or settlement.
