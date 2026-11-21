@@ -21,9 +21,9 @@ export function WarRoomTerminal() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const desk = normalizeDesk(searchParams.get("desk"));
-  const market = searchParams.get("market") || "";
-  const fixture = ["1", "true", "yes"].includes(String(searchParams.get("fixture") || "").toLowerCase());
+  const desk = normalizeDesk(searchParams?.get("desk"));
+  const market = searchParams?.get("market") || "";
+  const fixture = ["1", "true", "yes"].includes(String(searchParams?.get("fixture") || "").toLowerCase());
 
   const [mobileView, setMobileView] = useState<"globe" | "feed">("feed");
   const compactScreen = useCompactScreen();

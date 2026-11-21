@@ -53,18 +53,8 @@ export function GlobeStage({
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (compact || reduced || !hasWebGL()) return;
 
-    let idleId = 0;
-    let timeoutId = 0;
-    const kick = () => setReady(true);
-    if ("requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(kick, { timeout: 1800 });
-    } else {
-      timeoutId = window.setTimeout(kick, 250);
-    }
-    return () => {
-      if (idleId && "cancelIdleCallback" in window) window.cancelIdleCallback(idleId);
-      if (timeoutId) window.clearTimeout(timeoutId);
-    };
+    const timeoutId = window.setTimeout(() => setReady(true), 250);
+    return () => window.clearTimeout(timeoutId);
   }, [enhance]);
 
   const onFail = useCallback(() => setFailed(true), []);

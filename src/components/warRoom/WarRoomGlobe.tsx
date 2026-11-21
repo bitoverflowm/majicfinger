@@ -207,7 +207,7 @@ export function WarRoomGlobe({
         });
         hiddenHandler = () => {
           if (document.hidden) instance.stop();
-          else instance.start();
+          else (instance as { start?: () => void }).start?.();
         };
         document.addEventListener("visibilitychange", hiddenHandler);
         return instance;
