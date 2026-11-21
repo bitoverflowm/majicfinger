@@ -412,12 +412,29 @@ export async function fetchPolymarketMarketsByExploreFeed(feedId, opts = {}) {
   const id = String(feedId || "").trim().toLowerCase();
   const query = EXPLORE_FEED_QUERIES[id];
   if (!query) return [];
-  const limit = Math.max(1, Math.min(100, Math.floor(Number(opts.limit) || 64)));
-  const payload = await gammaGet("/markets", {
-    ...query,
-    limit,
-  });
-  let markets = marketsFromPayload(payload).filter((market) => market.outcomes.length >= 2);
+  const want = Math.max(1, Math.min(300, Math.floor(Number(opts.limit) || 64)));
+  const pageSize = 100;
+  const pages = Math.max(1, Math.ceil(want / pageSize));
+  const payloads = await Promise.all(
+    Array.from({ length: pages }, (_, index) =>
+      gammaGet("/markets", {
+        ...query,
+        limit: pageSize,
+        offset: index * pageSize,
+      }).catch(() => []),
+    ),
+  );
+  const seen = new Set();
+  let markets = payloads
+    .flatMap((payload) => marketsFromPayload(payload))
+    .filter((market) => {
+      if (market.outcomes.length < 2) return false;
+      const key = String(market.conditionId || market.id || "").trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, want);
   if (id === "competitive") {
     markets = markets
       .map((market) => {

@@ -184,6 +184,33 @@ export function locateMarket(input) {
   return null;
 }
 
+/**
+ * Deterministic world scatter for markets that don't geocode from title/tags.
+ * Keeps “all tradable” dense on the globe instead of dropping unlocated rows.
+ * @param {string} [seed]
+ * @returns {GeoPoint}
+ */
+export function fallbackWorldPoint(seed = "") {
+  let h = 2166136261;
+  const text = String(seed || "global");
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const lon = ((h >>> 0) % 3600) / 10 - 180;
+  const lat = ((h >>> 11) % 1100) / 10 - 45; // roughly −45°…65°
+  return point("Global", lon, Math.max(-55, Math.min(70, lat)), "global");
+}
+
+/**
+ * @param {{ seriesTicker?: string; title?: string; tags?: string[] }} input
+ * @param {string} [seed]
+ * @returns {GeoPoint}
+ */
+export function locateMarketOrFallback(input, seed = "") {
+  return locateMarket(input) || fallbackWorldPoint(seed || input?.seriesTicker || input?.title || "global");
+}
+
 export function featuredWeatherPoint() {
   return SERIES_GEO[FEATURED_WEATHER_SERIES];
 }

@@ -162,11 +162,15 @@ function matchesDesk(market, desk) {
 function mapBoostedMarkets(rows, observedTs, existingIds, accept) {
   /** @type {Array<Record<string, unknown>>} */
   const out = [];
+  const seen = new Set();
   for (const row of rows) {
     const mapped = fromPolymarketFeatured(row, observedTs);
     if (!mapped?.market) continue;
-    if (existingIds.has(mapped.market.id)) continue;
     if (accept && !accept(mapped.market)) continue;
+    if (seen.has(mapped.market.id)) continue;
+    // Always keep boosted rows in `out`. The feed pool is built from this list
+    // (plus Kalshi), so skipping desk duplicates used to drop most tradable markets.
+    seen.add(mapped.market.id);
     existingIds.add(mapped.market.id);
     out.push(mapped.market);
   }
@@ -205,7 +209,14 @@ async function categoryPolymarketBoost(category, observedTs, existingIds) {
 async function exploreFeedPolymarketBoost(exploreFeed, observedTs, existingIds) {
   if (!exploreFeed) return [];
   try {
-    const rows = await fetchPolymarketMarketsByExploreFeed(exploreFeed, { limit: 80 });
+    // Tradable / volume feeds should fill the desktop point cap; others stay denser but lighter.
+    const limit =
+      exploreFeed === "tradable" || exploreFeed === "volume" || exploreFeed === "liquidity"
+        ? 220
+        : exploreFeed === "new" || exploreFeed === "trending" || exploreFeed === "competitive"
+          ? 160
+          : 100;
+    const rows = await fetchPolymarketMarketsByExploreFeed(exploreFeed, { limit });
     return mapBoostedMarkets(rows, observedTs, existingIds);
   } catch {
     return [];

@@ -11,7 +11,12 @@ import {
   GEOPOLITICS_TITLE_RE,
   SOURCE_TIMEOUT_MS,
 } from "./constants";
-import { isWeatherSeries, locateMarket, pointGeometry, WEATHER_CITY_SERIES } from "./geography";
+import {
+  isWeatherSeries,
+  locateMarketOrFallback,
+  pointGeometry,
+  WEATHER_CITY_SERIES,
+} from "./geography";
 import { warRoomMarketId, warRoomSignalId } from "./ids";
 import { fetchKalshiHighNySeries, fetchNwsNyc, weatherStoryFromLive } from "./weather";
 
@@ -55,11 +60,14 @@ export function fromKalshiFeatured(market, observedTs) {
   if (!ticker) return null;
   const seriesTicker = String(market.seriesTicker || market.series_ticker || "").trim().toUpperCase();
   const title = String(market.title || ticker);
-  const geo = locateMarket({
-    seriesTicker,
-    title: `${title} ${market.eventTitle || ""}`,
-    tags: market.tags,
-  });
+  const geo = locateMarketOrFallback(
+    {
+      seriesTicker,
+      title: `${title} ${market.eventTitle || ""}`,
+      tags: market.tags,
+    },
+    ticker,
+  );
   const last = toNum(market.lastPriceDollars ?? market.last_price_dollars);
   const prev = toNum(market.raw?.previous_price_dollars);
   const move = last != null && prev != null && prev > 0 ? Number((last - prev).toFixed(4)) : null;
@@ -142,7 +150,10 @@ export function fromPolymarketFeatured(market, observedTs) {
   if (!conditionId) return null;
   const title = String(market.title || market.eventTitle || conditionId);
   const tags = normalizeTags(market.tags);
-  const geo = locateMarket({ title: `${title} ${market.eventTitle || ""}`, tags });
+  const geo = locateMarketOrFallback(
+    { title: `${title} ${market.eventTitle || ""}`, tags },
+    conditionId,
+  );
   const yes = (market.outcomes || []).find((o) => String(o.outcome).toLowerCase() === "yes") || market.outcomes?.[0];
   const price = featuredOutcomePriceDollars(yes?.lastPrice);
   const geopolitics = isGeopoliticsText(`${title} ${tags.join(" ")}`);
@@ -309,7 +320,6 @@ export async function fetchLiveWarRoomSources() {
       const mapped = fromKalshiFeatured(row, observedTs);
       if (!mapped) continue;
       if (markets.some((m) => m.id === mapped.market.id)) continue;
-      if (!mapped.market.geometry && mapped.market.category === "other") continue;
       markets.push(mapped.market);
       if (mapped.signal) {
         signals.push(mapped.signal);
@@ -361,7 +371,6 @@ export async function fetchLiveWarRoomSources() {
     for (const row of polyR.value || []) {
       const mapped = fromPolymarketFeatured(row, observedTs);
       if (!mapped) continue;
-      if (!mapped.market.geometry && mapped.market.category !== "geopolitics") continue;
       markets.push(mapped.market);
       if (mapped.signal) {
         signals.push(mapped.signal);
