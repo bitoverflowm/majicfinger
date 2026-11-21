@@ -5,7 +5,7 @@ export function GlobePoster({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative overflow-hidden bg-[#070b14]",
+        "relative overflow-hidden bg-black",
         className,
       )}
       aria-hidden
@@ -15,7 +15,7 @@ export function GlobePoster({ className }: { className?: string }) {
           <radialGradient id="wr-globe-fill" cx="38%" cy="32%" r="68%">
             <stop offset="0%" stopColor="#1c3a5c" />
             <stop offset="55%" stopColor="#102033" />
-            <stop offset="100%" stopColor="#070b14" />
+            <stop offset="100%" stopColor="#000000" />
           </radialGradient>
           <radialGradient id="wr-globe-shade" cx="70%" cy="78%" r="55%">
             <stop offset="0%" stopColor="#000000" stopOpacity="0" />
@@ -29,7 +29,7 @@ export function GlobePoster({ className }: { className?: string }) {
             </feMerge>
           </filter>
         </defs>
-        <rect width="800" height="800" fill="#070b14" />
+        <rect width="800" height="800" fill="#000000" />
         <circle cx="400" cy="400" r="248" fill="#0a1628" />
         <circle cx="400" cy="400" r="236" fill="url(#wr-globe-fill)" />
         {Array.from({ length: 9 }).map((_, i) => {
@@ -92,7 +92,7 @@ export function GlobePoster({ className }: { className?: string }) {
         <circle cx="526" cy="318" r="5" fill="#7dd3fc" fillOpacity="0.95" />
         <circle cx="526" cy="318" r="11" fill="none" stroke="#7dd3fc" strokeOpacity="0.45" />
       </svg>
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070b14] via-transparent to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
     </div>
   );
 }

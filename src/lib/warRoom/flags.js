@@ -31,8 +31,8 @@ export function isWarRoomHeroEnabled() {
 }
 
 /**
- * The live dashboard demo on the landing page. Off unless explicitly re-enabled,
- * and never combined with the War Room hero.
+ * The standalone live dashboard demo under the classic landing hero.
+ * Off while the War Room hero is on (that hero embeds the demo in its tabs via `force`).
  */
 export function isLandingDemoEnabled() {
   if (isWarRoomHeroEnabled()) return false;

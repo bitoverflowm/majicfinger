@@ -352,6 +352,12 @@ export type DashboardDemoSectionProps = {
   className?: string;
   /** Sits the demo in a browser window on the painted homepage backdrop. */
   framed?: boolean;
+  /**
+   * Open straight on workspace tabs (e.g. Holder Terminal). When set, the demo starts on
+   * `welcome` with these tabs instead of the integrations picker.
+   */
+  workspaceStartTabs?: Array<Record<string, unknown>>;
+  activeWorkspaceStartTabId?: string | null;
 };
 
 /** The homepage demo. Guide and hub pages pass `integrationId` so the demo starts on their source. */
@@ -360,7 +366,10 @@ export function DashboardDemoSection({
   sectionId = "demo",
   className = HOMEPAGE_DEMO_SECTION_CLASS,
   framed = false,
+  workspaceStartTabs,
+  activeWorkspaceStartTabId = null,
 }: DashboardDemoSectionProps = {}) {
+  const startOnTabs = Array.isArray(workspaceStartTabs) && workspaceStartTabs.length > 0;
   return (
     <StateProvider>
       <StateProviderV2
@@ -368,7 +377,13 @@ export function DashboardDemoSection({
           demo: true,
           landingDemo: true,
           landingDemoIntegration: integrationId || null,
-          viewing: "connectDataHome",
+          viewing: startOnTabs ? "welcome" : "connectDataHome",
+          ...(startOnTabs
+            ? {
+                workspaceStartTabs,
+                activeWorkspaceStartTabId: activeWorkspaceStartTabId || workspaceStartTabs[0]?.id || null,
+              }
+            : {}),
           rightPanelOpen: false,
           rightPanelTab: "integrations",
           integrationSidebar: null,
@@ -377,7 +392,7 @@ export function DashboardDemoSection({
         <LandingDemoStage sectionId={sectionId} className={className} framed={framed}>
           <LandingDemoMemberHandoff />
           {/* Try For Free only targets the homepage demo. */}
-          {integrationId ? null : <LandingDemoActivateListener />}
+          {integrationId || startOnTabs ? null : <LandingDemoActivateListener />}
           <LiveStreamManager />
           <RestLiveFeedManager />
           <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">

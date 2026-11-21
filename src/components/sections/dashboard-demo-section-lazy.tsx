@@ -13,7 +13,7 @@ import { DemoBackdrop } from "@/components/sections/demo-backdrop";
 import { DemoLoadingCard } from "@/components/sections/demo-loading-card";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
 import { isCompactScreen, useCompactScreen } from "@/lib/desktopOnly";
-import { isLandingDemoEnabled } from "@/lib/warRoom/flags";
+import { isLandingDemoEnabled, isWarRoomHeroEnabled } from "@/lib/warRoom/flags";
 import { retryImport } from "@/lib/retryImport";
 import { cn } from "@/lib/utils";
 import type { DashboardDemoSectionProps } from "./dashboard-demo-section";
@@ -23,7 +23,11 @@ import type { DashboardDemoSectionProps } from "./dashboard-demo-section";
  * The download starts when this module evaluates rather than when hydration first renders the
  * placeholder, which is seconds earlier on a cold load. Small screens never download it.
  */
-if (typeof window !== "undefined" && !isCompactScreen() && isLandingDemoEnabled()) {
+if (
+  typeof window !== "undefined" &&
+  !isCompactScreen() &&
+  (isLandingDemoEnabled() || isWarRoomHeroEnabled())
+) {
   import("./dashboard-demo-section").catch(() => {});
 }
 
@@ -103,7 +107,13 @@ function HomepageDemo(props: DashboardDemoSectionProps) {
   );
 }
 
-export function DashboardDemoSectionLazy(props: DashboardDemoSectionProps) {
-  if (!isLandingDemoEnabled()) return null;
-  return props.framed ? <HomepageDemo {...props} /> : <DashboardDemoSection {...props} />;
+export function DashboardDemoSectionLazy(
+  props: DashboardDemoSectionProps & {
+    /** Load even when the standalone landing demo flag is off (e.g. War Room hero tabs). */
+    force?: boolean;
+  },
+) {
+  const { force, ...demoProps } = props;
+  if (!force && !isLandingDemoEnabled()) return null;
+  return demoProps.framed ? <HomepageDemo {...demoProps} /> : <DashboardDemoSection {...demoProps} />;
 }

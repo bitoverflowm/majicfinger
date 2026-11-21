@@ -2,11 +2,18 @@
 
 import { useEffect, useRef } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
+import "./war-room-globe.css";
 
 import { MAP_UPDATE_CADENCE_MS } from "@/lib/warRoom/constants";
 import { cn } from "@/lib/utils";
 
-import { WAR_ROOM_ATTRIBUTION, WAR_ROOM_FALLBACK_STYLE, WAR_ROOM_VECTOR_STYLE } from "./mapStyle";
+import { WAR_ROOM_FALLBACK_STYLE, WAR_ROOM_SPACE_BLACK, WAR_ROOM_VECTOR_STYLE } from "./mapStyle";
+
+function stripAttribution(map: { getContainer?: () => HTMLElement }) {
+  const root = map.getContainer?.();
+  if (!root) return;
+  root.querySelectorAll(".maplibregl-ctrl-attrib, .maplibregl-ctrl-logo").forEach((node) => node.remove());
+}
 
 type FeatureCollection = {
   type: "FeatureCollection";
@@ -113,16 +120,36 @@ export function WarRoomGlobe({
           center: startCenter,
           zoom: globeZoom,
           attributionControl: false,
+          maplibreLogo: false,
           interactive,
           fadeDuration: reduceMotion ? 0 : 300,
           canvasContextAttributes: { antialias: true },
         });
-        instance.addControl(
-          new maplibregl.AttributionControl({ compact: true, customAttribution: WAR_ROOM_ATTRIBUTION }),
-          "bottom-right",
-        );
+        stripAttribution(instance);
         instance.on("style.load", () => {
+          stripAttribution(instance);
           applyProjection(instance);
+          try {
+            const style = instance.getStyle?.();
+            for (const layer of style?.layers || []) {
+              if (layer?.type === "background" && layer.id) {
+                instance.setPaintProperty(layer.id, "background-color", WAR_ROOM_SPACE_BLACK);
+              }
+            }
+          } catch {
+            /* style may omit a background layer */
+          }
+          try {
+            instance.setFog?.({
+              color: WAR_ROOM_SPACE_BLACK,
+              "high-color": WAR_ROOM_SPACE_BLACK,
+              "space-color": WAR_ROOM_SPACE_BLACK,
+              "horizon-blend": 0.02,
+              "star-intensity": 0,
+            });
+          } catch {
+            /* older MapLibre without fog */
+          }
           if (!instance.getSource(SOURCE_ID)) {
             instance.addSource(SOURCE_ID, {
               type: "geojson",
@@ -163,7 +190,7 @@ export function WarRoomGlobe({
                   "#60a5fa",
                 ],
                 "circle-stroke-width": 1.2,
-                "circle-stroke-color": "#070b14",
+                "circle-stroke-color": WAR_ROOM_SPACE_BLACK,
               },
             });
             instance.addLayer({
@@ -194,7 +221,7 @@ export function WarRoomGlobe({
               },
               paint: {
                 "text-color": "#e2e8f0",
-                "text-halo-color": "#070b14",
+                "text-halo-color": WAR_ROOM_SPACE_BLACK,
                 "text-halo-width": 1.2,
                 "text-opacity": 0.9,
               },
@@ -284,7 +311,7 @@ export function WarRoomGlobe({
   return (
     <div
       ref={containerRef}
-      className={cn("relative h-full w-full bg-[#070b14]", className)}
+      className={cn("relative h-full w-full bg-black", className)}
       data-war-room-globe
     />
   );

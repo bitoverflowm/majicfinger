@@ -1,0 +1,5 @@
+/* Homepage / terminal globe: hide MapLibre attribution chrome. */
+[data-war-room-globe] .maplibregl-ctrl-attrib,
+[data-war-room-globe] .maplibregl-ctrl-logo {
+  display: none !important;
+}
