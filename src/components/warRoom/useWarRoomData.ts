@@ -38,11 +38,13 @@ function qs(params: Record<string, string | boolean | undefined | null>) {
 export function useWarRoomData({
   desk,
   market,
+  category,
   fixture,
   mobile,
 }: {
   desk: string;
   market: string;
+  category?: string;
   fixture?: boolean;
   mobile?: boolean;
 }) {
@@ -54,7 +56,13 @@ export function useWarRoomData({
   const loadSnapshot = useCallback(async () => {
     if (hiddenRef.current) return;
     const res = await fetch(
-      `/api/war-room/snapshot${qs({ desk, market, fixture, mobile: mobile ? "1" : undefined })}`,
+      `/api/war-room/snapshot${qs({
+        desk,
+        market,
+        category: category || undefined,
+        fixture,
+        mobile: mobile ? "1" : undefined,
+      })}`,
       { credentials: "same-origin" },
     );
     const body = await res.json().catch(() => ({}));
@@ -62,7 +70,7 @@ export function useWarRoomData({
     setSnapshot(body);
     setError(null);
     return body as Snapshot;
-  }, [desk, market, fixture, mobile]);
+  }, [desk, market, category, fixture, mobile]);
 
   const loadDetail = useCallback(
     async (id: string) => {

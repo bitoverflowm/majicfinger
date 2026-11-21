@@ -92,6 +92,7 @@ export function mergePulsePairs(pairs, { limit = FEED_LIMIT } = {}) {
         headline: article.title,
         url: pulseArticleUrl(article),
         source: article.source || article.domain || null,
+        snippet: String(article.snippet || article.summary || "").trim() || null,
         t: article.t,
         markets: [...markets],
       });
@@ -103,6 +104,8 @@ export function mergePulsePairs(pairs, { limit = FEED_LIMIT } = {}) {
       prev.url = pulseArticleUrl(article) || prev.url;
       if (isGoogleNewsUrl(prev.url)) prev.url = null;
       if (article.source || article.domain) prev.source = article.source || article.domain;
+      const nextSnippet = String(article.snippet || article.summary || "").trim();
+      if (nextSnippet) prev.snippet = nextSnippet;
     }
     for (const m of markets) {
       const dup = prev.markets.some(

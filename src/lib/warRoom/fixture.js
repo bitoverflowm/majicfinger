@@ -57,6 +57,7 @@ export function fixtureWeatherMarket() {
     seriesTicker: FEATURED_WEATHER_SERIES,
     title: "Highest temperature in NYC on Nov 21 — 64° to 65°",
     category: "weather",
+    tags: ["weather"],
     desk: "weather",
     status: "open",
     region: FEATURED_WEATHER_CITY,
@@ -118,6 +119,7 @@ export function fixtureGeopoliticsMarkets() {
       venueMarketId: "0xfixtureceasfireukraine2026aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       title: "Russia-Ukraine ceasefire by March 31, 2026?",
       category: "geopolitics",
+      tags: ["geopolitics", "world"],
       desk: "geopolitics",
       status: "open",
       region: "Kyiv",
@@ -150,6 +152,7 @@ export function fixtureGeopoliticsMarkets() {
       seriesTicker: "KXFED",
       title: "Fed funds rate after December 2026 meeting — 325-350 bps",
       category: "geopolitics",
+      tags: ["geopolitics", "fed", "economics"],
       desk: "geopolitics",
       status: "open",
       region: "Washington, D.C.",
@@ -286,11 +289,24 @@ export function fixtureSignals() {
     source: "reuters",
     sourceId: "fixture-ukraine-talks",
     sourceUrl: "https://www.reuters.com/",
-    summary: "Negotiators float a limited ceasefire window as winter fighting slows",
+    title: "Russia-Ukraine ceasefire talks gain urgency as winter fighting slows",
+    summary: "Negotiators float a limited ceasefire window as winter fighting slows, with both sides probing for a narrow corridor around energy infrastructure.",
     occurredAt: iso("2026-11-21T19:10:00.000Z"),
     observedAt: iso("2026-11-21T19:12:00.000Z"),
     geometry: KYIV,
-    data: { publisher: "Reuters" },
+    marketId: POLY_MARKET_ID,
+    data: {
+      publisher: "Reuters",
+      snippet:
+        "Negotiators float a limited ceasefire window as winter fighting slows, with both sides probing for a narrow corridor around energy infrastructure.",
+      markets: [
+        {
+          venue: "polymarket",
+          title: "Russia-Ukraine ceasefire by March 31, 2026?",
+          condition_id: "0xfixtureceasfireukraine2026aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+      ],
+    },
   };
   const staleQuoteAttempt = {
     id: warRoomSignalId("quote", "kalshi", "KXHIGHNY-26NOV21-B64.5-13:00"),

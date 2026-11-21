@@ -250,6 +250,7 @@ export function weatherStoryFromLive(seriesPack, nws, observedTs) {
     seriesTicker: FEATURED_WEATHER_SERIES,
     title: `${String(series.title || "Highest temperature in NYC").trim()} — ${thresholdLabel(featured)}`,
     category: "weather",
+    tags: ["weather"],
     desk: "weather",
     status: String(featured.status || "open"),
     region: geo.region,

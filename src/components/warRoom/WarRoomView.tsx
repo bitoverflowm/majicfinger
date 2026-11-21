@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCompactScreen } from "@/lib/desktopOnly";
+import { CATEGORIES } from "@/lib/markets/exploreCategories";
 import { cn } from "@/lib/utils";
 
 import { ActivityPane, type ActivityRow } from "./ActivityPane";
@@ -36,8 +37,7 @@ function deepFocus(center: [number, number], key: string): FocusTarget {
 }
 
 /**
- * Shared War Room: left globe, right compact dual pane (markets by volume / live activity).
- * Used by both `/war-room` and the homepage explore tab — no demo vs live split.
+ * War Room shell: left detail (chart + trades), center globe, right markets/activity.
  */
 export function WarRoomView({
   fixture = false,
@@ -58,14 +58,30 @@ export function WarRoomView({
   const compactScreen = useCompactScreen();
   const compact = compactScreen !== false;
   const [localMarket, setLocalMarket] = useState("");
-  const [mobileView, setMobileView] = useState<"globe" | "panel">("globe");
+  const [mobileView, setMobileView] = useState<"globe" | "feed" | "detail">("globe");
   const [activityId, setActivityId] = useState<string | null>(null);
   const [focusTarget, setFocusTarget] = useState<FocusTarget>(null);
   const [detail, setDetail] = useState<WarRoomDetailTarget | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [feedRevealed, setFeedRevealed] = useState(false);
+  const [categoryId, setCategoryId] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const market = controlledMarket ?? localMarket;
+
+  // Slide the right rail in once the War Room stage is on screen.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) setFeedRevealed(true);
+      },
+      { threshold: 0.2 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const setMarket = useCallback(
     (id: string | null) => {
@@ -78,9 +94,22 @@ export function WarRoomView({
   const { snapshot, error, transport } = useWarRoomData({
     desk: "all",
     market,
+    category: categoryId,
     fixture,
     mobile: compact,
   });
+
+  const pickCategory = useCallback(
+    (next: string) => {
+      setCategoryId(next);
+      setActivityId(null);
+      setDetail(null);
+      setDetailOpen(false);
+      setFocusTarget(null);
+      setMarket(null);
+    },
+    [setMarket],
+  );
 
   const features = (snapshot?.features as { type: "FeatureCollection"; features: never[] }) || {
     type: "FeatureCollection",
@@ -99,6 +128,20 @@ export function WarRoomView({
     for (const row of markets) map.set(row.id, row);
     return map;
   }, [markets]);
+
+  // Keep open market detail in sync with polled feed quotes.
+  const liveDetail = useMemo(() => {
+    if (!detail || detail.kind === "news") return detail;
+    if (detail.kind === "market") {
+      const next = marketById.get(detail.market.id);
+      return next ? { kind: "market" as const, market: next } : detail;
+    }
+    if (detail.kind === "trade" && detail.market) {
+      const next = marketById.get(detail.market.id);
+      return next ? { ...detail, market: next } : detail;
+    }
+    return detail;
+  }, [detail, marketById]);
 
   const statusLabel = useMemo(() => {
     if (snapshot?.fixture) return snapshot.fixtureLabel || "Fixture";
@@ -125,10 +168,10 @@ export function WarRoomView({
       const coords = coordsForMarket(id);
       if (coords) {
         setFocusTarget(deepFocus(coords, `market:${id}:${Date.now()}`));
-        if (compact) setMobileView("globe");
       }
       setDetail({ kind: "market", market: row });
       setDetailOpen(true);
+      if (compact) setMobileView("detail");
     },
     [compact, coordsForMarket, marketById, setMarket],
   );
@@ -147,19 +190,17 @@ export function WarRoomView({
         });
         if (row.geometry?.coordinates) {
           setFocusTarget(deepFocus(row.geometry.coordinates, `news:${row.id}:${Date.now()}`));
-          if (compact) setMobileView("globe");
         }
         setDetail({ kind: "news", activity: row, relatedMarkets: related });
         setDetailOpen(true);
+        if (compact) setMobileView("detail");
         return;
       }
 
-      // Trade → same market card surface, zoomed to the trade ping.
       if (row.marketId) setMarket(row.marketId);
       const coords = row.geometry?.coordinates || (row.marketId ? coordsForMarket(row.marketId) : null);
       if (coords) {
         setFocusTarget(deepFocus(coords, `trade:${row.id}:${Date.now()}`));
-        if (compact) setMobileView("globe");
       }
       setDetail({
         kind: "trade",
@@ -167,6 +208,7 @@ export function WarRoomView({
         market: row.marketId ? marketById.get(row.marketId) || null : null,
       });
       setDetailOpen(true);
+      if (compact) setMobileView("detail");
     },
     [compact, coordsForMarket, marketById, markets, setMarket],
   );
@@ -179,26 +221,120 @@ export function WarRoomView({
     [onNavigate],
   );
 
-  const globe = (
-    <GlobeStage
-      enhance={embedded ? "auto" : compact ? "never" : "always"}
-      features={features}
-      pings={pings}
-      selectedMarketId={selectedId}
-      focusTarget={focusTarget}
-      onAnchorChange={setAnchor}
-      keepGlobe={embedded}
-      interactive
-      onSelect={openMarketDetail}
-      onTapPoster={compact && !embedded ? () => setMobileView("globe") : undefined}
-      className="h-full w-full"
-    />
+  const onSelectRelatedMarket = useCallback(
+    (row: MarketRow) => {
+      if (marketById.has(row.id)) {
+        openMarketDetail(row.id);
+        return;
+      }
+      setMarket(row.id);
+      setDetail({ kind: "market", market: row });
+      setDetailOpen(true);
+      if (compact) setMobileView("detail");
+    },
+    [compact, marketById, openMarketDetail, setMarket],
   );
 
-  const panel = (
+  const onSelectGlobe = useCallback(
+    (selection: { id: string; kind: "market" | "news" }) => {
+      if (selection.kind === "news") {
+        const row = activity.find((item) => item.id === selection.id);
+        if (row) selectActivity(row);
+        return;
+      }
+      openMarketDetail(selection.id);
+    },
+    [activity, openMarketDetail, selectActivity],
+  );
+
+  const mobileTabs = (
+    <div className="flex rounded-full border border-white/10 bg-black/70 p-0.5 text-[11px] backdrop-blur">
+      {(
+        [
+          ["globe", "Globe"],
+          ["detail", "Detail"],
+          ["feed", "Feed"],
+        ] as const
+      ).map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          className={cn(
+            "rounded-full px-2 py-0.5",
+            mobileView === id ? "bg-white text-slate-950" : "text-slate-300",
+          )}
+          onClick={() => setMobileView(id)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const categoryBar = (
+    <div
+      role="tablist"
+      aria-label="Market categories"
+      className="pointer-events-auto absolute left-1/2 top-3 z-20 flex max-w-[min(100%,52rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-full border border-white/10 bg-black/70 px-1.5 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-md"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={!categoryId}
+        onClick={() => pickCategory("")}
+        className={cn(
+          "shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors",
+          !categoryId
+            ? "bg-white font-medium text-slate-950"
+            : "text-slate-300 hover:bg-white/10 hover:text-white",
+        )}
+      >
+        All
+      </button>
+      {CATEGORIES.map((category) => (
+        <button
+          key={category.id}
+          type="button"
+          role="tab"
+          aria-selected={categoryId === category.id}
+          onClick={() => pickCategory(category.id)}
+          className={cn(
+            "shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors",
+            categoryId === category.id
+              ? "bg-white font-medium text-slate-950"
+              : "text-slate-300 hover:bg-white/10 hover:text-white",
+          )}
+        >
+          {category.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const globe = (
+    <div className="relative h-full w-full">
+      {categoryBar}
+      <GlobeStage
+        enhance={embedded ? "auto" : compact ? "never" : "always"}
+        features={features}
+        pings={pings}
+        selectedMarketId={selectedId}
+        focusTarget={focusTarget}
+        keepGlobe={embedded}
+        interactive
+        onSelect={onSelectGlobe}
+        onTapPoster={compact && !embedded ? () => setMobileView("globe") : undefined}
+        className="h-full w-full"
+      />
+    </div>
+  );
+
+  const feed = (
     <aside className="flex h-full min-h-0 w-full flex-col bg-[#07090f] text-slate-100">
       <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2.5 py-1.5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Markets</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+          Top Markets by Volume
+        </p>
         <span className="text-[10px] text-slate-500">{statusLabel}</span>
       </div>
       {error ? <p className="px-2.5 py-1 text-[11px] text-rose-300">{error}</p> : null}
@@ -224,8 +360,27 @@ export function WarRoomView({
     </aside>
   );
 
+  const detailPane = (
+    <WarRoomDetailCard
+      open={detailOpen}
+      target={liveDetail}
+      activityFeed={activity}
+      onOpenChange={(next) => {
+        setDetailOpen(next);
+        if (!next && compact) setMobileView("globe");
+      }}
+      onNavigate={handleNavigate}
+      onSelectRelatedMarket={onSelectRelatedMarket}
+      onSelectActivity={selectActivity}
+    />
+  );
+
+  const showLeft = detailOpen;
+  const showRight = compact ? mobileView === "feed" : feedRevealed;
+
   return (
     <div
+      ref={rootRef}
       className={cn(
         "relative flex min-h-0 flex-col bg-black text-slate-100",
         embedded ? "h-full w-full" : "h-[100svh] min-h-[100svh]",
@@ -243,52 +398,31 @@ export function WarRoomView({
           </div>
           <div className="flex items-center gap-2 text-[11px] text-slate-500">
             <span>{statusLabel}</span>
-            {compact ? (
-              <div className="flex rounded-full border border-white/10 p-0.5">
-                <button
-                  type="button"
-                  className={cn("rounded-full px-2 py-0.5", mobileView === "globe" && "bg-white text-slate-950")}
-                  onClick={() => setMobileView("globe")}
-                >
-                  Globe
-                </button>
-                <button
-                  type="button"
-                  className={cn("rounded-full px-2 py-0.5", mobileView === "panel" && "bg-white text-slate-950")}
-                  onClick={() => setMobileView("panel")}
-                >
-                  Feed
-                </button>
-              </div>
-            ) : null}
+            {compact ? mobileTabs : null}
           </div>
         </header>
       ) : compact ? (
-        <div className="absolute right-3 top-3 z-20 flex rounded-full border border-white/10 bg-black/70 p-0.5 text-[11px] backdrop-blur">
-          <button
-            type="button"
-            className={cn(
-              "rounded-full px-2 py-0.5",
-              mobileView === "globe" ? "bg-white text-slate-950" : "text-slate-300",
-            )}
-            onClick={() => setMobileView("globe")}
-          >
-            Globe
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "rounded-full px-2 py-0.5",
-              mobileView === "panel" ? "bg-white text-slate-950" : "text-slate-300",
-            )}
-            onClick={() => setMobileView("panel")}
-          >
-            Feed
-          </button>
-        </div>
+        <div className="absolute right-3 top-3 z-20">{mobileTabs}</div>
       ) : null}
 
       <div className={cn("relative flex min-h-0 flex-1", embedded && "overflow-hidden")}>
+        {/* Left: only when a selection needs the detail rail */}
+        <div
+          className={cn(
+            "min-h-0 overflow-hidden transition-[width,opacity,border-color] duration-300 ease-out",
+            compact
+              ? mobileView === "detail"
+                ? "flex w-full flex-col border-r border-white/10"
+                : "hidden w-0"
+              : showLeft
+                ? "flex w-[min(100%,26rem)] shrink-0 flex-col border-r border-white/10 opacity-100"
+                : "w-0 border-r-0 opacity-0",
+          )}
+        >
+          {showLeft || (compact && mobileView === "detail") ? detailPane : null}
+        </div>
+
+        {/* Center: globe */}
         <div
           className={cn(
             "relative min-h-0",
@@ -296,38 +430,22 @@ export function WarRoomView({
           )}
         >
           {globe}
-          <WarRoomDetailCard
-            open={detailOpen}
-            target={detail}
-            anchor={anchor}
-            onOpenChange={(next) => {
-              setDetailOpen(next);
-              if (!next) setAnchor(null);
-            }}
-            onNavigate={handleNavigate}
-            onSelectRelatedMarket={(row) => {
-              if (marketById.has(row.id)) {
-                openMarketDetail(row.id);
-                return;
-              }
-              // Pulse-only cousin — stay on the pin, open that market card with pulse quotes.
-              setMarket(row.id);
-              setDetail({ kind: "market", market: row });
-              setDetailOpen(true);
-            }}
-          />
         </div>
+
+        {/* Right: slides in once the War Room is in view */}
         <div
           className={cn(
-            "min-h-0 border-l border-white/10",
+            "min-h-0 overflow-hidden transition-[width,transform,opacity] duration-500 ease-out",
             compact
-              ? mobileView === "panel"
-                ? "flex w-full flex-col"
-                : "hidden"
-              : "flex w-[min(100%,22rem)] shrink-0 flex-col",
+              ? mobileView === "feed"
+                ? "flex w-full flex-col border-l border-white/10"
+                : "hidden w-0"
+              : showRight
+                ? "flex w-[min(100%,22rem)] shrink-0 translate-x-0 flex-col border-l border-white/10 opacity-100"
+                : "w-0 translate-x-8 border-l-0 opacity-0",
           )}
         >
-          {panel}
+          {showRight || (compact && mobileView === "feed") ? feed : null}
         </div>
       </div>
     </div>

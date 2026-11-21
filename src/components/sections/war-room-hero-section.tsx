@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
-
+import { LandingDemoScrollManager } from "./landing-demo-scroll";
+import { DemoScrollLink } from "./demo-scroll-link";
 import { HomepageExploreTabs } from "./homepage-explore-tabs";
 
 export function WarRoomHeroSection({ fixture = false }: { fixture?: boolean }) {
   return (
     <section id="hero" className="relative w-full overflow-visible">
+      <LandingDemoScrollManager />
       <div className="mx-auto flex w-full max-w-[min(100%,48rem)] flex-col items-center px-6 pb-10 pt-16 text-center sm:px-8 sm:pt-20">
         <h1 className="text-balance text-4xl font-semibold tracking-tight text-foreground sm:text-5xl md:text-6xl">
           The Ultimate Intelligence Terminal for Predicting the Future
@@ -16,12 +17,12 @@ export function WarRoomHeroSection({ fixture = false }: { fixture?: boolean }) {
           investigate wallets, build custom charts and live sharable dashboards. No code. No setup.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <Link
+          <DemoScrollLink
             href="#demo"
             className="inline-flex h-11 items-center justify-center rounded-full bg-foreground px-6 text-sm font-medium text-background transition hover:opacity-90"
           >
             Learn More
-          </Link>
+          </DemoScrollLink>
           <p className="text-sm font-medium text-muted-foreground">10K+ users</p>
         </div>
       </div>

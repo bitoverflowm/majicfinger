@@ -1,9 +1,9 @@
 /**
- * Scroll the landing / hub demo mockup into the balanced viewport position used on first paint:
- * mockup vertically centered with even breathing room (nav floats above the card).
+ * Scroll the landing / hub demo into view under the floating nav.
  * Avoids native hash scroll, which aligns the section top and overshoots downward.
  *
- * Homepage uses `#demo`; hub pages (e.g. Kalshi Live) use `#live-demo`.
+ * Homepage War Room hero: `#demo` + `[data-war-room-demo]` (tabs stay visible).
+ * Classic homepage / hubs: `#demo` / `#live-demo` mockup card.
  */
 
 const DEMO_SECTION_IDS = ["demo", "live-demo"];
@@ -21,23 +21,49 @@ export function resolveDemoSectionEl() {
 }
 
 /**
+ * War Room explore block (tabs + globe). Prefer this over a lower-page terminal mockup.
+ * @returns {HTMLElement | null}
+ */
+export function resolveWarRoomExploreEl() {
+  if (typeof document === "undefined") return null;
+  return (
+    document.querySelector("[data-war-room-demo]") ||
+    document.querySelector("#demo [role='tablist']") ||
+    null
+  );
+}
+
+/**
  * @returns {HTMLElement | null}
  */
 export function resolveDemoMockupEl() {
   if (typeof document === "undefined") return null;
+  // Never steal scroll from the War Room hero to a terminal mockup further down / in another tab.
+  if (resolveWarRoomExploreEl()) return null;
   return (
     document.getElementById("demo-mockup") ||
     document.querySelector("#demo [data-demo-mockup]") ||
     document.querySelector("#live-demo [data-demo-mockup]") ||
-    document.querySelector("[data-demo-mockup]")
+    document.querySelector("#explore-demo [data-demo-mockup]") ||
+    null
   );
 }
 
 export function getDemoScrollTop() {
   if (typeof window === "undefined") return 0;
 
-  const mockup = resolveDemoMockupEl();
+  const navOffset = Math.round(window.innerHeight * 0.1);
 
+  // Keep explore tabs in frame — scroll so the tablist sits under the nav.
+  const warRoom = resolveWarRoomExploreEl();
+  if (warRoom) {
+    const tablist = document.querySelector("#demo [role='tablist']");
+    const anchor = tablist || warRoom;
+    const rect = anchor.getBoundingClientRect();
+    return Math.max(0, Math.round(window.scrollY + rect.top - navOffset));
+  }
+
+  const mockup = resolveDemoMockupEl();
   if (!mockup) {
     const section = resolveDemoSectionEl();
     if (!section) return 0;
@@ -46,13 +72,7 @@ export function getDemoScrollTop() {
   }
 
   const rect = mockup.getBoundingClientRect();
-  /**
-   * Place the mockup card top just below the floating nav (~10–12% viewport).
-   * Native hash scroll aligns the section top to y=0 and overshoots downward.
-   */
-  const targetTop = window.innerHeight * 0.11;
-
-  return Math.max(0, Math.round(window.scrollY + rect.top - targetTop));
+  return Math.max(0, Math.round(window.scrollY + rect.top - navOffset));
 }
 
 /**

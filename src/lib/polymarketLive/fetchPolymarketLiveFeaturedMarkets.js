@@ -368,3 +368,24 @@ export async function fetchPolymarketLiveFeaturedMarkets(opts = {}) {
   const source = preferred.length >= Math.min(limit, pool.length) ? preferred : pool;
   return source.slice(0, limit);
 }
+
+/**
+ * Volume-ranked open markets for a Polymarket tag (War Room category chips).
+ *
+ * @param {string} tagSlug
+ * @param {{ limit?: number }} [opts]
+ * @returns {Promise<FeaturedPolymarketMarket[]>}
+ */
+export async function fetchPolymarketMarketsByTagSlug(tagSlug, opts = {}) {
+  const slug = String(tagSlug || "").trim().toLowerCase();
+  if (!slug) return [];
+  const limit = Math.max(1, Math.min(100, Math.floor(Number(opts.limit) || 48)));
+  const payload = await gammaGet("/markets", {
+    closed: false,
+    tag_slug: slug,
+    order: "volume24hr",
+    ascending: false,
+    limit,
+  });
+  return marketsFromPayload(payload).filter((market) => market.outcomes.length >= 2);
+}

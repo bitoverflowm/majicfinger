@@ -91,8 +91,10 @@ function HomepageDemo(props: DashboardDemoSectionProps) {
   const compact = useCompactScreen();
   useScrollbarWidth();
   if (compact === false) return <FramedDashboardDemoSection {...props} />;
+  // Prefer the caller's sectionId (e.g. explore-demo) — never steal the homepage `#demo` anchor.
+  const sectionId = props.sectionId || "demo";
   return (
-    <section id="demo" className={cn(HOMEPAGE_DEMO_SECTION_CLASS, "z-30")}>
+    <section id={sectionId} className={cn(HOMEPAGE_DEMO_SECTION_CLASS, "z-30")}>
       <div className={compact ? undefined : "lg:hidden"}>
         <CompactDemoFrame />
       </div>

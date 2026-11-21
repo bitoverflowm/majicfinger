@@ -40,7 +40,8 @@ export type WarRoomGlobeProps = {
   } | null;
   /** Screen coords of the focused ping, relative to the map container. */
   onAnchorChange?: (point: { x: number; y: number } | null) => void;
-  onSelect?: (id: string) => void;
+  /** Market or news ping selection from the globe. */
+  onSelect?: (selection: { id: string; kind: "market" | "news" }) => void;
   onFail?: () => void;
   className?: string;
   interactive?: boolean;
@@ -52,6 +53,30 @@ export type WarRoomGlobeProps = {
 const SOURCE_ID = "war-room-markets";
 const PING_SOURCE_ID = "war-room-pings";
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
+/** Prefer news layers first so rose pings win when stacked on a market. */
+const HIT_LAYERS = ["wr-news-points", "wr-news-halo", "wr-points", "wr-selected", "wr-halo"] as const;
+const HIT_PAD_PX = 10;
+
+function pickHit(
+  map: import("maplibre-gl").Map,
+  point: { x: number; y: number },
+): { id: string; kind: "market" | "news" } | null {
+  const layers = HIT_LAYERS.filter((id) => Boolean(map.getLayer(id)));
+  if (!layers.length) return null;
+  const bbox: [[number, number], [number, number]] = [
+    [point.x - HIT_PAD_PX, point.y - HIT_PAD_PX],
+    [point.x + HIT_PAD_PX, point.y + HIT_PAD_PX],
+  ];
+  const hits = map.queryRenderedFeatures(bbox, { layers: [...layers] });
+  for (const feature of hits) {
+    const id = feature?.properties?.id;
+    if (id == null || id === "") continue;
+    const layerId = String(feature.layer?.id || "");
+    const kind = layerId.startsWith("wr-news") ? "news" : "market";
+    return { id: String(id), kind };
+  }
+  return null;
+}
 
 function applyProjection(map: {
   setProjection?: (p: { type: string }) => void;
@@ -199,27 +224,24 @@ export function WarRoomGlobe({
               data: pendingRef.current,
               promoteId: "id",
             });
+            // Dense borderless dots — Kalshi green / Polymarket blue / soft pulse halo only.
             instance.addLayer({
               id: "wr-halo",
               type: "circle",
               source: SOURCE_ID,
               paint: {
-                "circle-radius": [
-                  "case",
-                  ["==", ["feature-state", "pulse"], 1],
-                  22,
-                  ["case", ["==", ["get", "marker"], "weather"], 14, 11],
-                ],
+                "circle-radius": ["case", ["==", ["feature-state", "pulse"], 1], 10, 5],
                 "circle-color": [
                   "match",
-                  ["get", "marker"],
-                  "weather",
-                  "#7dd3fc",
-                  "geopolitics",
-                  "#fbbf24",
-                  "#93c5fd",
+                  ["get", "venue"],
+                  "kalshi",
+                  "#28CC95",
+                  "polymarket",
+                  "#2E5CFF",
+                  "#60a5fa",
                 ],
-                "circle-opacity": ["case", ["==", ["feature-state", "pulse"], 1], 0.35, 0.18],
+                "circle-opacity": ["case", ["==", ["feature-state", "pulse"], 1], 0.28, 0.1],
+                "circle-stroke-width": 0,
               },
             });
             instance.addLayer({
@@ -228,22 +250,27 @@ export function WarRoomGlobe({
               source: SOURCE_ID,
               paint: {
                 "circle-radius": [
-                  "case",
-                  ["==", ["feature-state", "pulse"], 1],
-                  9,
-                  ["case", ["==", ["get", "marker"], "weather"], 6.5, 5.5],
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  1,
+                  ["case", ["==", ["feature-state", "pulse"], 1], 3.2, 2.1],
+                  4,
+                  ["case", ["==", ["feature-state", "pulse"], 1], 4.5, 2.8],
+                  7,
+                  ["case", ["==", ["feature-state", "pulse"], 1], 6, 3.6],
                 ],
                 "circle-color": [
                   "match",
-                  ["get", "marker"],
-                  "weather",
-                  "#7dd3fc",
-                  "geopolitics",
-                  "#f59e0b",
+                  ["get", "venue"],
+                  "kalshi",
+                  "#28CC95",
+                  "polymarket",
+                  "#2E5CFF",
                   "#60a5fa",
                 ],
-                "circle-stroke-width": 1.2,
-                "circle-stroke-color": WAR_ROOM_SPACE_BLACK,
+                "circle-opacity": 0.92,
+                "circle-stroke-width": 0,
               },
             });
             instance.addLayer({
@@ -252,31 +279,38 @@ export function WarRoomGlobe({
               source: SOURCE_ID,
               filter: ["==", ["get", "id"], selectedRef.current || ""],
               paint: {
-                "circle-radius": 11,
-                "circle-color": "#ffffff",
-                "circle-opacity": 0.15,
-                "circle-stroke-width": 2,
-                "circle-stroke-color": "#f8fafc",
+                "circle-radius": 7,
+                "circle-color": [
+                  "match",
+                  ["get", "venue"],
+                  "kalshi",
+                  "#28CC95",
+                  "polymarket",
+                  "#2E5CFF",
+                  "#60a5fa",
+                ],
+                "circle-opacity": 0.22,
+                "circle-stroke-width": 0,
               },
             });
             instance.addLayer({
               id: "wr-labels",
               type: "symbol",
               source: SOURCE_ID,
-              minzoom: 2.4,
+              minzoom: 3.2,
               layout: {
                 "text-field": ["get", "title"],
-                "text-size": 11,
-                "text-offset": [0, 1.2],
+                "text-size": 10,
+                "text-offset": [0, 1.05],
                 "text-anchor": "top",
-                "text-max-width": 14,
+                "text-max-width": 12,
                 "text-optional": true,
               },
               paint: {
                 "text-color": "#e2e8f0",
                 "text-halo-color": WAR_ROOM_SPACE_BLACK,
-                "text-halo-width": 1.2,
-                "text-opacity": 0.9,
+                "text-halo-width": 1,
+                "text-opacity": 0.85,
               },
             });
             instance.addSource(PING_SOURCE_ID, {
@@ -289,9 +323,10 @@ export function WarRoomGlobe({
               type: "circle",
               source: PING_SOURCE_ID,
               paint: {
-                "circle-radius": 16,
-                "circle-color": "#c4b5fd",
-                "circle-opacity": 0.28,
+                "circle-radius": 7,
+                "circle-color": "#fb7185",
+                "circle-opacity": 0.22,
+                "circle-stroke-width": 0,
               },
             });
             instance.addLayer({
@@ -299,22 +334,35 @@ export function WarRoomGlobe({
               type: "circle",
               source: PING_SOURCE_ID,
               paint: {
-                "circle-radius": 5.5,
-                "circle-color": "#a78bfa",
-                "circle-stroke-width": 1.2,
-                "circle-stroke-color": WAR_ROOM_SPACE_BLACK,
+                "circle-radius": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  1,
+                  2.4,
+                  4,
+                  3.2,
+                  7,
+                  4,
+                ],
+                "circle-color": "#f43f5e",
+                "circle-opacity": 0.95,
+                "circle-stroke-width": 0,
               },
             });
           }
         });
-        instance.on("click", "wr-points", (e) => {
-          const id = e.features?.[0]?.properties?.id;
-          if (id) onSelectRef.current?.(String(id));
+        instance.on("click", (e) => {
+          if (!interactive) return;
+          const hit = pickHit(instance, e.point);
+          if (hit) onSelectRef.current?.(hit);
         });
-        instance.on("mouseenter", "wr-points", () => {
-          instance.getCanvas().style.cursor = "pointer";
+        instance.on("mousemove", (e) => {
+          if (!interactive) return;
+          const hit = pickHit(instance, e.point);
+          instance.getCanvas().style.cursor = hit ? "pointer" : "";
         });
-        instance.on("mouseleave", "wr-points", () => {
+        instance.on("mouseleave", () => {
           instance.getCanvas().style.cursor = "";
         });
         instance.on("error", () => {

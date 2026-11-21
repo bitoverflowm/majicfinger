@@ -22,21 +22,38 @@ const LIVELINE_WINDOWS = [
   { label: "1m", secs: 60 },
   { label: "5m", secs: 300 },
   { label: "15m", secs: 900 },
+  { label: "1h", secs: 3600 },
 ];
 
+/** Polymarket/Kalshi prices as 0–1. Rejects garbage that would read as 800¢. */
+function asProb(raw: unknown): number | null {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  if (n > 1 && n <= 100) return n / 100;
+  if (n < 0 || n > 1) return null;
+  return n;
+}
+
 function formatProb(value: number) {
-  if (!Number.isFinite(value)) return "—";
-  return `${Math.round(value * 100)}¢`;
+  const p = asProb(value);
+  if (p == null) return "—";
+  return `${Math.round(p * 100)}¢`;
 }
 
 async function seedPolymarketHistory(tokenId: string, signal: AbortSignal): Promise<LivePoint[]> {
   const end = Math.floor(Date.now() / 1000);
   const start = end - 60 * 60 * 6;
   const histories = await fetchPriceHistory([tokenId], start, end, signal);
-  return (histories[0] || []).map((point) => ({
-    time: point.t > 1e12 ? point.t / 1000 : point.t,
-    value: point.p,
-  }));
+  return (histories[0] || [])
+    .map((point) => {
+      const value = asProb(point.p);
+      if (value == null) return null;
+      return {
+        time: point.t > 1e12 ? point.t / 1000 : point.t,
+        value,
+      };
+    })
+    .filter(Boolean) as LivePoint[];
 }
 
 async function fetchKalshiRecentTrades(ticker: string, signal: AbortSignal): Promise<TradeRow[]> {
@@ -49,13 +66,10 @@ async function fetchKalshiRecentTrades(ticker: string, signal: AbortSignal): Pro
   const rows = Array.isArray(body?.trades) ? body.trades : [];
   return rows
     .map((row: Record<string, unknown>, index: number) => {
-      const price =
-        Number(row.yes_price_dollars) ||
-        (Number(row.yes_price) > 1 ? Number(row.yes_price) / 100 : Number(row.yes_price)) ||
-        NaN;
+      const price = asProb(row.yes_price_dollars ?? row.yes_price);
       const at = Date.parse(String(row.created_time || "")) || Date.now() - index * 1000;
       const id = String(row.trade_id || row.id || `${ticker}-${at}`);
-      if (!Number.isFinite(price)) return null;
+      if (price == null) return null;
       return {
         id,
         price,
@@ -67,24 +81,24 @@ async function fetchKalshiRecentTrades(ticker: string, signal: AbortSignal): Pro
     .filter(Boolean) as TradeRow[];
 }
 
-function TradesFeed({ trades }: { trades: TradeRow[] }) {
+function TradesFeed({ trades, tall }: { trades: TradeRow[]; tall?: boolean }) {
   if (!trades.length) {
-    return <p className="py-1.5 text-[10px] text-slate-500">Waiting for prints…</p>;
+    return <p className="py-2 text-[11px] text-slate-500">Waiting for live trades…</p>;
   }
   return (
-    <ul className="max-h-[5.5rem] overflow-y-auto">
-      {trades.slice(0, 20).map((trade) => {
+    <ul className={cn("overflow-y-auto", tall ? "max-h-[14rem]" : "max-h-[7rem]")}>
+      {trades.slice(0, 40).map((trade) => {
         const side = String(trade.side || "").toUpperCase();
         const buy = side.includes("BUY");
         const sell = side.includes("SELL");
         return (
           <li
             key={trade.id}
-            className="flex items-center gap-2 border-b border-white/[0.04] py-1 text-[10px] last:border-b-0"
+            className="flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11px] last:border-b-0"
           >
             <span
               className={cn(
-                "w-8 shrink-0 font-semibold uppercase",
+                "w-9 shrink-0 font-semibold uppercase",
                 buy && "text-emerald-300",
                 sell && "text-rose-300",
                 !buy && !sell && "text-slate-500",
@@ -110,20 +124,30 @@ export function WarRoomMarketChart({
   tokenIds,
   ticker,
   className,
+  chartClassName,
+  tall,
   onLivePrice,
+  onMove,
 }: {
   venue?: string | null;
   tokenIds?: string[] | null;
   ticker?: string | null;
   className?: string;
+  chartClassName?: string;
+  /** Roomier chart + trade list for the left detail panel. */
+  tall?: boolean;
   onLivePrice?: (price: number | null) => void;
+  /** 6h move from seeded history when the desk quote has no move. */
+  onMove?: (move: number | null) => void;
 }) {
   const [points, setPoints] = useState<LivePoint[]>([]);
   const [trades, setTrades] = useState<TradeRow[]>([]);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const pointsRef = useRef<LivePoint[]>([]);
   const onLivePriceRef = useRef(onLivePrice);
+  const onMoveRef = useRef(onMove);
   onLivePriceRef.current = onLivePrice;
+  onMoveRef.current = onMove;
   const tokenId = tokenIds?.[0] || null;
 
   useEffect(() => {
@@ -140,21 +164,27 @@ export function WarRoomMarketChart({
     setTrades([]);
     setLivePrice(null);
     onLivePriceRef.current?.(null);
+    onMoveRef.current?.(null);
 
     if (venue === "polymarket" && tokenId) {
       seedPolymarketHistory(tokenId, abort.signal)
         .then((seed) => {
           if (abort.signal.aborted) return;
           setPoints(seed);
-          if (seed.length) setLivePrice(seed[seed.length - 1].value);
+          if (seed.length) {
+            const last = seed[seed.length - 1].value;
+            const first = seed[0].value;
+            setLivePrice(last);
+            onMoveRef.current?.(Number((last - first).toFixed(4)));
+          }
         })
         .catch(() => {});
 
       const close = openPolymarketMarketFeed({
         assetIds: [tokenId],
         onTrade: (trade: { asset_id?: string; price?: number; size?: number; side?: string }) => {
-          const price = Number(trade.price);
-          if (!Number.isFinite(price)) return;
+          const price = asProb(trade.price);
+          if (price == null) return;
           const now = Date.now() / 1000;
           const nextPoints = [...pointsRef.current, { time: now, value: price }].slice(-400);
           pointsRef.current = nextPoints;
@@ -174,8 +204,8 @@ export function WarRoomMarketChart({
           );
         },
         onQuote: (quote: { mid?: number; price?: number }) => {
-          const price = Number(quote.mid ?? quote.price);
-          if (!Number.isFinite(price)) return;
+          const price = asProb(quote.mid ?? quote.price);
+          if (price == null) return;
           setLivePrice(price);
         },
       });
@@ -196,7 +226,10 @@ export function WarRoomMarketChart({
             const nextPoints = chron.map((row) => ({ time: row.at / 1000, value: row.price }));
             pointsRef.current = nextPoints;
             setPoints(nextPoints);
-            setLivePrice(chron[chron.length - 1]?.price ?? null);
+            const last = chron[chron.length - 1]?.price ?? null;
+            const first = chron[0]?.price ?? null;
+            setLivePrice(last);
+            if (last != null && first != null) onMoveRef.current?.(Number((last - first).toFixed(4)));
           })
           .catch(() => {});
       pull();
@@ -214,8 +247,14 @@ export function WarRoomMarketChart({
   const value = livePrice ?? liveData[liveData.length - 1]?.value ?? 0;
 
   return (
-    <div className={cn("space-y-1.5", className)}>
-      <div className="h-[7.5rem] overflow-hidden rounded-md border border-white/10 bg-black/40">
+    <div className={cn("flex min-h-0 flex-col gap-2", className)}>
+      <div
+        className={cn(
+          "min-h-0 overflow-hidden rounded-md border border-white/10 bg-black/40",
+          tall ? "h-[min(42%,18rem)] min-h-[12rem] flex-1" : "h-[7.5rem]",
+          chartClassName,
+        )}
+      >
         <Liveline
           data={liveData}
           value={value}
@@ -238,11 +277,11 @@ export function WarRoomMarketChart({
           style={{ backgroundColor: "transparent" }}
         />
       </div>
-      <div>
+      <div className="min-h-0">
         <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-          Prints
+          Live trades
         </p>
-        <TradesFeed trades={trades} />
+        <TradesFeed trades={trades} tall={tall} />
       </div>
     </div>
   );

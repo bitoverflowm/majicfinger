@@ -184,6 +184,7 @@ async function fetchNewsActivity(observedTs) {
             ? warRoomMarketId("polymarket", polyCondition)
             : null;
       const occurredAt = isoMaybe(item.t, observedTs);
+      const snippet = String(item.snippet || item.summary || "").trim();
       out.push({
         id: warRoomSignalId("headline", "news", id),
         kind: "headline",
@@ -191,7 +192,7 @@ async function fetchNewsActivity(observedTs) {
         venue: "news",
         marketId,
         title,
-        summary: title,
+        summary: snippet && snippet !== title ? snippet : title,
         occurredAt,
         observedAt: observedTs,
         geometry: pointGeometry(geo, id),
@@ -200,6 +201,7 @@ async function fetchNewsActivity(observedTs) {
         data: {
           publisher: item.source || null,
           markets: item.markets || [],
+          snippet: snippet && snippet !== title ? snippet : null,
         },
       });
     }

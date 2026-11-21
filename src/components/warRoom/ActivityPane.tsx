@@ -21,6 +21,7 @@ export type ActivityRow = {
     notionalUsd?: number | null;
     publisher?: string | null;
     markets?: Array<Record<string, unknown>>;
+    snippet?: string | null;
   } | null;
 };
 

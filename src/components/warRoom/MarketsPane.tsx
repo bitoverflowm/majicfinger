@@ -85,7 +85,9 @@ export function MarketsPane({
       <div className="px-2.5 py-6 text-[11px] leading-snug text-slate-500">
         {emptyReason === "no_markets_in_desk"
           ? "Nothing in this desk right now."
-          : "Waiting for live markets…"}
+          : emptyReason === "no_markets_in_category"
+            ? "No markets in this category right now."
+            : "Waiting for live markets…"}
       </div>
     );
   }

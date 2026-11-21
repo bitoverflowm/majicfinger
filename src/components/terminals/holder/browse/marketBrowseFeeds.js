@@ -51,37 +51,15 @@ export const COMPETITIVE = {
 /** Tags Polymarket uses for its own plumbing, never shown as a category chip. */
 const NOISE_TAG = /^(hide from new|recurring|earn \d|hfc|parent for derivative|pre-market|pyth|season stats|all)/i;
 
-export const FEEDS = [
-  { id: "tradable", label: "All tradable markets" },
-  { id: "new", label: "Just listed" },
-  { id: "closed", label: "Recently closed" },
-  { id: "volume", label: "By volume" },
-  { id: "liquidity", label: "By liquidity" },
-  { id: "competitive", label: "Competitive" },
-  { id: "trending", label: "Trending" },
-];
-
-/** Category chips filter the tradable list by the tags Polymarket puts on each market. */
-export const CATEGORIES = [
-  { id: "politics", label: "Politics", tags: ["politics"] },
-  { id: "sports", label: "Sports", tags: ["sports"] },
-  { id: "crypto", label: "Crypto", tags: ["crypto"] },
-  { id: "economics", label: "Economics", tags: ["economy", "economics", "fed", "fed rates", "inflation", "macro"] },
-  { id: "finance", label: "Finance", tags: ["finance", "stocks", "equities"] },
-  { id: "tech", label: "Tech", tags: ["tech", "ai", "big tech"] },
-  { id: "geopolitics", label: "Geopolitics", tags: ["geopolitics", "world", "world affairs"] },
-  { id: "elections", label: "Elections", tags: ["elections", "global elections"] },
-  { id: "culture", label: "Culture", tags: ["culture", "movies", "music", "awards"] },
-  { id: "weather", label: "Weather", tags: ["weather"] },
-];
-
-const CATEGORY_TAGS = new Map(CATEGORIES.map((category) => [category.id, new Set(category.tags)]));
-
-export function inCategory(market, categoryId) {
-  const wanted = CATEGORY_TAGS.get(categoryId);
-  if (!wanted) return false;
-  return market.tags.some((tag) => wanted.has(tag.toLowerCase()));
-}
+export {
+  CATEGORIES,
+  EXPLORE_FEEDS as FEEDS,
+  EXPLORE_TOP_FEEDS,
+  inCategory,
+  normalizeCategory,
+  normalizeExploreFeed,
+  normalizeTags,
+} from "@/lib/markets/exploreCategories";
 
 export function displayTags(market, max = 2) {
   return market.tags.filter((tag) => !NOISE_TAG.test(tag)).slice(0, max);

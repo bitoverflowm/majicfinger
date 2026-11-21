@@ -1,7 +1,15 @@
 import { holderTerminalHref } from "@/lib/holderLanding/pages";
-import { fetchLiveWarRoomSources } from "./adapters";
+import {
+  activityMatchesCategory,
+  CATEGORIES,
+  matchesCategory,
+  normalizeCategory,
+} from "@/lib/markets/exploreCategories";
+import { fetchPolymarketMarketsByTagSlug } from "@/lib/polymarketLive/fetchPolymarketLiveFeaturedMarkets";
+import { fetchLiveWarRoomSources, fromPolymarketFeatured } from "./adapters";
 import {
   DESKTOP_POINT_CAP,
+  FEED_ROW_CAP,
   MOBILE_POINT_CAP,
   NEWS_ACTIVITY_CAP,
   POLL_INTERVAL_MS,
@@ -140,6 +148,36 @@ function matchesDesk(market, desk) {
   return marketDesk(market) === desk;
 }
 
+/**
+ * When a category chip is active, pull volume-ranked Polymarket markets for that
+ * tag so the globe / rail aren't limited to the small featured pool.
+ * @param {string} category
+ * @param {string} observedTs
+ * @param {Set<string>} existingIds
+ */
+async function categoryPolymarketBoost(category, observedTs, existingIds) {
+  const definition = CATEGORIES.find((row) => row.id === category);
+  if (!definition) return [];
+  const tagSlug = definition.tags[0];
+  if (!tagSlug) return [];
+  try {
+    const rows = await fetchPolymarketMarketsByTagSlug(tagSlug, { limit: 64 });
+    /** @type {Array<Record<string, unknown>>} */
+    const out = [];
+    for (const row of rows) {
+      const mapped = fromPolymarketFeatured(row, observedTs);
+      if (!mapped?.market) continue;
+      if (existingIds.has(mapped.market.id)) continue;
+      if (!matchesCategory(mapped.market, category)) continue;
+      existingIds.add(mapped.market.id);
+      out.push(mapped.market);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 function signalsForMarket(bundle, marketId) {
   const ids = new Set(
     (bundle.links || [])
@@ -199,6 +237,7 @@ function feedRow(bundle, market) {
     venue: market.venue,
     desk: marketDesk(market),
     category: market.category,
+    tags: Array.isArray(market.tags) ? market.tags : [],
     region: market.region || "Global",
     status: market.status,
     price: quote?.price ?? null,
@@ -214,9 +253,13 @@ function feedRow(bundle, market) {
       (market.venue === "polymarket" ? "/polymarket.png" : market.venue === "kalshi" ? "/kalshi.png" : null),
     slug: market.slug || null,
     venueMarketId: market.venueMarketId || null,
-    tokenIds: Array.isArray(market.outcomes)
-      ? market.outcomes.map((o) => o?.tokenId).filter(Boolean)
-      : [],
+    // YES first so live charts don't flip between Yes (~8¢) and No (~98¢).
+    tokenIds: (() => {
+      const outcomes = Array.isArray(market.outcomes) ? market.outcomes : [];
+      const yes = outcomes.find((o) => String(o?.label || o?.id || "").toLowerCase().startsWith("yes"));
+      const rest = outcomes.filter((o) => o !== yes);
+      return [yes, ...rest].map((o) => o?.tokenId).filter(Boolean);
+    })(),
     outcomes: Array.isArray(market.outcomes) ? market.outcomes : [],
     quoteAt: quote?.sourceTs || quote?.observedTs || null,
     signalSummary: signal?.summary || null,
@@ -255,8 +298,8 @@ function activityRows(bundle) {
       kind: row.kind,
       venue: row.source,
       marketId: row.marketId || null,
-      title: row.summary,
-      summary: row.summary,
+      title: row.title || row.summary,
+      summary: row.summary || row.title,
       occurredAt: row.occurredAt || row.observedAt || null,
       region: null,
       geometry: row.geometry || null,
@@ -278,6 +321,7 @@ function featureFromMarket(market) {
       venue: market.venue,
       desk: marketDesk(market),
       category: market.category,
+      tags: Array.isArray(market.tags) ? market.tags : [],
       price: market.quote?.price ?? null,
       move: market.quote?.move ?? null,
       status: market.status,
@@ -330,6 +374,7 @@ export async function getWarRoomPreview(opts = {}) {
  * @param {{
  *   desk?: string;
  *   market?: string;
+ *   category?: string;
  *   mobile?: boolean;
  *   cursor?: string;
  *   forceFixture?: boolean;
@@ -337,19 +382,30 @@ export async function getWarRoomPreview(opts = {}) {
  */
 export async function getWarRoomSnapshot(opts = {}) {
   const desk = normalizeDesk(opts.desk);
+  const category = normalizeCategory(opts.category);
   const bundle = await loadWarRoomBundle(opts);
   const marketId = String(opts.market || "").trim();
-  const filtered = bundle.markets.filter((market) => matchesDesk(market, desk));
+  const existingIds = new Set(bundle.markets.map((market) => market.id));
+  const boosted = category
+    ? await categoryPolymarketBoost(category, bundle.asOf, existingIds)
+    : [];
+  const pool = boosted.length ? [...bundle.markets, ...boosted] : bundle.markets;
+  const filtered = pool.filter(
+    (market) => matchesDesk(market, desk) && matchesCategory(market, category),
+  );
   const byVolume = [...filtered].sort((a, b) => {
     const av = Number(a.volume24h) || 0;
     const bv = Number(b.volume24h) || 0;
     if (bv !== av) return bv - av;
     return Math.abs(Number(b.quote?.move) || 0) - Math.abs(Number(a.quote?.move) || 0);
   });
+  const marketById = new Map(pool.map((market) => [market.id, market]));
   const cap = opts.mobile ? MOBILE_POINT_CAP : DESKTOP_POINT_CAP;
   const features = byVolume.map(featureFromMarket).filter(Boolean).slice(0, cap);
-  const feed = byVolume.map((market) => feedRow(bundle, market));
-  const activity = activityRows(bundle);
+  const feed = byVolume.slice(0, FEED_ROW_CAP).map((market) => feedRow(bundle, market));
+  const activity = activityRows(bundle).filter((row) =>
+    activityMatchesCategory(row, category, marketById),
+  );
   const newsPings = activity
     .filter((row) => row.kind === "headline" && row.geometry?.type === "Point")
     .slice(0, NEWS_ACTIVITY_CAP)
@@ -364,8 +420,11 @@ export async function getWarRoomSnapshot(opts = {}) {
         marker: "news",
       },
     }));
-  const selected = marketId ? filtered.find((m) => m.id === marketId) || bundle.markets.find((m) => m.id === marketId) : null;
-  const selectedValid = selected && matchesDesk(selected, desk) ? selected : marketId ? null : byVolume[0] || null;
+  const selected = marketId
+    ? filtered.find((m) => m.id === marketId) ||
+      pool.find((m) => m.id === marketId && matchesDesk(m, desk) && matchesCategory(m, category))
+    : null;
+  const selectedValid = selected ? selected : marketId ? null : byVolume[0] || null;
   const invalidMarket = Boolean(marketId && parseWarRoomMarketId(marketId) && !selectedValid);
   const missingMarket = Boolean(marketId && !parseWarRoomMarketId(marketId));
 
@@ -379,6 +438,7 @@ export async function getWarRoomSnapshot(opts = {}) {
     pollIntervalMs: bundle.pollIntervalMs,
     freshness: bundle.freshness,
     desk,
+    category: category || null,
     cursor: cursorFor(bundle, desk),
     features: { type: "FeatureCollection", features },
     pings: { type: "FeatureCollection", features: newsPings },
@@ -386,13 +446,15 @@ export async function getWarRoomSnapshot(opts = {}) {
     activity,
     selectedMarketId: selectedValid?.id || null,
     emptyReason: !filtered.length
-      ? bundle.markets.length
-        ? "no_markets_in_desk"
+      ? pool.length
+        ? category
+          ? "no_markets_in_category"
+          : "no_markets_in_desk"
         : "no_snapshot"
       : invalidMarket || missingMarket
         ? "invalid_market"
         : null,
-    globalCount: bundle.markets.filter((m) => marketDesk(m) === "global").length,
+    globalCount: pool.filter((m) => marketDesk(m) === "global").length,
     status: filtered.length ? (bundle.stale ? "stale" : "ok") : "empty",
   };
 }
