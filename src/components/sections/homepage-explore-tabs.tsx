@@ -1,14 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import Image from "next/image";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { BookOpen, Newspaper } from "lucide-react";
 
 import { GlobeStage } from "@/components/warRoom/GlobeStage";
 import { useWarRoomData } from "@/components/warRoom/useWarRoomData";
 import { warRoomHref } from "@/lib/warRoom/href";
-import { useKalshiHistoricalCutoffDisplay, KALSHI_HISTORICAL_DEEP_CAPTION } from "@/hooks/useKalshiHistoricalCutoffDisplay";
-import { MARKETING_INTEGRATIONS } from "@/lib/integrations/marketing-catalog";
+import {
+  useKalshiHistoricalCutoffDisplay,
+  kalshiHistoricalV2Caption,
+  kalshiLiveCaption,
+  KALSHI_HISTORICAL_DEEP_CAPTION,
+} from "@/hooks/useKalshiHistoricalCutoffDisplay";
+import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
+import { DEMO_WINDOW_TITLE } from "@/components/sections/dashboard-demo-layout";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -20,49 +27,99 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-const LIVE_IDS = new Set(["kalshiLive", "polymarket", "binance", "chainlink", "coinGecko", "geckoDex", "twitter"]);
-const HISTORICAL_IDS = new Set(["kalshiHistorical", "polymarketHistorical"]);
+const LOGO_BG: Record<string, string> = {
+  kalshi: "bg-[#28CC95]",
+  polymarket: "bg-[#2E5CFF]",
+  binance: "bg-black",
+  chainlink: "bg-[#375BD2]",
+  coinGecko: "bg-black",
+  geckoDex: "bg-black",
+  twitter: "bg-black",
+  news: "bg-zinc-800",
+};
 
-function Card({
-  href,
-  title,
-  note,
-  onClick,
-}: {
-  href?: string;
-  title: string;
-  note?: string;
-  onClick?: () => void;
-}) {
-  const className =
-    "flex w-full items-start justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3 text-left transition hover:border-foreground/20 hover:bg-muted/40";
-  const body = (
-    <>
-      <span>
-        <span className="block text-sm font-medium text-foreground">{title}</span>
-        {note ? <span className="mt-0.5 block text-xs text-muted-foreground">{note}</span> : null}
-      </span>
-      <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-    </>
-  );
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className={className}>
-        {body}
-      </button>
-    );
-  }
+type Pill = {
+  id: string;
+  name: string;
+  href: string;
+  caption?: string;
+  logo?: { src: string; brand: keyof typeof LOGO_BG };
+  icon?: ReactNode;
+};
+
+const PILL_CLASS = cn(
+  "flex w-full min-h-[2.625rem] items-center gap-2.5 rounded-md border border-border/40 bg-card px-2 py-1 text-left",
+  "text-xs font-light leading-none text-foreground transition-all duration-200",
+  "hover:border-border hover:bg-muted/25 hover:shadow-md",
+);
+
+function LogoSlot({ brand, src }: { brand: keyof typeof LOGO_BG; src: string }) {
   return (
-    <Link href={href || "/"} className={className}>
-      {body}
+    <span
+      className={cn(
+        "relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md text-white",
+        LOGO_BG[brand],
+      )}
+    >
+      <Image src={src} alt="" fill className="object-contain p-0.5" sizes="28px" />
+    </span>
+  );
+}
+
+function DemoPill({ pill }: { pill: Pill }) {
+  return (
+    <Link href={pill.href} className={PILL_CLASS} title={pill.caption || pill.name}>
+      {pill.logo ? (
+        <LogoSlot brand={pill.logo.brand} src={pill.logo.src} />
+      ) : (
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/70 text-muted-foreground">
+          {pill.icon}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate leading-tight">{pill.name}</span>
+        {pill.caption ? (
+          <span className="mt-0.5 block truncate text-[10px] font-light leading-tight text-muted-foreground">
+            {pill.caption}
+          </span>
+        ) : null}
+      </span>
     </Link>
+  );
+}
+
+function DemoPicker({
+  heading,
+  subtext,
+  pills,
+}: {
+  heading: string;
+  subtext: string;
+  pills: Pill[];
+}) {
+  return (
+    <DemoWindowMockup title={DEMO_WINDOW_TITLE} className="min-h-[28rem] sm:min-h-[34rem]">
+      <div className="flex h-full min-h-[28rem] flex-col bg-background p-5 sm:min-h-[34rem] sm:p-8">
+        <div>
+          <h2 className="text-balance text-xl font-semibold tracking-tight text-foreground">{heading}</h2>
+          <p className="mt-1.5 max-w-2xl text-pretty text-sm leading-snug text-muted-foreground">{subtext}</p>
+        </div>
+        <p className="mb-2 mt-8 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          Integrations
+        </p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {pills.map((pill) => (
+            <DemoPill key={pill.id} pill={pill} />
+          ))}
+        </div>
+      </div>
+    </DemoWindowMockup>
   );
 }
 
 export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) {
   const [tab, setTab] = useState<TabId>("war-room");
   const [center, setCenter] = useState<[number, number] | null>(null);
-  const [kalshiOpen, setKalshiOpen] = useState(false);
   const cutoff = useKalshiHistoricalCutoffDisplay();
   const { snapshot } = useWarRoomData({ desk: "all", market: "", fixture });
 
@@ -80,23 +137,140 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
     features: [],
   };
 
-  const live = useMemo(
-    () => MARKETING_INTEGRATIONS.filter((row) => LIVE_IDS.has(row.id)),
-    [],
+  const pastPills = useMemo<Pill[]>(
+    () => [
+      {
+        id: "kalshiHistoricalV2",
+        name: "Kalshi Historical v2",
+        href: "/kalshi-historical-data",
+        caption: kalshiHistoricalV2Caption(cutoff.cutoffLabel),
+        logo: { src: "/kalshi.png", brand: "kalshi" },
+      },
+      {
+        id: "kalshiHistorical",
+        name: "Kalshi Historical",
+        href: "/kalshi-historical-data",
+        caption: KALSHI_HISTORICAL_DEEP_CAPTION,
+        logo: { src: "/kalshi.png", brand: "kalshi" },
+      },
+      {
+        id: "polymarketHistorical",
+        name: "Polymarket Historical",
+        href: "/polymarket-historical-data",
+        caption: "Closed Polymarket markets and trade history",
+        logo: { src: "/polymarket.png", brand: "polymarket" },
+      },
+      {
+        id: "news-archive",
+        name: "News Archive",
+        href: "/news-archive",
+        caption: "Search headlines by keyword and time",
+        icon: <Newspaper className="size-3.5" strokeWidth={1.75} />,
+      },
+      {
+        id: "kalshi-trades-recipe",
+        name: "Download Kalshi Trade History",
+        href: "/guides/download-kalshi-trade-history",
+        caption: "Recipe: pull every trade for a Kalshi market",
+        icon: <BookOpen className="size-3.5" strokeWidth={1.75} />,
+      },
+      {
+        id: "poly-trades-recipe",
+        name: "Download Polymarket Trade History",
+        href: "/guides/download-polymarket-trade-history",
+        caption: "Recipe: pull every trade for a Polymarket market",
+        icon: <BookOpen className="size-3.5" strokeWidth={1.75} />,
+      },
+    ],
+    [cutoff.cutoffLabel],
   );
-  const historical = useMemo(
-    () => MARKETING_INTEGRATIONS.filter((row) => HISTORICAL_IDS.has(row.id)),
+
+  const presentPills = useMemo<Pill[]>(
+    () => [
+      {
+        id: "kalshiLive",
+        name: "Kalshi Live",
+        href: "/kalshi-live-data",
+        caption: kalshiLiveCaption(cutoff.cutoffLabel),
+        logo: { src: "/kalshi.png", brand: "kalshi" },
+      },
+      {
+        id: "polymarket",
+        name: "Polymarket Live",
+        href: "/polymarket-live-data",
+        caption: "Live markets, prices, trades, and order books",
+        logo: { src: "/polymarket.png", brand: "polymarket" },
+      },
+      {
+        id: "binance",
+        name: "Binance",
+        href: "/integrations/binance",
+        caption: "Spot prices streamed next to the odds",
+        logo: { src: "/binance.jpeg", brand: "binance" },
+      },
+      {
+        id: "chainlink",
+        name: "Chainlink",
+        href: "/integrations/chainlink",
+        caption: "On-chain reference prices",
+        logo: { src: "/chainlink.png", brand: "chainlink" },
+      },
+      {
+        id: "coinGecko",
+        name: "CoinGecko",
+        href: "/integrations/coinGecko",
+        caption: "Crypto prices and market analytics",
+        logo: { src: "/coinGecko.png", brand: "coinGecko" },
+      },
+      {
+        id: "geckoDex",
+        name: "GeckoTerminal",
+        href: "/integrations/geckoDex",
+        caption: "DEX prices, liquidity, and volume",
+        logo: { src: "/geckoDex1.png", brand: "geckoDex" },
+      },
+      {
+        id: "twitter",
+        name: "Twitter",
+        href: "/integrations/twitter",
+        caption: "Tweets, profiles, and engagement",
+        logo: { src: "/x.png", brand: "twitter" },
+      },
+      {
+        id: "news",
+        name: "News",
+        href: "/news",
+        caption: "Live headlines next to the markets they can move",
+        icon: <Newspaper className="size-3.5" strokeWidth={1.75} />,
+      },
+    ],
+    [cutoff.cutoffLabel],
+  );
+
+  const holderPills = useMemo<Pill[]>(
+    () => [
+      {
+        id: "holder-terminal",
+        name: "Holder Terminal",
+        href: "/polymarket-holder-terminal",
+        caption: "Who holds every Polymarket market, what they paid, how each trader is doing",
+        logo: { src: "/polymarket.png", brand: "polymarket" },
+      },
+      {
+        id: "holder-analysis",
+        name: "Polymarket Holder analysis",
+        href: "/guides/polymarket-top-holders",
+        caption: "Recipe and walkthrough for top holders on a market",
+        icon: <BookOpen className="size-3.5" strokeWidth={1.75} />,
+      },
+    ],
     [],
   );
 
   return (
     <section id="demo" className="w-full px-4 pb-16 sm:px-6 lg:px-10">
       <div className="mx-auto w-full max-w-[min(100%,72rem)]">
-        <div
-          role="tablist"
-          aria-label="Explore Lychee"
-          className="flex flex-wrap gap-2"
-        >
+        <div role="tablist" aria-label="Explore Lychee" className="flex flex-wrap gap-2">
           {TABS.map((item) => {
             const selected = tab === item.id;
             return (
@@ -107,10 +281,10 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
                 aria-selected={selected}
                 onClick={() => setTab(item.id)}
                 className={cn(
-                  "rounded-full border px-4 py-1.5 text-sm font-medium transition",
+                  "rounded-full px-4 py-1.5 text-sm font-medium transition",
                   selected
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground",
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-muted-foreground hover:text-foreground",
                 )}
               >
                 {item.label}
@@ -119,9 +293,9 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
           })}
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-border bg-[#070b14]">
+        <div className="mt-4">
           {tab === "war-room" ? (
-            <div className="relative min-h-[28rem] sm:min-h-[34rem]">
+            <div className="relative min-h-[28rem] overflow-hidden rounded-[1.5rem] bg-[#070b14] sm:min-h-[34rem]">
               <GlobeStage
                 enhance="auto"
                 features={features}
@@ -139,84 +313,31 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
                 Open War Room
               </Link>
             </div>
-          ) : (
-            <div className="bg-background p-5 sm:p-8">
-              {tab === "past" ? (
-                <div className="space-y-4">
-                  <h2 className="text-2xl font-semibold tracking-tight">Analyze the Past</h2>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Card
-                        title="Kalshi Historical"
-                        note="Choose V2 (recent) or V1 (deep history)"
-                        onClick={() => setKalshiOpen((v) => !v)}
-                      />
-                      {kalshiOpen ? (
-                        <div className="ml-2 space-y-2 border-l border-border pl-3">
-                          <Card
-                            href="/kalshi-historical-data"
-                            title="V2 — recent historical"
-                            note={cutoff.cutoffLabel ? `Most recent historical data until ${cutoff.cutoffLabel}` : "Recent closed Kalshi history"}
-                          />
-                          <Card
-                            href="/kalshi-historical-data"
-                            title="V1 — deep history"
-                            note={KALSHI_HISTORICAL_DEEP_CAPTION}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                    {historical
-                      .filter((row) => row.id !== "kalshiHistorical")
-                      .map((row) => (
-                        <Card key={row.id} href={row.href} title={row.label} note={row.description} />
-                      ))}
-                    <Card href="/news-archive" title="News Archive" note="Search headlines by keyword and time." />
-                    <Card
-                      href="/guides/download-kalshi-trade-history"
-                      title="Download Kalshi Trade History"
-                      note="Recipe: pull every trade for a Kalshi market."
-                    />
-                    <Card
-                      href="/guides/download-polymarket-trade-history"
-                      title="Download Polymarket Trade History"
-                      note="Recipe: pull every trade for a Polymarket market."
-                    />
-                  </div>
-                </div>
-              ) : null}
+          ) : null}
 
-              {tab === "present" ? (
-                <div className="space-y-4">
-                  <h2 className="text-2xl font-semibold tracking-tight">Monitor the present</h2>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {live.map((row) => (
-                      <Card key={row.id} href={row.href} title={row.label} note={row.description} />
-                    ))}
-                    <Card href="/news" title="News" note="Live headlines next to the markets they can move." />
-                  </div>
-                </div>
-              ) : null}
+          {tab === "past" ? (
+            <DemoPicker
+              heading="Analyze the Past"
+              subtext="Pull closed Kalshi and Polymarket markets, trade history, and the news archive — same sources as the terminal demo."
+              pills={pastPills}
+            />
+          ) : null}
 
-              {tab === "holders" ? (
-                <div className="space-y-4">
-                  <h2 className="text-2xl font-semibold tracking-tight">Holders</h2>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Card
-                      href="/polymarket-holder-terminal"
-                      title="Holder Terminal"
-                      note="Who holds every Polymarket market, what they paid, and how each trader is doing."
-                    />
-                    <Card
-                      href="/guides/polymarket-top-holders"
-                      title="Polymarket Holder analysis"
-                      note="Recipe and walkthrough for top holders on a market."
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          )}
+          {tab === "present" ? (
+            <DemoPicker
+              heading="Monitor the present"
+              subtext="Live Kalshi, Polymarket, and supporting feeds. Pick a source the way you would in the terminal."
+              pills={presentPills}
+            />
+          ) : null}
+
+          {tab === "holders" ? (
+            <DemoPicker
+              heading="Holders"
+              subtext="Open the Holder Terminal or run the Polymarket holder analysis recipe."
+              pills={holderPills}
+            />
+          ) : null}
         </div>
       </div>
     </section>
