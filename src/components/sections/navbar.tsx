@@ -50,7 +50,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
   const closeDrawer = () => setIsDrawerOpen(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
+    <header className="sticky top-0 z-50 w-full bg-background">
       <div className="relative mx-auto flex h-14 w-full max-w-[min(100%,88rem)] items-center px-3 sm:px-5">
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <Link href="/" className="flex shrink-0 items-center gap-2 pr-2">
