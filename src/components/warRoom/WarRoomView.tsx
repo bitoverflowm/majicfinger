@@ -22,6 +22,7 @@ import {
   type WarRoomDetailTarget,
   type WarRoomNavigateRequest,
 } from "./WarRoomDetailCard";
+import { WarRoomLayersRail } from "./WarRoomLayersRail";
 import { relatedMarketsForHeadline } from "./relatedMarkets";
 import { useWarRoomData } from "./useWarRoomData";
 
@@ -485,6 +486,9 @@ export function WarRoomView({
     <div className="relative h-full w-full">
       {categoryBar}
       {viewStatsOverlay}
+      {!compact ? (
+        <WarRoomLayersRail lockKind={embedded ? "pro" : "coming-soon"} />
+      ) : null}
       <GlobeStage
         enhance={embedded ? "auto" : compact ? "never" : "always"}
         features={features}

@@ -215,6 +215,8 @@ function ChartCanvas({
       loading={loading}
       emptyText="Waiting for live prices"
       formatValue={formatProb}
+      /* Keep the exaggerated line inside the plot box (windows + badge + axis). */
+      padding={{ top: 36, right: 52, bottom: 18, left: 10 }}
       className={cn("h-full min-h-0 w-full", className)}
       style={{ backgroundColor: "transparent" }}
     />
@@ -375,8 +377,9 @@ export function WarRoomMarketChart({
     <div className={cn("flex min-h-0 flex-col gap-2", className)}>
       <div
         className={cn(
-          "relative min-h-0 overflow-hidden rounded-md border border-white/10 bg-black/40",
-          tall ? "h-[min(42%,18rem)] min-h-[12rem] flex-1" : "h-[7.5rem]",
+          "relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40",
+          /* Cap height — flex-1 was stretching the canvas past the detail panel. */
+          tall ? "h-[13.5rem] max-h-[13.5rem]" : "h-[7.5rem]",
           chartClassName,
         )}
       >
@@ -397,7 +400,7 @@ export function WarRoomMarketChart({
           loading={!liveData.length}
         />
       </div>
-      <div className="min-h-0">
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           Live trades
         </p>

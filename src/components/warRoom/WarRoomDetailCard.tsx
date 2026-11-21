@@ -42,6 +42,54 @@ function VenueTag({ venue }: { venue: string }) {
   );
 }
 
+function isVenueWordmark(src: string) {
+  return /\/kalshi\.png$|\/landing\/logos\/kalshi|\/polymarket\.png$/i.test(src);
+}
+
+/** Market art when we have it; otherwise a brand tile so Kalshi’s wide wordmark isn’t cropped. */
+function MarketMark({
+  src,
+  venue,
+  size = "md",
+}: {
+  src?: string | null;
+  venue?: string | null;
+  size?: "sm" | "md";
+}) {
+  const v = String(venue || "").toLowerCase();
+  const fallback = v === "kalshi" ? "/landing/logos/kalshi.png" : "/polymarket.png";
+  const resolved = String(src || "").trim() || fallback;
+  const venueMark = isVenueWordmark(resolved);
+  const kalshi = v === "kalshi" || /kalshi/i.test(resolved);
+
+  if (venueMark) {
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center justify-center overflow-hidden rounded-md",
+          size === "sm" ? "size-5 p-0.5" : "size-9 p-1.5",
+          kalshi ? "bg-[#28CC95]" : "bg-[#2E5CFF]",
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={resolved} alt="" className="size-full object-contain" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "relative shrink-0 overflow-hidden rounded-md bg-slate-900",
+        size === "sm" ? "size-5" : "size-9",
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={resolved} alt="" className="h-full w-full object-cover" />
+    </div>
+  );
+}
+
 function Metric({
   label,
   value,
@@ -202,15 +250,10 @@ function RelatedMarketsList({
                   onClick={() => onSelect?.(row)}
                   className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-white/[0.04]"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={
-                      row.avatarUrl ||
-                      row.imageUrl ||
-                      (row.venue === "kalshi" ? "/kalshi.png" : "/polymarket.png")
-                    }
-                    alt=""
-                    className="size-5 rounded object-cover"
+                  <MarketMark
+                    size="sm"
+                    venue={row.venue}
+                    src={row.avatarUrl || row.imageUrl}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
@@ -511,14 +554,7 @@ export function WarRoomDetailCard({
             <Newspaper className="size-4" />
           </div>
         ) : (
-          <div className="relative size-9 shrink-0 overflow-hidden rounded-md bg-slate-900">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={avatarUrl || imageUrl || (venue === "kalshi" ? "/kalshi.png" : "/polymarket.png")}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          </div>
+          <MarketMark venue={venue} src={avatarUrl || imageUrl} />
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
