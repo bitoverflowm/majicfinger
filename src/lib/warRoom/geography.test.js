@@ -33,6 +33,20 @@ test("locateMarket maps geopolitics titles and series", () => {
   assert.equal(locateMarket({ title: "Fed rate decision in December" }).region, "Washington, D.C.");
 });
 
+test("locateMarket maps sports homes to stadiums via shared catalog", () => {
+  const bournemouth = locateMarket({ title: "Will AFC Bournemouth win?" });
+  assert.equal(bournemouth.region, "Bournemouth · Vitality Stadium");
+  assert.equal(bournemouth.precision, "venue");
+  assert.ok(Math.abs(bournemouth.lat - 50.7352) < 0.01);
+});
+
+test("locateMarket maps crypto to NYC and entity HQs to city", () => {
+  const btc = locateMarket({ title: "Will Bitcoin hit $100k this year?", tags: ["Crypto"] });
+  assert.equal(btc.region, "New York City");
+  const nvidia = locateMarket({ title: "Will Jensen Huang stay CEO of Nvidia?" });
+  assert.match(nvidia.region, /Santa Clara/);
+});
+
 test("pointGeometry jitters stacked contracts in the same city", () => {
   const base = locateMarket({ seriesTicker: "KXHIGHNY" });
   const a = pointGeometry(base, "KXHIGHNY-A");

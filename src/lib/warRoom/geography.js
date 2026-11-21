@@ -1,3 +1,5 @@
+import { resolveMarketLocation } from "@/lib/markets/marketLocation";
+
 import { FEATURED_WEATHER_SERIES, NYC_COORDINATES } from "./constants";
 
 /** @typedef {{ lon: number; lat: number; region: string; precision: string }} GeoPoint */
@@ -177,6 +179,21 @@ export function locateMarket(input) {
     const code = series.replace(/^KX(HIGH|LOW|TEMP|SNOW|RAIN)/, "");
     if (code && SERIES_GEO[`KXHIGH${code}`]) return SERIES_GEO[`KXHIGH${code}`];
   }
+  // Sports venues, crypto→NYC, known HQ cities — shared catalog (no LLM).
+  const catalog = resolveMarketLocation({
+    title: input?.title,
+    tags: input?.tags,
+    seriesTicker: input?.seriesTicker,
+  });
+  if (catalog) {
+    return {
+      lon: catalog.lon,
+      lat: catalog.lat,
+      region: catalog.venue ? `${catalog.region} · ${catalog.venue}` : catalog.region,
+      precision: catalog.precision || "city",
+    };
+  }
+
   const hay = `${input?.title || ""} ${(input?.tags || []).join(" ")}`;
   for (const row of TITLE_GEO) {
     if (row.re.test(hay)) return row.point;

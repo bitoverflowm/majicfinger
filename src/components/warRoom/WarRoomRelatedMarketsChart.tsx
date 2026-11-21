@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Maximize2 } from "lucide-react";
 import { Liveline } from "liveline";
 
 import { fetchPriceHistory } from "@/components/terminals/holder/useMarketPriceHistory";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { parseWarRoomMarketId } from "@/lib/warRoom/ids";
 
@@ -32,10 +34,16 @@ type SeriesRow = {
 
 const SERIES_COLORS = ["#2E5CFF", "#28CC95", "#F472B6", "#FBBF24", "#A78BFA", "#38BDF8"];
 
+const FULL_HISTORY_SECS = 90 * 24 * 3600;
+const DEFAULT_WINDOW_SECS = 3600;
+const ALL_WINDOW_SECS = FULL_HISTORY_SECS;
+
 const LIVELINE_WINDOWS = [
-  { label: "1h", secs: 3600 },
+  { label: "1h", secs: DEFAULT_WINDOW_SECS },
   { label: "6h", secs: 6 * 3600 },
   { label: "1d", secs: 24 * 3600 },
+  { label: "7d", secs: 7 * 24 * 3600 },
+  { label: "All", secs: ALL_WINDOW_SECS },
 ];
 
 function asProb(raw: unknown): number | null {
@@ -60,7 +68,7 @@ function shortLabel(title: string, max = 28) {
 
 async function seedPolymarketHistory(tokenId: string, signal: AbortSignal): Promise<LivePoint[]> {
   const end = Math.floor(Date.now() / 1000);
-  const start = end - 60 * 60 * 24;
+  const start = end - FULL_HISTORY_SECS;
   const histories = await fetchPriceHistory([tokenId], start, end, signal);
   return (histories[0] || [])
     .map((point) => {
@@ -75,22 +83,60 @@ async function seedPolymarketHistory(tokenId: string, signal: AbortSignal): Prom
 }
 
 async function seedKalshiHistory(ticker: string, signal: AbortSignal): Promise<LivePoint[]> {
-  const res = await fetch(
-    `/api/integrations/kalshi-live/markets/trades?${new URLSearchParams({ ticker, limit: "50" })}`,
-    { credentials: "same-origin", signal },
-  );
+  const end = Math.floor(Date.now() / 1000);
+  const start = end - FULL_HISTORY_SECS;
+  const params = new URLSearchParams({
+    market_tickers: ticker,
+    start_ts: String(start),
+    end_ts: String(end),
+    period_interval: "60",
+    per_ticker: "1",
+  });
+  const res = await fetch(`/api/integrations/kalshi-live/markets/candlesticks?${params}`, {
+    credentials: "same-origin",
+    signal,
+  });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) return [];
-  const rows = Array.isArray(body?.trades) ? body.trades : [];
-  return rows
-    .map((row: Record<string, unknown>, index: number) => {
-      const price = asProb(row.yes_price_dollars ?? row.yes_price);
-      const at = Date.parse(String(row.created_time || "")) || Date.now() - index * 1000;
-      if (price == null) return null;
-      return { time: at / 1000, value: price };
+  if (!res.ok) {
+    // Fall back to recent trades if candles are unavailable.
+    const tradeRes = await fetch(
+      `/api/integrations/kalshi-live/markets/trades?${new URLSearchParams({ ticker, limit: "100" })}`,
+      { credentials: "same-origin", signal },
+    );
+    const tradeBody = await tradeRes.json().catch(() => ({}));
+    if (!tradeRes.ok) return [];
+    const rows = Array.isArray(tradeBody?.trades) ? tradeBody.trades : [];
+    return rows
+      .map((row: Record<string, unknown>, index: number) => {
+        const price = asProb(row.yes_price_dollars ?? row.yes_price);
+        const at = Date.parse(String(row.created_time || "")) || Date.now() - index * 1000;
+        if (price == null) return null;
+        return { time: at / 1000, value: price };
+      })
+      .filter(Boolean)
+      .sort((a: LivePoint, b: LivePoint) => a.time - b.time) as LivePoint[];
+  }
+  const markets = Array.isArray(body?.markets) ? body.markets : [];
+  const group =
+    markets.find(
+      (row: { market_ticker?: string }) =>
+        String(row?.market_ticker || "").toUpperCase() === ticker.toUpperCase(),
+    ) || markets[0];
+  const candles = Array.isArray(group?.candlesticks) ? group.candlesticks : [];
+  return candles
+    .map((candle: Record<string, unknown>) => {
+      const t = Number(candle.end_period_ts);
+      const price = candle.price && typeof candle.price === "object" ? (candle.price as Record<string, unknown>) : null;
+      const yesBid =
+        candle.yes_bid && typeof candle.yes_bid === "object"
+          ? (candle.yes_bid as Record<string, unknown>)
+          : null;
+      const value = asProb(price?.close_dollars ?? yesBid?.close_dollars ?? candle.price_close_dollars);
+      if (!Number.isFinite(t) || value == null) return null;
+      return { time: t, value };
     })
     .filter(Boolean)
-    .sort((a, b) => (a!.time as number) - (b!.time as number)) as LivePoint[];
+    .sort((a: LivePoint, b: LivePoint) => a.time - b.time) as LivePoint[];
 }
 
 /**
@@ -106,6 +152,8 @@ export function WarRoomRelatedMarketsChart({
 }) {
   const [series, setSeries] = useState<SeriesRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [windowSecs, setWindowSecs] = useState(DEFAULT_WINDOW_SECS);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const chartable = useMemo(() => {
     return markets
@@ -154,6 +202,7 @@ export function WarRoomRelatedMarketsChart({
     }
     const abort = new AbortController();
     setLoading(true);
+    setWindowSecs(DEFAULT_WINDOW_SECS);
     Promise.all(
       chartable.map(async (row) => {
         const data =
@@ -196,6 +245,7 @@ export function WarRoomRelatedMarketsChart({
   }, [chartKey]);
 
   const primary = series[0];
+
   if (!chartable.length) {
     return (
       <p className="rounded-md border border-dashed border-white/10 px-2 py-2 text-[11px] text-slate-500">
@@ -204,41 +254,58 @@ export function WarRoomRelatedMarketsChart({
     );
   }
 
+  const chartBody = (
+    <Liveline
+      data={primary?.data || []}
+      value={primary?.value ?? 0}
+      series={series.map((row) => ({
+        id: row.id,
+        data: row.data,
+        value: row.value,
+        color: row.color,
+        label: row.label,
+      }))}
+      theme="dark"
+      color={primary?.color || "#60a5fa"}
+      momentum
+      showValue
+      valueMomentumColor
+      window={windowSecs}
+      windows={LIVELINE_WINDOWS}
+      onWindowChange={setWindowSecs}
+      windowStyle="rounded"
+      exaggerate
+      scrub
+      seriesToggleCompact
+      loading={loading && !series.length}
+      emptyText="Waiting for related prices"
+      formatValue={formatProb}
+      className="h-full min-h-0 w-full"
+      style={{ backgroundColor: "transparent" }}
+    />
+  );
+
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           Related prices
         </p>
-        {loading ? <span className="text-[10px] text-slate-500">Loading…</span> : null}
+        <div className="flex items-center gap-2">
+          {loading ? <span className="text-[10px] text-slate-500">Loading…</span> : null}
+          <button
+            type="button"
+            onClick={() => setFullscreen(true)}
+            className="inline-flex size-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-slate-300 hover:bg-black/70 hover:text-white"
+            aria-label="Open related chart fullscreen"
+            title="Fullscreen"
+          >
+            <Maximize2 className="size-3.5" />
+          </button>
+        </div>
       </div>
-      <div className="h-[11.5rem] overflow-hidden rounded-md border border-white/10 bg-black/40">
-        <Liveline
-          data={primary?.data || []}
-          value={primary?.value ?? 0}
-          series={series.map((row) => ({
-            id: row.id,
-            data: row.data,
-            value: row.value,
-            color: row.color,
-            label: row.label,
-          }))}
-          theme="dark"
-          color={primary?.color || "#60a5fa"}
-          momentum
-          showValue
-          valueMomentumColor
-          windows={LIVELINE_WINDOWS}
-          windowStyle="rounded"
-          exaggerate
-          scrub
-          seriesToggleCompact
-          loading={loading && !series.length}
-          emptyText="Waiting for related prices"
-          formatValue={formatProb}
-          className="h-full min-h-0 w-full"
-          style={{ backgroundColor: "transparent" }}
-        />
+      <div className="relative h-[11.5rem] overflow-hidden rounded-md border border-white/10 bg-black/40">
+        {chartBody}
       </div>
       {series.length ? (
         <ul className="flex flex-wrap gap-x-3 gap-y-1">
@@ -251,6 +318,29 @@ export function WarRoomRelatedMarketsChart({
           ))}
         </ul>
       ) : null}
+
+      <Dialog open={fullscreen} onOpenChange={setFullscreen}>
+        <DialogContent className="flex h-[min(92svh,52rem)] w-[min(96vw,72rem)] max-w-none flex-col gap-3 overflow-hidden border-white/10 bg-[#07090f] p-3 pt-10 text-slate-100 sm:rounded-xl">
+          <div className="min-w-0 pr-8">
+            <DialogTitle className="text-[14px] font-medium text-slate-50">Related prices</DialogTitle>
+            <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-slate-500">Focus mode</p>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/40">
+            {chartBody}
+          </div>
+          {series.length ? (
+            <ul className="flex flex-wrap gap-x-3 gap-y-1">
+              {series.map((row) => (
+                <li key={row.id} className="flex min-w-0 items-center gap-1.5 text-[10px] text-slate-400">
+                  <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
+                  <span className="truncate">{row.label}</span>
+                  <span className="shrink-0 font-mono tabular-nums text-slate-200">{formatCents(row.value)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

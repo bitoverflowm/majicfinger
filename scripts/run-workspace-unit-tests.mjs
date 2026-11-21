@@ -106,6 +106,7 @@ import "@/lib/kalshiLive/fetchKalshiLiveFeaturedMarkets.test.js";
 import "@/lib/warRoom/timeline.test.js";
 import "@/lib/warRoom/serving.test.js";
 import "@/lib/warRoom/geography.test.js";
+import "@/lib/markets/marketLocation.test.js";
 import "@/lib/kalshiLive/liveMarketAttributeQuery.node.test.js";
 import "@/lib/textTermMatch.test.js";
 import "@/lib/predictionMarkets/matchKalshiToPolymarketLive.test.js";
