@@ -89,7 +89,9 @@ export function MarketsPane({
             ? "No markets in this category right now."
             : emptyReason === "no_markets_in_feed"
               ? "No markets in this feed right now."
-              : "Waiting for live markets…"}
+              : emptyReason === "no_markets_in_venue"
+                ? "No markets for this venue in the current view."
+                : "Waiting for live markets…"}
       </div>
     );
   }

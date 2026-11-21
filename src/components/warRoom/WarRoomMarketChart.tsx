@@ -22,11 +22,21 @@ type TradeRow = {
 
 /** Seed enough history that “All” can show the full line we fetched. */
 const FULL_HISTORY_SECS = 90 * 24 * 3600;
-const DEFAULT_WINDOW_SECS = 3600;
+const MOVE_WINDOW_SECS = 3600;
 const ALL_WINDOW_SECS = FULL_HISTORY_SECS;
 
+/**
+ * Fixed canvas box only — Liveline’s built-in window bar / value label are document-flow
+ * siblings of a height:100% canvas, so putting them inside this box clips the line.
+ * Window pills live outside; the canvas fills this box alone.
+ */
+const CHART_H_TALL = "h-[18rem] min-h-[18rem] max-h-[18rem]";
+const CHART_H_COMPACT = "h-[9rem] min-h-[9rem] max-h-[9rem]";
+const TRADES_H_TALL = "min-h-[9rem]";
+const TRADES_H_COMPACT = "min-h-[5.5rem]";
+
 const LIVELINE_WINDOWS = [
-  { label: "1h", secs: DEFAULT_WINDOW_SECS },
+  { label: "1h", secs: MOVE_WINDOW_SECS },
   { label: "6h", secs: 6 * 3600 },
   { label: "1d", secs: 24 * 3600 },
   { label: "7d", secs: 7 * 24 * 3600 },
@@ -126,7 +136,58 @@ async function fetchKalshiRecentTrades(ticker: string, signal: AbortSignal): Pro
         at,
       };
     })
-    .filter(Boolean) as TradeRow[];
+    .filter(Boolean)
+    .sort((a, b) => b.at - a.at) as TradeRow[];
+}
+
+async function fetchPolymarketRecentTrades(
+  conditionId: string,
+  tokenId: string,
+  signal: AbortSignal,
+): Promise<TradeRow[]> {
+  const params = new URLSearchParams({
+    query: "getTradesByMarket",
+    market: conditionId,
+    limit: "100",
+    takerOnly: "false",
+    skipFlatten: "true",
+  });
+  const res = await fetch(`/api/integrations/polymarket?${params}`, {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) return [];
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.trades)
+      ? payload.trades
+      : [];
+  return rows
+    .map((row: Record<string, unknown>, index: number) => {
+      if (!row || typeof row !== "object") return null;
+      const asset = String(row.asset || row.asset_id || "").trim();
+      if (asset && tokenId && asset !== tokenId) return null;
+      const price = asProb(row.price);
+      if (price == null) return null;
+      const rawTs = Number(row.timestamp ?? row.createdAt ?? row.match_time);
+      const at = Number.isFinite(rawTs)
+        ? rawTs < 1e12
+          ? rawTs * 1000
+          : rawTs
+        : Date.now() - index * 1000;
+      const id = String(row.transactionHash || row.id || `${conditionId}-${at}-${price}`);
+      return {
+        id,
+        price,
+        size: Number(row.size) || null,
+        side: String(row.side || row.type || "") || null,
+        at,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.at - a.at) as TradeRow[];
 }
 
 function mergeSeedWithTrades(seed: LivePoint[], trades: TradeRow[]): LivePoint[] {
@@ -141,9 +202,26 @@ function mergeSeedWithTrades(seed: LivePoint[], trades: TradeRow[]): LivePoint[]
     .sort((a, b) => a.time - b.time);
 }
 
-function TradesFeed({ trades, tall }: { trades: TradeRow[]; tall?: boolean }) {
+function prependLiveTrade(prev: TradeRow[], next: TradeRow): TradeRow[] {
+  if (prev.some((row) => row.id === next.id)) return prev;
+  return [next, ...prev].slice(0, 80);
+}
+
+function TradesFeed({
+  trades,
+  tall,
+  loading,
+}: {
+  trades: TradeRow[];
+  tall?: boolean;
+  loading?: boolean;
+}) {
   if (!trades.length) {
-    return <p className="py-2 text-[11px] text-slate-500">Waiting for live trades…</p>;
+    return (
+      <p className="py-2 text-[11px] text-slate-500">
+        {loading ? "Loading trade history…" : "No trades yet — waiting for the next print…"}
+      </p>
+    );
   }
   return (
     <ul className={cn("overflow-y-auto", tall ? "max-h-[14rem]" : "max-h-[7rem]")}>
@@ -179,18 +257,56 @@ function TradesFeed({ trades, tall }: { trades: TradeRow[]; tall?: boolean }) {
   );
 }
 
+function WindowPills({
+  value,
+  onChange,
+  className,
+}: {
+  value: number;
+  onChange: (secs: number) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Chart range"
+      className={cn(
+        "inline-flex rounded-full bg-white/[0.03] p-0.5 text-[11px]",
+        className,
+      )}
+    >
+      {LIVELINE_WINDOWS.map((option) => {
+        const active = option.secs === value;
+        return (
+          <button
+            key={option.label}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(option.secs)}
+            className={cn(
+              "rounded-full px-2.5 py-1 font-medium transition-colors",
+              active ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300",
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ChartCanvas({
   data,
   value,
   windowSecs,
-  onWindowChange,
   loading,
   className,
 }: {
   data: LivePoint[];
   value: number;
   windowSecs: number;
-  onWindowChange: (secs: number) => void;
   loading?: boolean;
   className?: string;
 }) {
@@ -201,22 +317,18 @@ function ChartCanvas({
       theme="dark"
       color="#60a5fa"
       momentum
-      showValue
-      valueMomentumColor
+      /* Controlled window only — no `windows` / `showValue` (those sit above height:100% canvas and clip). */
       window={windowSecs}
-      windows={LIVELINE_WINDOWS}
-      onWindowChange={onWindowChange}
-      windowStyle="rounded"
       scrub
       badge
       badgeVariant="default"
       loading={loading}
-      emptyText="Waiting for live prices"
+      emptyText="Loading price history…"
       formatValue={formatProb}
-      /* No exaggerate — it shrinks Y margin to ~1% so momentum overshoots the box. */
-      padding={{ top: 40, right: 56, bottom: 28, left: 12 }}
+      /* No exaggerate — tight Y margin lets momentum overshoot the plot. */
+      padding={{ top: 20, right: 48, bottom: 28, left: 10 }}
       className={cn("h-full min-h-0 w-full", className)}
-      style={{ backgroundColor: "transparent" }}
+      style={{ backgroundColor: "transparent", height: "100%", width: "100%" }}
     />
   );
 }
@@ -225,6 +337,7 @@ export function WarRoomMarketChart({
   venue,
   tokenIds,
   ticker,
+  conditionId,
   title,
   className,
   chartClassName,
@@ -235,6 +348,8 @@ export function WarRoomMarketChart({
   venue?: string | null;
   tokenIds?: string[] | null;
   ticker?: string | null;
+  /** Polymarket condition id — used to seed trade history before the socket. */
+  conditionId?: string | null;
   title?: string | null;
   className?: string;
   chartClassName?: string;
@@ -247,8 +362,10 @@ export function WarRoomMarketChart({
   const [points, setPoints] = useState<LivePoint[]>([]);
   const [trades, setTrades] = useState<TradeRow[]>([]);
   const [livePrice, setLivePrice] = useState<number | null>(null);
-  const [windowSecs, setWindowSecs] = useState(DEFAULT_WINDOW_SECS);
+  const [windowSecs, setWindowSecs] = useState(ALL_WINDOW_SECS);
   const [fullscreen, setFullscreen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [tradesLoading, setTradesLoading] = useState(false);
   const pointsRef = useRef<LivePoint[]>([]);
   const seedRef = useRef<LivePoint[]>([]);
   const onLivePriceRef = useRef(onLivePrice);
@@ -271,7 +388,7 @@ export function WarRoomMarketChart({
       return;
     }
     const last = seed[seed.length - 1].value;
-    const cutoff = seed[seed.length - 1].time - DEFAULT_WINDOW_SECS;
+    const cutoff = seed[seed.length - 1].time - MOVE_WINDOW_SECS;
     const first = seed.find((point) => point.time >= cutoff)?.value ?? seed[0].value;
     setLivePrice(last);
     onMoveRef.current?.(Number((last - first).toFixed(4)));
@@ -279,159 +396,220 @@ export function WarRoomMarketChart({
 
   useEffect(() => {
     const abort = new AbortController();
+    let closeSocket: (() => void) | null = null;
+    let pollTimer: number | null = null;
+
     setPoints([]);
     setTrades([]);
     setLivePrice(null);
-    setWindowSecs(DEFAULT_WINDOW_SECS);
+    setWindowSecs(ALL_WINDOW_SECS);
+    setHistoryLoading(true);
+    setTradesLoading(false);
     seedRef.current = [];
     onLivePriceRef.current?.(null);
     onMoveRef.current?.(null);
 
-    if (venue === "polymarket" && tokenId) {
-      seedPolymarketHistory(tokenId, abort.signal)
-        .then((seed) => {
-          if (abort.signal.aborted) return;
-          seedRef.current = seed;
-          setPoints(seed);
-          reportMove(seed);
-        })
-        .catch(() => {});
+    const paintHistory = (seed: LivePoint[]) => {
+      seedRef.current = seed;
+      pointsRef.current = seed;
+      setPoints(seed);
+      if (seed.length) reportMove(seed);
+      setHistoryLoading(false);
+    };
 
-      const close = openPolymarketMarketFeed({
-        assetIds: [tokenId],
-        onTrade: (trade: { asset_id?: string; price?: number; size?: number; side?: string }) => {
-          const price = asProb(trade.price);
-          if (price == null) return;
-          const now = Date.now() / 1000;
-          const nextPoints = [...pointsRef.current, { time: now, value: price }].slice(-4000);
-          pointsRef.current = nextPoints;
-          setPoints(nextPoints);
-          setLivePrice(price);
-          setTrades((prev) =>
-            [
-              {
-                id: `${trade.asset_id || tokenId}-${now}-${price}`,
-                price,
-                size: Number(trade.size) || null,
-                side: trade.side || null,
-                at: Date.now(),
-              },
-              ...prev,
-            ].slice(0, 40),
-          );
-        },
-        onQuote: (quote: { mid?: number; price?: number }) => {
-          const price = asProb(quote.mid ?? quote.price);
-          if (price == null) return;
-          setLivePrice(price);
-        },
-      });
+    if (venue === "polymarket" && tokenId) {
+      (async () => {
+        try {
+          // 1) Price history first — paint the chart before opening the socket.
+          const seed = await seedPolymarketHistory(tokenId, abort.signal);
+          if (abort.signal.aborted) return;
+          paintHistory(seed);
+
+          // 2) Trade history tape, then live prints on top.
+          setTradesLoading(true);
+          if (conditionId) {
+            try {
+              const historyTrades = await fetchPolymarketRecentTrades(conditionId, tokenId, abort.signal);
+              if (abort.signal.aborted) return;
+              setTrades(historyTrades);
+              if (historyTrades.length) {
+                const merged = mergeSeedWithTrades(seedRef.current, historyTrades);
+                pointsRef.current = merged;
+                setPoints(merged);
+                reportMove(merged);
+              }
+            } catch {
+              /* live socket still attaches below */
+            }
+          }
+          if (abort.signal.aborted) return;
+          setTradesLoading(false);
+
+          // 3) Live websocket only after history is on screen.
+          closeSocket = openPolymarketMarketFeed({
+            assetIds: [tokenId],
+            onTrade: (trade: { asset_id?: string; price?: number; size?: number; side?: string; timestamp?: number }) => {
+              const price = asProb(trade.price);
+              if (price == null) return;
+              const at = Number(trade.timestamp) || Date.now();
+              const now = at > 1e12 ? at / 1000 : at;
+              // Keep the seeded history for “All”; only trim runaway live tails.
+              const nextPoints = [...pointsRef.current, { time: now, value: price }];
+              const capped =
+                nextPoints.length > 12_000 ? nextPoints.slice(nextPoints.length - 12_000) : nextPoints;
+              pointsRef.current = capped;
+              setPoints(capped);
+              setLivePrice(price);
+              setTrades((prev) =>
+                prependLiveTrade(prev, {
+                  id: `${trade.asset_id || tokenId}-${at}-${price}`,
+                  price,
+                  size: Number(trade.size) || null,
+                  side: trade.side || null,
+                  at: at > 1e12 ? at : at * 1000,
+                }),
+              );
+            },
+            onQuote: (quote: { mid?: number; price?: number }) => {
+              const price = asProb(quote.mid ?? quote.price);
+              if (price == null) return;
+              setLivePrice(price);
+            },
+          });
+        } catch {
+          if (!abort.signal.aborted) {
+            setHistoryLoading(false);
+            setTradesLoading(false);
+          }
+        }
+      })();
 
       return () => {
         abort.abort();
-        close();
+        closeSocket?.();
       };
     }
 
     if (venue === "kalshi" && ticker) {
-      seedKalshiCandles(ticker, abort.signal)
-        .then((seed) => {
+      (async () => {
+        try {
+          // 1) Candles first.
+          const seed = await seedKalshiCandles(ticker, abort.signal);
           if (abort.signal.aborted) return;
-          seedRef.current = seed;
-          if (seed.length) {
-            setPoints(seed);
-            reportMove(seed);
-          }
-        })
-        .catch(() => {});
+          paintHistory(seed);
 
-      const pull = () =>
-        fetchKalshiRecentTrades(ticker, abort.signal)
-          .then((rows) => {
+          // 2) Trade history, then poll for new prints.
+          setTradesLoading(true);
+          const pullTrades = async (merge: boolean) => {
+            const rows = await fetchKalshiRecentTrades(ticker, abort.signal);
             if (abort.signal.aborted || !rows.length) return;
             setTrades(rows);
-            const merged = mergeSeedWithTrades(seedRef.current, rows);
-            pointsRef.current = merged;
-            setPoints(merged);
-            reportMove(merged);
-          })
-          .catch(() => {});
-      pull();
-      const timer = window.setInterval(pull, 4000);
+            if (merge) {
+              const merged = mergeSeedWithTrades(seedRef.current, rows);
+              pointsRef.current = merged;
+              setPoints(merged);
+              reportMove(merged);
+            }
+          };
+          try {
+            await pullTrades(true);
+          } catch {
+            /* keep candle chart */
+          }
+          if (abort.signal.aborted) return;
+          setTradesLoading(false);
+
+          pollTimer = window.setInterval(() => {
+            pullTrades(false).catch(() => {});
+          }, 4000);
+        } catch {
+          if (!abort.signal.aborted) {
+            setHistoryLoading(false);
+            setTradesLoading(false);
+          }
+        }
+      })();
+
       return () => {
         abort.abort();
-        window.clearInterval(timer);
+        if (pollTimer != null) window.clearInterval(pollTimer);
       };
     }
 
+    setHistoryLoading(false);
     return () => abort.abort();
-  }, [venue, tokenId, ticker, reportMove]);
+  }, [venue, tokenId, ticker, conditionId, reportMove]);
 
   const liveData = useMemo(() => points, [points]);
   const value = livePrice ?? liveData[liveData.length - 1]?.value ?? 0;
   const chartTitle = String(title || ticker || "Market").trim() || "Market";
+  const chartBoxClass = tall ? CHART_H_TALL : CHART_H_COMPACT;
+  const tradesBoxClass = tall ? TRADES_H_TALL : TRADES_H_COMPACT;
 
   return (
     <div className={cn("flex min-h-0 flex-col gap-2", className)}>
-      <div
-        className={cn(
-          "relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40",
-          /* Cap height — flex-1 was stretching the canvas past the detail panel. */
-          tall ? "h-[13.5rem] max-h-[13.5rem]" : "h-[7.5rem]",
-          chartClassName,
-        )}
-      >
+      <div className="flex shrink-0 items-center gap-2">
+        <WindowPills value={windowSecs} onChange={setWindowSecs} />
         <button
           type="button"
           onClick={() => setFullscreen(true)}
-          className="absolute right-1.5 top-1.5 z-10 inline-flex size-7 items-center justify-center rounded-md border border-white/10 bg-black/55 text-slate-300 backdrop-blur hover:bg-black/75 hover:text-white"
+          className="ml-auto inline-flex size-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-slate-300 hover:bg-black/60 hover:text-white"
           aria-label="Open chart fullscreen"
           title="Fullscreen"
         >
           <Maximize2 className="size-3.5" />
         </button>
+      </div>
+      <div
+        className={cn(
+          "relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40",
+          chartBoxClass,
+          chartClassName,
+        )}
+      >
         <ChartCanvas
           data={liveData}
           value={value}
           windowSecs={windowSecs}
-          onWindowChange={setWindowSecs}
-          loading={!liveData.length}
+          loading={historyLoading && !liveData.length}
         />
       </div>
-      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div className={cn("min-h-0 min-w-0 flex-1 overflow-hidden", tradesBoxClass)}>
         <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-          Live trades
+          Trades
         </p>
-        <TradesFeed trades={trades} tall={tall} />
+        <TradesFeed trades={trades} tall={tall} loading={tradesLoading || historyLoading} />
       </div>
 
       <Dialog open={fullscreen} onOpenChange={setFullscreen}>
         <DialogContent className="flex h-[min(92svh,52rem)] w-[min(96vw,72rem)] max-w-none flex-col gap-3 overflow-hidden border-white/10 bg-[#07090f] p-3 pt-10 text-slate-100 sm:rounded-xl">
-          <div className="min-w-0 pr-8">
-            <DialogTitle className="truncate text-[14px] font-medium text-slate-50">
-              {chartTitle}
-            </DialogTitle>
-            <p className="mt-0.5 font-mono text-[12px] tabular-nums text-slate-400">
-              {formatProb(value)}
-              <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-slate-500">
-                Focus mode
-              </span>
-            </p>
+          <div className="flex min-w-0 items-start justify-between gap-3 pr-8">
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-[14px] font-medium text-slate-50">
+                {chartTitle}
+              </DialogTitle>
+              <p className="mt-0.5 font-mono text-[12px] tabular-nums text-slate-400">
+                {formatProb(value)}
+                <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                  Focus mode
+                </span>
+              </p>
+            </div>
+            <WindowPills value={windowSecs} onChange={setWindowSecs} />
           </div>
           <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/40">
             <ChartCanvas
               data={liveData}
               value={value}
               windowSecs={windowSecs}
-              onWindowChange={setWindowSecs}
-              loading={!liveData.length}
+              loading={historyLoading && !liveData.length}
             />
           </div>
           <div className="max-h-[10rem] shrink-0 overflow-hidden">
             <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Live trades
+              Trades
             </p>
-            <TradesFeed trades={trades} tall />
+            <TradesFeed trades={trades} tall loading={tradesLoading || historyLoading} />
           </div>
         </DialogContent>
       </Dialog>

@@ -36,6 +36,19 @@ function formatCount(n: number) {
   return String(Math.round(n));
 }
 
+type VenueFilter = "both" | "kalshi" | "polymarket";
+
+const VENUE_FILTERS: Array<{ id: VenueFilter; label: string }> = [
+  { id: "both", label: "Both" },
+  { id: "kalshi", label: "Kalshi" },
+  { id: "polymarket", label: "Polymarket" },
+];
+
+function venueMatches(filter: VenueFilter, venue: string | null | undefined) {
+  if (filter === "both") return true;
+  return String(venue || "").toLowerCase() === filter;
+}
+
 type FocusTarget = {
   center: [number, number];
   zoom?: number;
@@ -85,6 +98,7 @@ export function WarRoomView({
   const [feedRevealed, setFeedRevealed] = useState(false);
   const [categoryId, setCategoryId] = useState("");
   const [exploreFeedId, setExploreFeedId] = useState("tradable");
+  const [venueFilter, setVenueFilter] = useState<VenueFilter>("both");
   const [mapResetNonce, setMapResetNonce] = useState(0);
   const [sessionTrades, setSessionTrades] = useState(0);
   const [sessionTraders, setSessionTraders] = useState(0);
@@ -175,12 +189,12 @@ export function WarRoomView({
     () => ({ type: "FeatureCollection" as const, features: [] as never[] }),
     [],
   );
-  const features = useMemo(() => {
+  const allFeatures = useMemo(() => {
     const raw = snapshot?.features as { type?: string; features?: unknown } | null | undefined;
     if (raw?.type === "FeatureCollection" && Array.isArray(raw.features)) {
-      return raw as { type: "FeatureCollection"; features: never[] };
+      return raw as { type: "FeatureCollection"; features: Array<Record<string, unknown>> };
     }
-    return emptyCollection;
+    return emptyCollection as { type: "FeatureCollection"; features: Array<Record<string, unknown>> };
   }, [snapshot?.features, emptyCollection]);
   const pings = useMemo(() => {
     const raw = snapshot?.pings as { type?: string; features?: unknown } | null | undefined;
@@ -189,9 +203,49 @@ export function WarRoomView({
     }
     return emptyCollection;
   }, [snapshot?.pings, emptyCollection]);
-  const markets = (Array.isArray(snapshot?.feed) ? snapshot.feed : []) as MarketRow[];
-  const activity = (Array.isArray(snapshot?.activity) ? snapshot.activity : []) as ActivityRow[];
-  const selectedId = snapshot?.selectedMarketId || market || null;
+  const allMarkets = (Array.isArray(snapshot?.feed) ? snapshot.feed : []) as MarketRow[];
+  /** All globe points — feed is a rail-sized slice; clicks must resolve against this. */
+  const allMapMarkets = (
+    Array.isArray(snapshot?.mapMarkets) && snapshot.mapMarkets.length
+      ? snapshot.mapMarkets
+      : allMarkets
+  ) as MarketRow[];
+  const allActivity = (Array.isArray(snapshot?.activity) ? snapshot.activity : []) as ActivityRow[];
+
+  const features = useMemo(() => {
+    if (venueFilter === "both") return allFeatures;
+    return {
+      type: "FeatureCollection" as const,
+      features: allFeatures.features.filter((f) =>
+        venueMatches(venueFilter, String((f as { properties?: { venue?: string } }).properties?.venue || "")),
+      ),
+    };
+  }, [allFeatures, venueFilter]);
+
+  const markets = useMemo(
+    () => (venueFilter === "both" ? allMarkets : allMarkets.filter((row) => venueMatches(venueFilter, row.venue))),
+    [allMarkets, venueFilter],
+  );
+  const mapMarkets = useMemo(
+    () =>
+      venueFilter === "both" ? allMapMarkets : allMapMarkets.filter((row) => venueMatches(venueFilter, row.venue)),
+    [allMapMarkets, venueFilter],
+  );
+  const activity = useMemo(
+    () =>
+      venueFilter === "both"
+        ? allActivity
+        : allActivity.filter((row) => row.kind === "headline" || venueMatches(venueFilter, row.venue)),
+    [allActivity, venueFilter],
+  );
+
+  const selectedId = useMemo(() => {
+    const id = market || snapshot?.selectedMarketId || null;
+    if (!id || venueFilter === "both") return id;
+    const row = allMapMarkets.find((item) => item.id === id);
+    if (row && !venueMatches(venueFilter, row.venue)) return null;
+    return id;
+  }, [market, snapshot?.selectedMarketId, venueFilter, allMapMarkets]);
 
   // Count fills (and unique traders) that arrive after the first snapshot while viewing.
   useEffect(() => {
@@ -247,9 +301,17 @@ export function WarRoomView({
 
   const marketById = useMemo(() => {
     const map = new Map<string, MarketRow>();
-    for (const row of markets) map.set(row.id, row);
+    // Keep full index so a selected market stays resolvable while the venue filter changes.
+    for (const row of allMapMarkets) map.set(row.id, row);
     return map;
-  }, [markets]);
+  }, [allMapMarkets]);
+
+  // Drop selection when it falls outside the active venue filter.
+  useEffect(() => {
+    if (venueFilter === "both" || !selectedId) return;
+    const row = marketById.get(selectedId);
+    if (row && !venueMatches(venueFilter, row.venue)) clearSelectionChrome();
+  }, [venueFilter, selectedId, marketById, clearSelectionChrome]);
 
   // Keep open market detail in sync with polled feed quotes.
   const liveDetail = useMemo(() => {
@@ -462,23 +524,55 @@ export function WarRoomView({
           ),
         )}
       </div>
-      <div
-        role="tablist"
-        aria-label="Categories"
-        className="flex max-w-full items-center gap-1 overflow-x-auto border-t border-white/10 pt-1"
-      >
-        {CATEGORIES.map((category) => (
-          <button
-            key={category.id}
-            type="button"
-            role="tab"
-            aria-selected={categoryId === category.id}
-            onClick={() => pickCategory(categoryId === category.id ? "" : category.id)}
-            className={chipClass(categoryId === category.id)}
-          >
-            {category.label}
-          </button>
-        ))}
+      <div className="flex max-w-full items-center gap-2 overflow-x-auto border-t border-white/10 pt-1">
+        <div
+          role="tablist"
+          aria-label="Categories"
+          className="flex min-w-0 flex-1 items-center gap-1"
+        >
+          {CATEGORIES.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              role="tab"
+              aria-selected={categoryId === category.id}
+              onClick={() => pickCategory(categoryId === category.id ? "" : category.id)}
+              className={chipClass(categoryId === category.id)}
+            >
+              {category.label}
+            </button>
+          ))}
+        </div>
+        <div
+          role="radiogroup"
+          aria-label="Venues"
+          className="flex shrink-0 items-center rounded-full border border-white/10 bg-black/50 p-0.5"
+        >
+          {VENUE_FILTERS.map((option) => {
+            const selected = venueFilter === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setVenueFilter(option.id)}
+                className={cn(
+                  "rounded-full px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] transition-colors",
+                  selected
+                    ? option.id === "kalshi"
+                      ? "bg-[#28CC95] text-slate-950"
+                      : option.id === "polymarket"
+                        ? "bg-[#2E5CFF] text-white"
+                        : "bg-white text-slate-950"
+                    : "text-slate-400 hover:text-white",
+                )}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -565,7 +659,11 @@ export function WarRoomView({
               rows={markets}
               selectedId={selectedId}
               onSelect={openMarketDetail}
-              emptyReason={snapshot?.emptyReason}
+              emptyReason={
+                !markets.length && allMarkets.length
+                  ? "no_markets_in_venue"
+                  : snapshot?.emptyReason
+              }
             />
           )}
         </div>

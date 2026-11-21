@@ -18,6 +18,24 @@ test("resolveSportsVenue finds Premier League home stadiums", () => {
   assert.equal(row.method, "sports_home");
 });
 
+test("resolveMarketLocation places NCAAF / NHL spreads at home venues", () => {
+  const tech = resolveMarketLocation({ title: "Spread: Texas Tech (-5.5)" });
+  assert.equal(tech.region, "Lubbock");
+  assert.equal(tech.venue, "Jones AT&T Stadium");
+  assert.ok(tech.lon < -100 && tech.lat > 33 && tech.lat < 34);
+
+  const islanders = resolveMarketLocation({ title: "Spread: Islanders (-1.5)" });
+  assert.equal(islanders.region, "Elmont");
+  assert.equal(islanders.venue, "UBS Arena");
+
+  const utah = resolveMarketLocation({ title: "Spread: Utah (-7.5)" });
+  assert.equal(utah.region, "Salt Lake City");
+  assert.equal(utah.venue, "Rice-Eccles Stadium");
+
+  const celta = resolveMarketLocation({ title: "Spread: RC Celta de Vigo (-1.5)" });
+  assert.equal(celta.region, "Vigo");
+});
+
 test("resolveMarketLocation places crypto in New York", () => {
   const row = resolveMarketLocation({ title: "Will ETH flip BTC?" });
   assert.equal(row.region, "New York City");

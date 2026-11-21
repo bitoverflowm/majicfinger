@@ -657,6 +657,7 @@ export function WarRoomDetailCard({
               venue={market.venue}
               tokenIds={tokenIds}
               ticker={parsed?.venue === "kalshi" ? parsed.venueMarketId : market.venueMarketId}
+              conditionId={parsed?.venue === "polymarket" ? parsed.venueMarketId : null}
               title={market.title}
               onLivePrice={setLivePrice}
               onMove={setHistoryMove}

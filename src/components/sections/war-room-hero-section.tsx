@@ -8,7 +8,7 @@ export function WarRoomHeroSection({ fixture = false }: { fixture?: boolean }) {
   return (
     <section id="hero" className="relative w-full overflow-visible">
       <LandingDemoScrollManager />
-      <div className="mx-auto flex w-full max-w-[min(100%,48rem)] flex-col items-center px-6 pb-10 pt-16 text-center sm:px-8 sm:pt-20">
+      <div className="mx-auto flex w-full max-w-[min(100%,48rem)] flex-col items-center px-8 py-[150px] text-center">
         <h1 className="text-balance text-4xl font-semibold tracking-tight text-foreground sm:text-5xl md:text-6xl">
           The Ultimate Intelligence Terminal for Predicting the Future
         </h1>

@@ -30,9 +30,61 @@ export const CATEGORIES = [
   { id: "weather", label: "Weather", tags: ["weather"] },
 ];
 
+/**
+ * War Room chip → Kalshi GET /series `category` values (see kalshiLiveCategories).
+ * Polymarket uses Gamma tag slugs; Kalshi uses these series categories.
+ */
+export const WAR_ROOM_TO_KALSHI_SERIES_CATEGORIES = {
+  politics: ["Elections"],
+  elections: ["Elections"],
+  sports: ["Sports"],
+  crypto: ["Crypto"],
+  economics: ["Economics"],
+  finance: ["Financials"],
+  tech: ["Companies & Tech"],
+  culture: ["Culture & Entertainment"],
+  weather: ["Climate & Weather"],
+  geopolitics: ["Elections", "Mentions"],
+};
+
+/** Kalshi series.category (lowercased) → War Room category ids. */
+const KALSHI_SERIES_TO_WAR_ROOM = new Map([
+  ["elections", ["politics", "elections", "geopolitics"]],
+  ["sports", ["sports"]],
+  ["crypto", ["crypto"]],
+  ["economics", ["economics"]],
+  ["financials", ["finance"]],
+  ["companies & tech", ["tech"]],
+  ["climate & weather", ["weather"]],
+  ["culture & entertainment", ["culture"]],
+  ["mentions", ["geopolitics", "politics"]],
+]);
+
 const CATEGORY_TAGS = new Map(CATEGORIES.map((category) => [category.id, new Set(category.tags)]));
 const CATEGORY_IDS = new Set(CATEGORIES.map((category) => category.id));
 const EXPLORE_FEED_IDS = new Set(EXPLORE_FEEDS.map((feed) => feed.id));
+
+/**
+ * @param {string} [kalshiCategory]
+ * @returns {string[]}
+ */
+export function warRoomCategoriesForKalshiSeries(kalshiCategory) {
+  const key = String(kalshiCategory || "")
+    .trim()
+    .toLowerCase();
+  if (!key) return [];
+  return KALSHI_SERIES_TO_WAR_ROOM.get(key) || [];
+}
+
+/**
+ * @param {string} [warRoomCategoryId]
+ * @returns {string[]}
+ */
+export function kalshiSeriesCategoriesForWarRoom(warRoomCategoryId) {
+  const id = normalizeCategory(warRoomCategoryId);
+  if (!id) return [];
+  return WAR_ROOM_TO_KALSHI_SERIES_CATEGORIES[id] || [];
+}
 
 /**
  * Normalize an Explore feed id. Empty / all → `tradable`.
@@ -117,9 +169,10 @@ export function inferCategory(market) {
   for (const category of CATEGORIES) {
     if (inCategory({ tags }, category.id)) return category.id;
   }
-  if (market?.category && CATEGORY_IDS.has(String(market.category))) {
-    return String(market.category);
-  }
+  const rawCategory = String(market?.category || "").trim();
+  if (rawCategory && CATEGORY_IDS.has(rawCategory)) return rawCategory;
+  const fromKalshi = warRoomCategoriesForKalshiSeries(rawCategory);
+  if (fromKalshi[0]) return fromKalshi[0];
   const hay = `${market?.title || ""} ${market?.seriesTicker || ""} ${market?.region || ""}`.toLowerCase();
   for (const category of CATEGORIES) {
     if (category.tags.some((tag) => hay.includes(tag))) return category.id;
@@ -137,6 +190,7 @@ export function matchesCategory(market, categoryId) {
   const tags = normalizeTags(market?.tags);
   if (inCategory({ tags }, categoryId)) return true;
   if (String(market?.category || "") === categoryId) return true;
+  if (warRoomCategoriesForKalshiSeries(market?.category).includes(categoryId)) return true;
   const category = CATEGORIES.find((row) => row.id === categoryId);
   if (!category) return false;
   const hay = `${market?.title || ""} ${market?.region || ""} ${market?.seriesTicker || ""} ${tags.join(" ")}`.toLowerCase();

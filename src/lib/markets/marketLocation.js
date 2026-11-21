@@ -25,6 +25,12 @@ const DC = loc("Washington, D.C.", -77.0365, 38.8977, "city", undefined, "us_pol
 /**
  * Home venues for major sports franchises. Matched as whole phrases in the
  * market title (longest key wins). Coordinates are stadium / arena locations.
+ *
+ * Polymarket / Kalshi do not expose event lat/lon (or reliable home/away venue
+ * fields) on featured market payloads — spreads are titled like
+ * “Spread: Texas Tech (-5.5)”. Until a live sports schedule API is wired, this
+ * catalog is the source of truth for map placement (home stadium = default).
+ *
  * @type {Array<{ keys: string[]; region: string; lon: number; lat: number; venue: string }>}
  */
 const SPORTS_HOMES = [
@@ -49,15 +55,21 @@ const SPORTS_HOMES = [
   { keys: ["tottenham", "spurs"], region: "London", lon: -0.0662, lat: 51.6042, venue: "Tottenham Hotspur Stadium" },
   { keys: ["west ham"], region: "London", lon: -0.0165, lat: 51.5387, venue: "London Stadium" },
   { keys: ["wolverhampton", "wolves"], region: "Wolverhampton", lon: -2.1303, lat: 52.5902, venue: "Molineux" },
-  // Top EU clubs
+  // Top EU clubs + La Liga / Serie A regulars on prediction markets
   { keys: ["real madrid"], region: "Madrid", lon: -3.6883, lat: 40.453, venue: "Santiago Bernabéu" },
   { keys: ["barcelona", "fc barcelona", "barça"], region: "Barcelona", lon: 2.1228, lat: 41.3809, venue: "Spotify Camp Nou" },
   { keys: ["atletico madrid", "atlético madrid"], region: "Madrid", lon: -3.5997, lat: 40.4362, venue: "Cívitas Metropolitano" },
+  { keys: ["rc celta de vigo", "celta de vigo", "celta vigo", "celta"], region: "Vigo", lon: -8.7397, lat: 42.2118, venue: "Balaídos" },
+  { keys: ["athletic bilbao", "athletic club"], region: "Bilbao", lon: -2.9494, lat: 43.2642, venue: "San Mamés" },
+  { keys: ["real sociedad"], region: "San Sebastián", lon: -1.9736, lat: 43.3014, venue: "Reale Arena" },
+  { keys: ["sevilla"], region: "Seville", lon: -5.9817, lat: 37.3841, venue: "Ramón Sánchez-Pizjuán" },
+  { keys: ["villarreal"], region: "Villarreal", lon: -0.1036, lat: 39.9441, venue: "Estadio de la Cerámica" },
   { keys: ["bayern munich", "bayern münchen", "bayern"], region: "Munich", lon: 11.6247, lat: 48.2188, venue: "Allianz Arena" },
   { keys: ["borussia dortmund", "dortmund"], region: "Dortmund", lon: 7.4518, lat: 51.4926, venue: "Signal Iduna Park" },
   { keys: ["psg", "paris saint-germain", "paris saint germain"], region: "Paris", lon: 2.253, lat: 48.8414, venue: "Parc des Princes" },
   { keys: ["juventus"], region: "Turin", lon: 7.565, lat: 45.1096, venue: "Allianz Stadium" },
   { keys: ["ac milan", "inter milan", "inter"], region: "Milan", lon: 9.124, lat: 45.4781, venue: "San Siro" },
+  { keys: ["napoli", "ssc napoli"], region: "Naples", lon: 14.1931, lat: 40.8515, venue: "Diego Armando Maradona" },
   { keys: ["ajax"], region: "Amsterdam", lon: 4.9419, lat: 52.3142, venue: "Johan Cruijff Arena" },
   { keys: ["benfica"], region: "Lisbon", lon: -9.1847, lat: 38.7527, venue: "Estádio da Luz" },
   { keys: ["porto", "fc porto"], region: "Porto", lon: -8.5836, lat: 41.1618, venue: "Estádio do Dragão" },
@@ -134,13 +146,74 @@ const SPORTS_HOMES = [
   { keys: ["houston astros", "astros"], region: "Houston", lon: -95.3555, lat: 29.7573, venue: "Daikin Park" },
   { keys: ["atlanta braves", "braves"], region: "Cumberland", lon: -84.4677, lat: 33.8907, venue: "Truist Park" },
   { keys: ["new york mets", "mets"], region: "Queens", lon: -73.8458, lat: 40.7571, venue: "Citi Field" },
-  // NHL
-  { keys: ["toronto maple leafs", "maple leafs"], region: "Toronto", lon: -79.3791, lat: 43.6435, venue: "Scotiabank Arena" },
-  { keys: ["montreal canadiens", "canadiens"], region: "Montreal", lon: -73.569, lat: 45.4961, venue: "Bell Centre" },
+  // NHL (full)
+  { keys: ["anaheim ducks", "ducks"], region: "Anaheim", lon: -117.8765, lat: 33.8078, venue: "Honda Center" },
+  { keys: ["arizona coyotes", "utah hockey club", "coyotes"], region: "Salt Lake City", lon: -111.9011, lat: 40.7683, venue: "Delta Center" },
   { keys: ["boston bruins", "bruins"], region: "Boston", lon: -71.0621, lat: 42.3662, venue: "TD Garden" },
-  { keys: ["new york rangers", "rangers"], region: "New York City", lon: -73.9934, lat: 40.7505, venue: "Madison Square Garden" },
+  { keys: ["buffalo sabres", "sabres"], region: "Buffalo", lon: -78.8767, lat: 42.875, venue: "KeyBank Center" },
+  { keys: ["calgary flames", "flames"], region: "Calgary", lon: -114.0526, lat: 51.0374, venue: "Scotiabank Saddledome" },
+  { keys: ["carolina hurricanes", "hurricanes"], region: "Raleigh", lon: -78.7219, lat: 35.8033, venue: "Lenovo Center" },
+  { keys: ["chicago blackhawks", "blackhawks"], region: "Chicago", lon: -87.6742, lat: 41.8807, venue: "United Center" },
+  { keys: ["colorado avalanche", "avalanche"], region: "Denver", lon: -104.992, lat: 39.7487, venue: "Ball Arena" },
+  { keys: ["columbus blue jackets", "blue jackets"], region: "Columbus", lon: -83.0552, lat: 39.9692, venue: "Nationwide Arena" },
+  { keys: ["dallas stars"], region: "Dallas", lon: -96.8103, lat: 32.7905, venue: "American Airlines Center" },
+  { keys: ["detroit red wings", "red wings"], region: "Detroit", lon: -83.054, lat: 42.3411, venue: "Little Caesars Arena" },
   { keys: ["edmonton oilers", "oilers"], region: "Edmonton", lon: -113.497, lat: 53.5469, venue: "Rogers Place" },
+  { keys: ["florida panthers"], region: "Sunrise", lon: -80.3256, lat: 26.1585, venue: "Amerant Bank Arena" },
+  { keys: ["los angeles kings"], region: "Los Angeles", lon: -118.2673, lat: 34.043, venue: "Crypto.com Arena" },
+  { keys: ["minnesota wild"], region: "Saint Paul", lon: -93.1011, lat: 44.9447, venue: "Xcel Energy Center" },
+  { keys: ["montreal canadiens", "canadiens", "habs"], region: "Montreal", lon: -73.569, lat: 45.4961, venue: "Bell Centre" },
+  { keys: ["nashville predators", "predators"], region: "Nashville", lon: -86.7785, lat: 36.1592, venue: "Bridgestone Arena" },
+  { keys: ["new jersey devils", "devils"], region: "Newark", lon: -74.1711, lat: 40.7336, venue: "Prudential Center" },
+  { keys: ["new york islanders", "islanders"], region: "Elmont", lon: -73.7265, lat: 40.7117, venue: "UBS Arena" },
+  { keys: ["new york rangers", "rangers"], region: "New York City", lon: -73.9934, lat: 40.7505, venue: "Madison Square Garden" },
+  { keys: ["ottawa senators", "senators"], region: "Ottawa", lon: -75.6549, lat: 45.2969, venue: "Canadian Tire Centre" },
+  { keys: ["philadelphia flyers", "flyers"], region: "Philadelphia", lon: -75.1719, lat: 39.9012, venue: "Wells Fargo Center" },
+  { keys: ["pittsburgh penguins", "penguins"], region: "Pittsburgh", lon: -79.9012, lat: 40.4396, venue: "PPG Paints Arena" },
+  { keys: ["san jose sharks", "sharks"], region: "San Jose", lon: -121.9012, lat: 37.3327, venue: "SAP Center" },
+  { keys: ["seattle kraken", "kraken"], region: "Seattle", lon: -122.3322, lat: 47.6221, venue: "Climate Pledge Arena" },
+  { keys: ["st. louis blues", "st louis blues", "blues"], region: "St. Louis", lon: -90.202, lat: 38.6268, venue: "Enterprise Center" },
+  { keys: ["tampa bay lightning", "lightning"], region: "Tampa", lon: -82.5059, lat: 27.9427, venue: "Amalie Arena" },
+  { keys: ["toronto maple leafs", "maple leafs"], region: "Toronto", lon: -79.3791, lat: 43.6435, venue: "Scotiabank Arena" },
+  { keys: ["vancouver canucks", "canucks"], region: "Vancouver", lon: -123.1088, lat: 49.2778, venue: "Rogers Arena" },
   { keys: ["vegas golden knights", "golden knights"], region: "Las Vegas", lon: -115.182, lat: 36.1028, venue: "T-Mobile Arena" },
+  { keys: ["washington capitals", "capitals", "caps"], region: "Washington, D.C.", lon: -77.0209, lat: 38.8981, venue: "Capital One Arena" },
+  { keys: ["winnipeg jets"], region: "Winnipeg", lon: -97.1434, lat: 49.8927, venue: "Canada Life Centre" },
+  // NCAAF / high-volume college (home stadium). Keys include common spread titles.
+  { keys: ["texas tech", "red raiders"], region: "Lubbock", lon: -101.8727, lat: 33.591, venue: "Jones AT&T Stadium" },
+  { keys: ["utah utes", "utes"], region: "Salt Lake City", lon: -111.8489, lat: 40.76, venue: "Rice-Eccles Stadium" },
+  { keys: ["ohio state", "buckeyes"], region: "Columbus", lon: -83.0207, lat: 40.0017, venue: "Ohio Stadium" },
+  { keys: ["alabama", "crimson tide"], region: "Tuscaloosa", lon: -87.5502, lat: 33.2083, venue: "Bryant-Denny Stadium" },
+  { keys: ["georgia bulldogs", "uga"], region: "Athens", lon: -83.3733, lat: 33.9497, venue: "Sanford Stadium" },
+  { keys: ["michigan wolverines"], region: "Ann Arbor", lon: -83.7487, lat: 42.2659, venue: "Michigan Stadium" },
+  { keys: ["oregon ducks"], region: "Eugene", lon: -123.0687, lat: 44.0583, venue: "Autzen Stadium" },
+  { keys: ["penn state", "nittany lions"], region: "University Park", lon: -77.8627, lat: 40.8122, venue: "Beaver Stadium" },
+  { keys: ["notre dame"], region: "South Bend", lon: -86.2418, lat: 41.6984, venue: "Notre Dame Stadium" },
+  { keys: ["usc trojans", "southern california"], region: "Los Angeles", lon: -118.2879, lat: 34.0141, venue: "LA Memorial Coliseum" },
+  { keys: ["lsu", "fighting tigers"], region: "Baton Rouge", lon: -91.1519, lat: 30.412, venue: "Tiger Stadium" },
+  { keys: ["texas longhorns"], region: "Austin", lon: -97.7325, lat: 30.283, venue: "Darrell K Royal–Texas Memorial Stadium" },
+  { keys: ["oklahoma sooners"], region: "Norman", lon: -97.4426, lat: 35.2059, venue: "Gaylord Family Oklahoma Memorial Stadium" },
+  { keys: ["florida gators"], region: "Gainesville", lon: -82.3489, lat: 29.65, venue: "Ben Hill Griffin Stadium" },
+  { keys: ["florida state", "seminoles", "fsu"], region: "Tallahassee", lon: -84.3182, lat: 30.4382, venue: "Doak Campbell Stadium" },
+  { keys: ["clemson"], region: "Clemson", lon: -82.8432, lat: 34.6787, venue: "Memorial Stadium" },
+  { keys: ["miami hurricanes"], region: "Miami Gardens", lon: -80.2389, lat: 25.958, venue: "Hard Rock Stadium" },
+  { keys: ["washington huskies"], region: "Seattle", lon: -122.3017, lat: 47.6506, venue: "Husky Stadium" },
+  { keys: ["colorado buffaloes"], region: "Boulder", lon: -105.2669, lat: 40.0095, venue: "Folsom Field" },
+  { keys: ["arizona state", "sun devils"], region: "Tempe", lon: -111.9326, lat: 33.4264, venue: "Mountain America Stadium" },
+  { keys: ["byu", "brigham young"], region: "Provo", lon: -111.6544, lat: 40.2575, venue: "LaVell Edwards Stadium" },
+  { keys: ["boise state"], region: "Boise", lon: -116.1954, lat: 43.6035, venue: "Albertsons Stadium" },
+  { keys: ["kansas state", "wildcats"], region: "Manhattan", lon: -96.594, lat: 39.2017, venue: "Bill Snyder Family Stadium" },
+  { keys: ["iowa state", "cyclones"], region: "Ames", lon: -93.6355, lat: 42.014, venue: "Jack Trice Stadium" },
+  { keys: ["tcu", "horned frogs"], region: "Fort Worth", lon: -97.368, lat: 32.7096, venue: "Amon G. Carter Stadium" },
+  { keys: ["baylor"], region: "Waco", lon: -97.115, lat: 31.5587, venue: "McLane Stadium" },
+  { keys: ["oklahoma state", "cowboys"], region: "Stillwater", lon: -97.0665, lat: 36.1257, venue: "Boone Pickens Stadium" },
+  { keys: ["cincinnati bearcats"], region: "Cincinnati", lon: -84.5088, lat: 39.1312, venue: "Nippert Stadium" },
+  { keys: ["smu mustangs"], region: "Dallas", lon: -96.7806, lat: 32.8382, venue: "Gerald J. Ford Stadium" },
+  // Ambiguous nicknames — only match when the title looks like a sports market.
+  { keys: ["utah"], region: "Salt Lake City", lon: -111.8489, lat: 40.76, venue: "Rice-Eccles Stadium", ambiguous: true },
+  { keys: ["alabama"], region: "Tuscaloosa", lon: -87.5502, lat: 33.2083, venue: "Bryant-Denny Stadium", ambiguous: true },
+  // UFC — Apex when no city in title; city keys still win via CITY_HOMES when present.
+  { keys: ["ufc fight night", "ufc"], region: "Las Vegas", lon: -115.1833, lat: 36.0909, venue: "UFC Apex" },
   // Tennis majors / golf majors
   { keys: ["wimbledon"], region: "London", lon: -0.2144, lat: 51.4341, venue: "All England Club" },
   { keys: ["us open", "u.s. open"], region: "Queens", lon: -73.8467, lat: 40.75, venue: "USTA Billie Jean King" },
@@ -227,16 +300,27 @@ function normalizeHay(title, tags) {
   return `${title || ""} ${tagText}`.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+const SPORTS_CONTEXT_RE =
+  /\b(spread|moneyline|o\/u|over\/under|vs\.?|nba|nfl|nhl|mlb|ufc|ncaa|ncaaf|mls|epl|premier league|la liga|serie a|bundesliga|fight night|finals|championship|puck line|ats\b|sports)\b/i;
+const SPREAD_LINE_RE = /\([+-]?\d+(?:\.\d+)?\)/;
+
+function hasSportsContext(hay) {
+  return SPORTS_CONTEXT_RE.test(hay) || SPREAD_LINE_RE.test(hay);
+}
+
 /**
  * @param {string} hay
- * @param {Array<{ keys: string[]; region: string; lon: number; lat: number; venue?: string }>} catalog
+ * @param {Array<{ keys: string[]; region: string; lon: number; lat: number; venue?: string; ambiguous?: boolean }>} catalog
  * @param {string} method
+ * @param {{ allowAmbiguous?: boolean }} [opts]
  * @returns {MarketLocation | null}
  */
-function matchCatalog(hay, catalog, method) {
+function matchCatalog(hay, catalog, method, opts = {}) {
+  const allowAmbiguous = opts.allowAmbiguous !== false;
   let best = null;
   let bestLen = 0;
   for (const row of catalog) {
+    if (row.ambiguous && !allowAmbiguous) continue;
     for (const key of row.keys) {
       if (key.length < bestLen) continue;
       // Word-ish boundaries so "inter" doesn't steal "winter".
@@ -260,7 +344,15 @@ export function resolveMarketLocation(input = {}) {
   const hay = normalizeHay(input.title, input.tags);
   if (!hay) return null;
 
-  const sports = matchCatalog(hay, SPORTS_HOMES, "sports_home");
+  const sportsOpts = { allowAmbiguous: hasSportsContext(hay) };
+  // “Spread: Texas Tech (-5.5)” → place at the named team’s home stadium.
+  const spreadTeam = hay.match(/\bspread:\s*([^(-]+?)\s*\(/);
+  if (spreadTeam?.[1]) {
+    const fromSpread = matchCatalog(spreadTeam[1].trim(), SPORTS_HOMES, "sports_home", sportsOpts);
+    if (fromSpread) return fromSpread;
+  }
+
+  const sports = matchCatalog(hay, SPORTS_HOMES, "sports_home", sportsOpts);
   if (sports) return sports;
 
   // Cities before crypto so “temperature in Singapore” isn’t dumped in NYC.

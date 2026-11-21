@@ -159,11 +159,14 @@ function LandingDemoStage({
   sectionId,
   className,
   framed,
+  bare = false,
 }: {
   children: ReactNode;
   sectionId: string;
   className: string;
   framed: boolean;
+  /** Full-bleed dashboard — no painted backdrop, no device window chrome. */
+  bare?: boolean;
 }) {
   const ctx = useMyStateV2();
   const active = !!ctx?.landingDemoActive;
@@ -291,50 +294,60 @@ function LandingDemoStage({
     else activate();
   };
 
+  /** Explore tabs are full-bleed; never show the device card radius. */
+  const flush = bare || sectionId === "explore-demo";
+
+  const escHint = (
+    <div
+      aria-live="polite"
+      className={cn(
+        "pointer-events-none absolute left-1/2 top-3 z-[600] -translate-x-1/2 transition-all duration-300",
+        hintVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0",
+      )}
+    >
+      <div className="flex items-center gap-1.5 rounded-full bg-zinc-900/85 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur">
+        <span>Press</span>
+        <kbd className="rounded border border-white/30 px-1.5 py-px font-sans text-[11px] leading-none">
+          Esc
+        </kbd>
+        <span>to exit the demo</span>
+      </div>
+    </div>
+  );
+
   const slot = (
     <div
       ref={slotRef}
-      className="relative"
+      className={cn("relative", flush && "h-full min-h-0")}
       style={slotHeight != null ? { height: slotHeight } : undefined}
-      onClickCapture={framed ? undefined : activateOnClick}
+      onClickCapture={framed || flush ? undefined : activateOnClick}
     >
       <DemoWindowMockup
         id="demo-mockup"
         data-demo-mockup
-        title={framed && !staged ? DEMO_WINDOW_TITLE : undefined}
+        flush={flush}
+        title={!flush && framed && !staged ? DEMO_WINDOW_TITLE : undefined}
         style={stageStyle(phase, origin)}
         className={cn(
           "[transform:translateZ(0)] will-change-[opacity,transform]",
+          flush && "h-full min-h-0",
           staged && "border-transparent shadow-none ring-0",
         )}
         contentClassName={cn(
           "overflow-hidden",
-          staged ? "h-full min-h-0" : DEMO_CONTENT_HEIGHT_CLASS,
+          flush || staged ? "h-full min-h-0" : DEMO_CONTENT_HEIGHT_CLASS,
+          flush && !staged && "min-h-[32rem]",
         )}
       >
         {children}
-        <div
-          aria-live="polite"
-          className={cn(
-            "pointer-events-none absolute left-1/2 top-3 z-[600] -translate-x-1/2 transition-all duration-300",
-            hintVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0",
-          )}
-        >
-          <div className="flex items-center gap-1.5 rounded-full bg-zinc-900/85 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur">
-            <span>Press</span>
-            <kbd className="rounded border border-white/30 px-1.5 py-px font-sans text-[11px] leading-none">
-              Esc
-            </kbd>
-            <span>to exit the demo</span>
-          </div>
-        </div>
+        {escHint}
       </DemoWindowMockup>
     </div>
   );
 
   return (
-    <section id={sectionId} className={cn(className, staged ? "z-50" : "z-30")}>
-      {framed ? (
+    <section id={sectionId} className={cn(className, staged ? "z-50" : "z-30", flush && "h-full min-h-0")}>
+      {framed && !flush ? (
         <DemoBackdrop className={cn(!staged && "cursor-pointer")} onClickCapture={activateOnClick}>
           {slot}
         </DemoBackdrop>
@@ -352,6 +365,13 @@ export type DashboardDemoSectionProps = {
   className?: string;
   /** Sits the demo in a browser window on the painted homepage backdrop. */
   framed?: boolean;
+  /** Full-bleed dashboard with no backdrop art and no device mockup. */
+  bare?: boolean;
+  /**
+   * Homepage Explore surface. `"historical"` / `"present"` curate Connect; `"markets"` /
+   * `"holders"` lock Holder Terminal search scope. The real dashboard stays unchanged.
+   */
+  landingDemoSurface?: "historical" | "present" | "markets" | "holders" | null;
   /**
    * Open straight on workspace tabs (e.g. Holder Terminal). When set, the demo starts on
    * `welcome` with these tabs instead of the integrations picker.
@@ -366,6 +386,8 @@ export function DashboardDemoSection({
   sectionId = "demo",
   className = HOMEPAGE_DEMO_SECTION_CLASS,
   framed = false,
+  bare = false,
+  landingDemoSurface = null,
   workspaceStartTabs,
   activeWorkspaceStartTabId = null,
 }: DashboardDemoSectionProps = {}) {
@@ -377,6 +399,7 @@ export function DashboardDemoSection({
           demo: true,
           landingDemo: true,
           landingDemoIntegration: integrationId || null,
+          landingDemoSurface: landingDemoSurface || null,
           viewing: startOnTabs ? "welcome" : "connectDataHome",
           ...(startOnTabs
             ? {
@@ -389,7 +412,7 @@ export function DashboardDemoSection({
           integrationSidebar: null,
         }}
       >
-        <LandingDemoStage sectionId={sectionId} className={className} framed={framed}>
+        <LandingDemoStage sectionId={sectionId} className={className} framed={framed} bare={bare}>
           <LandingDemoMemberHandoff />
           {/* Try For Free only targets the homepage demo. */}
           {integrationId || startOnTabs ? null : <LandingDemoActivateListener />}

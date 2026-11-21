@@ -1,7 +1,7 @@
 import { kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
 
 const FEATURED_LIMIT_DEFAULT = 5;
-const FEATURED_POOL_SIZE = 20;
+const FEATURED_POOL_SIZE = 48;
 const FEATURED_PER_SERIES = 2;
 const FEATURED_CACHE_TTL_MS = 5 * 60_000;
 
@@ -446,9 +446,103 @@ async function getFeaturedPool() {
  * @returns {Promise<FeaturedKalshiMarket[]>}
  */
 export async function fetchKalshiLiveFeaturedMarkets(opts = {}) {
-  const limit = Math.max(1, Math.min(12, Math.floor(Number(opts.limit) || FEATURED_LIMIT_DEFAULT)));
+  // War Room asks for denser desks; hub demos stay small.
+  const requested = Math.floor(Number(opts.limit) || FEATURED_LIMIT_DEFAULT);
+  const limit = Math.max(1, Math.min(48, Number.isFinite(requested) ? requested : FEATURED_LIMIT_DEFAULT));
   const pool = await getFeaturedPool();
   return pickFromFeaturedPool(pool, { limit, excludeTickers: opts.excludeTickers });
+}
+
+/**
+ * Volume-ranked open markets for one or more Kalshi series categories
+ * (GET /series?category=… then GET /markets?series_ticker=…).
+ *
+ * @param {{
+ *   categories: string[];
+ *   limit?: number;
+ * }} opts
+ * @returns {Promise<FeaturedKalshiMarket[]>}
+ */
+export async function fetchKalshiLiveMarketsBySeriesCategories(opts) {
+  const categories = [
+    ...new Set(
+      (Array.isArray(opts?.categories) ? opts.categories : [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  const limit = Math.max(1, Math.min(120, Math.floor(Number(opts?.limit) || 80)));
+  if (!categories.length) return [];
+
+  /** @type {Map<string, { ticker: string; vol: number; category: string; title: string }>} */
+  const seriesByTicker = new Map();
+  await Promise.all(
+    categories.map(async (category) => {
+      try {
+        const body = await kalshiGet("series", {
+          category,
+          include_volume: "true",
+          include_product_metadata: "false",
+        });
+        const rows = Array.isArray(body?.series) ? body.series : [];
+        for (const row of rows) {
+          if (!row || typeof row !== "object") continue;
+          const ticker = String(row.ticker || "").trim().toUpperCase();
+          if (!ticker) continue;
+          const vol =
+            toNum(row.volume_24h) ??
+            toNum(row.volume) ??
+            toNum(row.total_volume) ??
+            0;
+          const prev = seriesByTicker.get(ticker);
+          if (prev && prev.vol >= vol) continue;
+          seriesByTicker.set(ticker, {
+            ticker,
+            vol,
+            category: String(row.category || category).trim() || category,
+            title: String(row.title || ticker).trim() || ticker,
+          });
+        }
+      } catch {
+        /* try remaining categories */
+      }
+    }),
+  );
+
+  const rankedSeries = [...seriesByTicker.values()].sort((a, b) => b.vol - a.vol).slice(0, 28);
+  if (!rankedSeries.length) return [];
+
+  /** @type {FeaturedKalshiMarket[]} */
+  const out = [];
+  const seenMarkets = new Set();
+
+  await Promise.all(
+    rankedSeries.map(async (series) => {
+      try {
+        const markets = await fetchTopOpenMarketsForSeries(series.ticker, 3);
+        for (const market of markets) {
+          const ticker = String(market.ticker || "").trim().toUpperCase();
+          if (!ticker || seenMarkets.has(ticker)) continue;
+          seenMarkets.add(ticker);
+          out.push(
+            toFeaturedMarket(market, {
+              seriesTicker: series.ticker,
+              seriesTitle: series.title,
+              category: series.category,
+              tags: [series.category, series.ticker].filter(Boolean),
+              title: String(market.title || market.yes_sub_title || ticker).trim() || ticker,
+            }),
+          );
+        }
+      } catch {
+        /* skip series */
+      }
+    }),
+  );
+
+  return out
+    .sort((a, b) => (Number(b.volume24h) || 0) - (Number(a.volume24h) || 0))
+    .slice(0, limit);
 }
 
 /**

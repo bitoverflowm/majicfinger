@@ -17,6 +17,8 @@ type Snapshot = {
   features: { type: "FeatureCollection"; features: unknown[] };
   pings?: { type: "FeatureCollection"; features: unknown[] };
   feed: Array<Record<string, unknown>>;
+  /** Every market drawn on the globe (may be larger than `feed`). */
+  mapMarkets?: Array<Record<string, unknown>>;
   activity?: Array<Record<string, unknown>>;
   selectedMarketId?: string | null;
   emptyReason?: string | null;
@@ -72,6 +74,7 @@ async function fetchSnapshot(params: {
     features,
     pings,
     feed: Array.isArray(body?.feed) ? body.feed : [],
+    mapMarkets: Array.isArray(body?.mapMarkets) ? body.mapMarkets : undefined,
     activity: Array.isArray(body?.activity) ? body.activity : [],
   };
 }

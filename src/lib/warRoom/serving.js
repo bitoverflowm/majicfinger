@@ -2,15 +2,17 @@ import { holderTerminalHref } from "@/lib/holderLanding/pages";
 import {
   activityMatchesCategory,
   CATEGORIES,
+  kalshiSeriesCategoriesForWarRoom,
   matchesCategory,
   normalizeCategory,
   normalizeExploreFeed,
 } from "@/lib/markets/exploreCategories";
+import { fetchKalshiLiveMarketsBySeriesCategories } from "@/lib/kalshiLive/fetchKalshiLiveFeaturedMarkets";
 import {
   fetchPolymarketMarketsByExploreFeed,
   fetchPolymarketMarketsByTagSlug,
 } from "@/lib/polymarketLive/fetchPolymarketLiveFeaturedMarkets";
-import { fetchLiveWarRoomSources, fromPolymarketFeatured } from "./adapters";
+import { fetchLiveWarRoomSources, fromKalshiFeatured, fromPolymarketFeatured } from "./adapters";
 import {
   DESKTOP_POINT_CAP,
   FEED_ROW_CAP,
@@ -198,6 +200,40 @@ async function categoryPolymarketBoost(category, observedTs, existingIds) {
       category,
       tags: [...new Set([...(market.tags || []), category, tagSlug].filter(Boolean))],
     }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Same category chip → Kalshi GET /series?category=… then open markets.
+ * Without this, Kalshi-only + category is empty (desk featured rarely matches).
+ * @param {string} category
+ * @param {string} observedTs
+ * @param {Set<string>} existingIds
+ */
+async function categoryKalshiBoost(category, observedTs, existingIds) {
+  const kalshiCategories = kalshiSeriesCategoriesForWarRoom(category);
+  if (!kalshiCategories.length) return [];
+  try {
+    const rows = await fetchKalshiLiveMarketsBySeriesCategories({
+      categories: kalshiCategories,
+      limit: 100,
+    });
+    /** @type {Array<Record<string, unknown>>} */
+    const out = [];
+    for (const row of rows) {
+      const mapped = fromKalshiFeatured(row, observedTs);
+      if (!mapped?.market) continue;
+      if (existingIds.has(mapped.market.id)) continue;
+      existingIds.add(mapped.market.id);
+      out.push({
+        ...mapped.market,
+        category,
+        tags: [...new Set([...(mapped.market.tags || []), category, ...kalshiCategories].filter(Boolean))],
+      });
+    }
+    return out;
   } catch {
     return [];
   }
@@ -455,24 +491,27 @@ export async function getWarRoomSnapshot(opts = {}) {
   // immediately, then replace with the boosted snapshot.
   const feedBoosted =
     !shell && exploreFeed ? await exploreFeedPolymarketBoost(exploreFeed, bundle.asOf, existingIds) : [];
-  const categoryBoosted =
-    !shell && category ? await categoryPolymarketBoost(category, bundle.asOf, existingIds) : [];
+  const [categoryPolyBoosted, categoryKalshiBoosted] = !shell && category
+    ? await Promise.all([
+        categoryPolymarketBoost(category, bundle.asOf, existingIds),
+        categoryKalshiBoost(category, bundle.asOf, existingIds),
+      ])
+    : [[], []];
+  const categoryBoosted = [...categoryPolyBoosted, ...categoryKalshiBoosted];
 
   /** @type {Array<Record<string, unknown>>} */
   let pool;
   if (category && shell) {
-    // Fast path: filter the cached desk in-process (no Gamma). Full fetch replaces this.
+    // Fast path: filter the cached desk in-process (no Gamma / Kalshi series). Full fetch replaces this.
     pool = bundle.markets.filter((market) => matchesCategory(market, category));
   } else if (category) {
-    // Category view: tag-matched Polymarket (via events) + matching Kalshi from the desk.
-    // Always prefer the boost when the chip is active — even if Gamma returned 0 rows —
+    // Category view: Gamma Polymarket + Kalshi series-category markets + desk matches.
+    // Always prefer the boost when the chip is active — even if a venue returned 0 rows —
     // so we don't silently fall back to the unfiltered featured pool.
-    const kalshi = bundle.markets.filter(
-      (market) => market.venue === "kalshi" && matchesCategory(market, category),
-    );
+    const deskMatches = bundle.markets.filter((market) => matchesCategory(market, category));
     pool = [...categoryBoosted];
     const poolIds = new Set(pool.map((market) => market.id));
-    for (const market of kalshi) {
+    for (const market of deskMatches) {
       if (poolIds.has(market.id)) continue;
       poolIds.add(market.id);
       pool.push(market);
@@ -500,7 +539,9 @@ export async function getWarRoomSnapshot(opts = {}) {
   const filteredIds = new Set(ranked.map((market) => market.id));
   const cap = opts.mobile ? MOBILE_POINT_CAP : DESKTOP_POINT_CAP;
   const features = ranked.map(featureFromMarket).filter(Boolean).slice(0, cap);
-  const feed = ranked.slice(0, FEED_ROW_CAP).map((market) => feedRow(bundle, market));
+  // Full map index (globe can show more points than the right-rail list).
+  const mapMarkets = ranked.slice(0, cap).map((market) => feedRow(bundle, market));
+  const feed = mapMarkets.slice(0, FEED_ROW_CAP);
   const activity = activityRows(bundle).filter((row) => {
     if (category) return activityMatchesCategory(row, category, marketById);
     // All tradable: keep the full activity stream.
@@ -558,6 +599,7 @@ export async function getWarRoomSnapshot(opts = {}) {
     cursor: cursorFor(bundle, desk),
     features: { type: "FeatureCollection", features },
     pings: { type: "FeatureCollection", features: newsPings },
+    mapMarkets,
     feed,
     activity,
     selectedMarketId: selectedValid?.id || null,

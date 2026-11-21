@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState } from "react";
 
 import { WarRoomView, type WarRoomNavigateRequest } from "@/components/warRoom/WarRoomView";
 import { DashboardDemoSectionLazy } from "@/components/sections/dashboard-demo-section-lazy";
-import { HOMEPAGE_DEMO_SECTION_CLASS } from "@/components/sections/dashboard-demo-layout";
 import { terminalTab } from "@/components/terminals/openTerminalTab";
 import { parseWarRoomMarketId } from "@/lib/warRoom/ids";
 import { findTerminal } from "@/lib/workspaceTerminals";
@@ -12,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { id: "war-room", label: "War Room" },
-  { id: "past", label: "The Past" },
+  { id: "past", label: "Historical" },
   { id: "present", label: "The Present" },
   { id: "markets", label: "Markets" },
   { id: "holders", label: "Holders" },
@@ -35,14 +34,12 @@ type TraderSubject = {
 
 const BROWSE_MODE_KEY = "lychee:holderTerminal:browseMode";
 
-/** Same full-bleed width as the homepage demo, without the hero spacing above the card. */
-const EXPLORE_DEMO_SECTION_CLASS = cn(
-  HOMEPAGE_DEMO_SECTION_CLASS,
-  "mt-0 sm:mt-0 md:mt-0 lg:mt-0",
-);
-
+/** Full-bleed stage shared by War Room + Historical / Present / Markets / Holders. */
 const DEMO_STAGE_CLASS =
-  "relative left-1/2 h-[min(88svh,58rem)] min-h-[32rem] w-screen max-w-[100vw] -translate-x-1/2 overflow-hidden bg-black";
+  "relative left-1/2 h-[min(88svh,58rem)] min-h-[32rem] w-screen max-w-[100vw] -translate-x-1/2 overflow-hidden";
+
+/** Section fills the stage — no painted backdrop, no device chrome. */
+const BARE_DEMO_SECTION_CLASS = "relative z-30 m-0 h-full w-full p-0";
 
 /** Anchor for Learn More / #demo — keeps explore tabs in view (not a lower-page mockup). */
 const WAR_ROOM_STAGE_ATTR = { "data-war-room-demo": true } as const;
@@ -141,7 +138,8 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
     [marketSubject, openHoldersTab, openMarketsTab, traderSubject],
   );
 
-  const showPastPresent = tab === "past" || tab === "present";
+  const showPast = tab === "past";
+  const showPresent = tab === "present";
   const showMarkets = tab === "markets" && marketsStart;
   const showHolders = tab === "holders" && holdersStart;
 
@@ -174,7 +172,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
 
       <div className="mt-4">
         {tab === "war-room" ? (
-          <div className={DEMO_STAGE_CLASS} {...WAR_ROOM_STAGE_ATTR}>
+          <div className={cn(DEMO_STAGE_CLASS, "bg-black")} {...WAR_ROOM_STAGE_ATTR}>
             <WarRoomView
               fixture={fixture}
               embedded
@@ -184,38 +182,60 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
           </div>
         ) : null}
 
-        {showPastPresent ? (
-          <DashboardDemoSectionLazy
-            key={`terminal-demo-${tab}`}
-            force
-            framed
-            sectionId="explore-demo"
-            className={EXPLORE_DEMO_SECTION_CLASS}
-          />
+        {showPast ? (
+          <div className={cn(DEMO_STAGE_CLASS, "bg-background")}>
+            <DashboardDemoSectionLazy
+              key="terminal-demo-past"
+              force
+              bare
+              sectionId="explore-demo"
+              className={BARE_DEMO_SECTION_CLASS}
+              landingDemoSurface="historical"
+            />
+          </div>
+        ) : null}
+
+        {showPresent ? (
+          <div className={cn(DEMO_STAGE_CLASS, "bg-background")}>
+            <DashboardDemoSectionLazy
+              key="terminal-demo-present"
+              force
+              bare
+              sectionId="explore-demo"
+              className={BARE_DEMO_SECTION_CLASS}
+              landingDemoSurface="present"
+            />
+          </div>
         ) : null}
 
         {showMarkets ? (
-          <DashboardDemoSectionLazy
-            key={`markets-${marketSubject?.conditionId || "explore"}`}
-            force
-            framed
-            sectionId="explore-demo"
-            className={EXPLORE_DEMO_SECTION_CLASS}
-            workspaceStartTabs={marketsStart.workspaceStartTabs}
-            activeWorkspaceStartTabId={marketsStart.activeWorkspaceStartTabId}
-          />
+          <div className={cn(DEMO_STAGE_CLASS, "bg-background")}>
+            <DashboardDemoSectionLazy
+              key={`markets-${marketSubject?.conditionId || "explore"}`}
+              force
+              bare
+              sectionId="explore-demo"
+              className={BARE_DEMO_SECTION_CLASS}
+              landingDemoSurface="markets"
+              workspaceStartTabs={marketsStart.workspaceStartTabs}
+              activeWorkspaceStartTabId={marketsStart.activeWorkspaceStartTabId}
+            />
+          </div>
         ) : null}
 
         {showHolders ? (
-          <DashboardDemoSectionLazy
-            key={`holders-${traderSubject?.address || "browse"}`}
-            force
-            framed
-            sectionId="explore-demo"
-            className={EXPLORE_DEMO_SECTION_CLASS}
-            workspaceStartTabs={holdersStart.workspaceStartTabs}
-            activeWorkspaceStartTabId={holdersStart.activeWorkspaceStartTabId}
-          />
+          <div className={cn(DEMO_STAGE_CLASS, "bg-background")}>
+            <DashboardDemoSectionLazy
+              key={`holders-${traderSubject?.address || "browse"}`}
+              force
+              bare
+              sectionId="explore-demo"
+              className={BARE_DEMO_SECTION_CLASS}
+              landingDemoSurface="holders"
+              workspaceStartTabs={holdersStart.workspaceStartTabs}
+              activeWorkspaceStartTabId={holdersStart.activeWorkspaceStartTabId}
+            />
+          </div>
         ) : null}
       </div>
     </section>

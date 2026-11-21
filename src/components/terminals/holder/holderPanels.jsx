@@ -54,7 +54,23 @@ function HolderIntroPanel() {
 
 function HolderSearchPanel() {
   const { subject, actions } = useHolderSession();
-  return <HolderTerminalSearch onPick={actions.pick} onExplore={subject ? actions.explore : undefined} className="max-w-3xl px-4 pb-4 pt-3 pr-10" />;
+  const surface = useMyStateV2()?.landingDemoSurface;
+  const exploreDemo = surface === "markets" || surface === "holders";
+  // Homepage Markets / Holders demos lock search to one side; dashboard keeps both.
+  const scopes =
+    surface === "markets" ? ["markets"] : surface === "holders" ? ["traders"] : undefined;
+  return (
+    <HolderTerminalSearch
+      onPick={actions.pick}
+      onExplore={subject ? actions.explore : undefined}
+      scopes={scopes}
+      className={
+        exploreDemo
+          ? "mx-auto w-full max-w-xl px-4 pb-3 pt-4"
+          : "max-w-3xl px-4 pb-4 pt-3 pr-10"
+      }
+    />
+  );
 }
 
 function HolderBrowsePanel() {

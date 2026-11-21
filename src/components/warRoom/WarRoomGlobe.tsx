@@ -72,16 +72,17 @@ function asCollection(input: FeatureCollection | FeatureCollection["features"] |
   if (Array.isArray(input)) return { type: "FeatureCollection", features: input };
   return EMPTY;
 }
-/** Prefer news layers first so rose pings win when stacked on a market. Include labels so title text is clickable. */
+/** Prefer news first; wr-hit is an oversized invisible target so labels/dots stay clickable. */
 const HIT_LAYERS = [
   "wr-news-points",
   "wr-news-halo",
+  "wr-hit",
   "wr-labels",
   "wr-points",
   "wr-selected",
   "wr-halo",
 ] as const;
-const HIT_PAD_PX = 22;
+const HIT_PAD_PX = 36;
 
 function pickHit(
   map: import("maplibre-gl").Map,
@@ -257,6 +258,28 @@ export function WarRoomGlobe({
               type: "geojson",
               data: pendingRef.current,
               promoteId: "id",
+            });
+            // Invisible oversized hit target — dots/labels are small; clicks need a fat target.
+            instance.addLayer({
+              id: "wr-hit",
+              type: "circle",
+              source: SOURCE_ID,
+              paint: {
+                "circle-radius": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  1,
+                  14,
+                  4,
+                  16,
+                  7,
+                  18,
+                ],
+                "circle-color": "#000000",
+                "circle-opacity": 0,
+                "circle-stroke-width": 0,
+              },
             });
             // Dense borderless dots — Kalshi green / Polymarket blue / soft pulse halo only.
             instance.addLayer({

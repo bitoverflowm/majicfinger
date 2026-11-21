@@ -16,6 +16,7 @@ import { loadWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
 import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { WorkspaceTabsLayer } from "@/components/dashboardComposer/blankDashboardEmpty";
+import { hideLandingExploreTabChrome } from "@/components/dashboardComposer/workspaceStartTabBar";
 import { IntegrationConnectLandingDemo } from "@/components/dashboardComposer/integrationConnectDialog";
 import FigmaNavChrome from "./components/figmaNavChrome";
 import { cn } from "@/lib/utils";
@@ -447,7 +448,12 @@ const DashBody = ({ user }) => {
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div
           {...{ [PROJECT_THUMBNAIL_ROOT]: "" }}
-          className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1 [--dashboard-tab-clearance:2.75rem]"
+          className={cn(
+            "relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1",
+            hideLandingExploreTabChrome(contextStateV2)
+              ? "[--dashboard-tab-clearance:0px]"
+              : "[--dashboard-tab-clearance:2.75rem]",
+          )}
         >
                 <WorkspaceCanvas />
                 {(viewing === "welcome" || viewing === "connectDataHome") && (

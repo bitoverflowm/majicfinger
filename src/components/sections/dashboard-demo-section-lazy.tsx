@@ -43,6 +43,17 @@ const FramedDashboardDemoSection = dynamic<DashboardDemoSectionProps>(
   { ssr: false, loading: () => <DashboardDemoSkeleton framed /> },
 );
 
+const BareDashboardDemoSection = dynamic<DashboardDemoSectionProps>(
+  () =>
+    retryImport(() => import("./dashboard-demo-section")).then((m) => ({ default: m.DashboardDemoSection })),
+  {
+    ssr: false,
+    loading: () => (
+      <DashboardDemoSkeleton bare sectionId="explore-demo" className="relative z-30 m-0 h-full w-full p-0" />
+    ),
+  },
+);
+
 function SkeletonMockup({ framed }: { framed: boolean }) {
   return (
     <DemoWindowMockup
@@ -58,7 +69,17 @@ export function DashboardDemoSkeleton({
   sectionId = "demo",
   className = HOMEPAGE_DEMO_SECTION_CLASS,
   framed = false,
-}: Pick<DashboardDemoSectionProps, "sectionId" | "className" | "framed">) {
+  bare = false,
+}: Pick<DashboardDemoSectionProps, "sectionId" | "className" | "framed" | "bare">) {
+  if (bare) {
+    return (
+      <section id={sectionId} className={cn(className, "z-30 h-full min-h-0")}>
+        <div className="flex h-full min-h-[32rem] w-full items-center justify-center overflow-hidden bg-background">
+          <DemoLoadingCard />
+        </div>
+      </section>
+    );
+  }
   return (
     <section id={sectionId} className={cn(className, "z-30")}>
       {framed ? (
@@ -117,5 +138,7 @@ export function DashboardDemoSectionLazy(
 ) {
   const { force, ...demoProps } = props;
   if (!force && !isLandingDemoEnabled()) return null;
+  // Bare / full-bleed explore tabs skip the painted framed homepage path.
+  if (demoProps.bare) return <BareDashboardDemoSection {...demoProps} />;
   return demoProps.framed ? <HomepageDemo {...demoProps} /> : <DashboardDemoSection {...demoProps} />;
 }
