@@ -351,7 +351,7 @@ async function getFeaturedPool() {
 export async function fetchPolymarketLiveFeaturedMarkets(opts = {}) {
   const limit = Math.max(
     1,
-    Math.min(12, Math.floor(Number(opts.limit) || FEATURED_LIMIT_DEFAULT)),
+    Math.min(24, Math.floor(Number(opts.limit) || FEATURED_LIMIT_DEFAULT)),
   );
   const exclude = new Set(
     (Array.isArray(opts.excludeIds) ? opts.excludeIds : [])

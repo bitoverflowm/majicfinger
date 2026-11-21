@@ -3,10 +3,10 @@ import { TelegramMarketingTracker } from "@/components/analytics/TelegramMarketi
 
 export default function MarketingLayout({ children }) {
   return (
-    <div className="relative mx-auto min-w-0 max-w-[min(100%,84rem)] overflow-x-visible">
+    <div className="relative min-w-0 overflow-x-visible">
       <TelegramMarketingTracker />
       <MarketingNavbar />
-      {children}
+      <div className="mx-auto min-w-0 max-w-[min(100%,84rem)]">{children}</div>
     </div>
   );
 }

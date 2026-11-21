@@ -63,7 +63,7 @@ const nextConfig = {
       },
     ]
   },
-  transpilePackages: ["@nivo", "@duckdb/duckdb-wasm", "apache-arrow", "react-tweet"],
+  transpilePackages: ["@nivo", "@duckdb/duckdb-wasm", "apache-arrow", "react-tweet", "maplibre-gl"],
   experimental: {
     esmExternals: 'loose',
     // The marketing nav reads content/ at request time; Vercel functions only ship traced files.

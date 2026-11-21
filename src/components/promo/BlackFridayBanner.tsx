@@ -11,7 +11,7 @@ import { BLACK_FRIDAY_ANCHOR, SEE_BLACK_FRIDAY_EVENT, useBlackFridayCountdown } 
 const DISMISS_KEY = `lychee:promo-dismissed:${BLACK_FRIDAY.id}`;
 
 /** Full-screen app surfaces and embeds, where a strip above the page would cover fixed chrome. */
-const HIDDEN_PREFIXES = ["/dashboard", "/checkout", "/easy/"];
+const HIDDEN_PREFIXES = ["/dashboard", "/war-room", "/checkout", "/easy/"];
 
 export function BlackFridayBanner() {
   const pathname = usePathname() || "";

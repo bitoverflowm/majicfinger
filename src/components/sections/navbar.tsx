@@ -1,28 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { AnimatePresence, motion, useMotionValue, useScroll } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
-import { NavMenu } from "@/components/nav-menu";
 import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
-import { DemoScrollLink } from "@/components/sections/demo-scroll-link";
-import { siteConfig } from "@/lib/config";
-import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefIsInPageScrollSpy, navHrefToSectionId, normalizeMarketingPathname } from "@/lib/nav-hrefs";
+import { NewsNavDropdown } from "@/components/nav/news-nav-dropdown";
+import { JarvisNavSearch } from "@/components/nav/jarvis-nav-search";
 import type { ProductsNavData } from "@/lib/nav/products-nav";
-import { cn } from "@/lib/utils";
 import { useUser } from "@/lib/hooks";
 import { WORKSPACE_ENTRY_PATH } from "@/lib/workspaceEntry";
 import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient";
-import { interceptOnCompactScreen } from "@/lib/desktopOnly";
-import { requestLandingDemoActivateAfterScroll } from "@/lib/landingDemoSession";
-import { scrollToHashSection } from "@/lib/scrollToHashSection";
-
-const INITIAL_WIDTH = "70rem";
-const MAX_WIDTH = "60rem";
 
 const overlayVariants = {
   hidden: { opacity: 0 },
@@ -31,406 +22,182 @@ const overlayVariants = {
 };
 
 const drawerVariants = {
-  hidden: { opacity: 0, y: 100 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    rotate: 0,
-    transition: {
-      type: "spring",
-      damping: 15,
-      stiffness: 200,
-      staggerChildren: 0.03,
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: 100,
-    transition: { duration: 0.1 },
-  },
-};
-
-const drawerMenuContainerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-};
-
-const drawerMenuVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
+  hidden: { opacity: 0, y: 80 },
+  visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 22, stiffness: 260 } },
+  exit: { opacity: 0, y: 80, transition: { duration: 0.12 } },
 };
 
 export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
-  const { scrollY } = useScroll();
-  const headerRef = useRef<HTMLElement>(null);
-  const navOffset = useMotionValue(0);
-  const [hasScrolled, setHasScrolled] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
   const user = useUser();
   const router = useRouter();
   const pathname = usePathname();
-  const tryForFreeHref =
-    pathname === "/polymarket-live-data"
-      ? "#find-polymarket-markets"
-      : pathname === "/polymarket-historical-data" ||
-          pathname === "/kalshi-historical-data"
-        ? "#explore-data"
-        : pathname === "/kalshi-vs-polymarket-odds"
-          ? "#compare"
-          : siteConfig.hero.cta.primary.href;
-  const TryForFreeLink =
-    pathname === "/polymarket-live-data" ||
-    pathname === "/polymarket-historical-data" ||
-    pathname === "/kalshi-historical-data" ||
-    pathname === "/kalshi-vs-polymarket-odds"
-      ? Link
-      : DemoScrollLink;
-  const handleTryForFreeClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (interceptOnCompactScreen(event)) {
-      setIsDrawerOpen(false);
-      return;
-    }
-    if (pathname === "/") requestLandingDemoActivateAfterScroll();
-    if (TryForFreeLink !== Link || !tryForFreeHref.startsWith("#")) return;
-    event.preventDefault();
-    scrollToHashSection(tryForFreeHref);
-    setIsDrawerOpen(false);
-  };
+  const pricingHref = pathname === "/" ? "/#pricing" : "/#pricing";
 
-  useEffect(() => {
-    let frame = 0;
-    const updateActiveSection = () => {
-      frame = 0;
-      const sections = getNavLinksForPathname(pathname)
-        .filter((item) => navHrefIsInPageScrollSpy(item.href, pathname))
-        .map((item) => navHrefToSectionId(item.href))
-        .filter((id): id is string => Boolean(id));
-
-      let next: string | null = null;
-      for (const section of sections) {
-        const element = document.getElementById(section);
-        if (!element) continue;
-        const rect = element.getBoundingClientRect();
-        if (rect.top <= 150 && rect.bottom >= 150) {
-          next = section;
-          break;
-        }
-      }
-      setActiveSection(next);
-    };
-    const handleScroll = () => {
-      if (!frame) frame = requestAnimationFrame(updateActiveSection);
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    updateActiveSection();
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      cancelAnimationFrame(frame);
-    };
-  }, [pathname]);
-
-  useEffect(() => {
-    return scrollY.on("change", (latest) => {
-      setHasScrolled(latest > 10);
-    });
-  }, [scrollY]);
-
-  // The demo's top edge pushes the bar up as it arrives, and its bottom edge lets the bar back
-  // down as it leaves, so the bar tracks the scroll in both directions.
-  useEffect(() => {
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      const header = headerRef.current;
-      const demo = document.querySelector<HTMLElement>("[data-hides-nav]");
-      if (!header || !demo) {
-        navOffset.set(0);
-        return;
-      }
-      const navBottom = header.getBoundingClientRect().bottom;
-      const { top, bottom } = demo.getBoundingClientRect();
-      const tucked = Math.min(navBottom - top, bottom);
-      navOffset.set(-Math.min(navBottom + 8, Math.max(0, tucked)));
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
-    schedule();
-    return () => {
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-      cancelAnimationFrame(frame);
-    };
-  }, [navOffset, pathname]);
-
-  const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
-  const handleOverlayClick = () => setIsDrawerOpen(false);
   const handleLogout = async () => {
     try {
       endAuthenticatedSession({
         email: user?.email,
         userId: user?._id || user?.userId,
       });
-      const response = await fetch("/api/logout", {
-        method: "POST",
-      });
-      if (response.ok) {
-        router.push("/");
-      } else {
-        // eslint-disable-next-line no-console
-        console.error("Logout failed");
-      }
+      const response = await fetch("/api/logout", { method: "POST" });
+      if (response.ok) router.push("/");
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error("An error occurred during logout", error);
     }
   };
 
+  const closeDrawer = () => setIsDrawerOpen(false);
+
   return (
-    <header
-      ref={headerRef}
-      className={cn(
-        "sticky z-50 mx-4 flex justify-center transition-all duration-300 md:mx-0",
-        hasScrolled ? "top-6" : "top-4 mx-0",
-      )}
-    >
-      <motion.div
-        className="max-w-full"
-        style={{ y: navOffset }}
-        initial={{ width: INITIAL_WIDTH }}
-        animate={{ width: hasScrolled ? MAX_WIDTH : INITIAL_WIDTH }}
-        transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-      >
-        <div
-          className={cn(
-            "mx-auto max-w-7xl rounded-2xl transition-all duration-300 xl:px-0",
-            hasScrolled
-              ? "px-2 border border-border backdrop-blur-lg bg-background/75"
-              : "shadow-none px-7",
-          )}
-        >
-          <div className="flex h-[56px] items-center justify-between p-4">
-            <Link href="/" className="flex gap-2 items-center pr-6 md:pr-8">
-              <span className="flex shrink-0 items-center justify-center">
-                <Image
-                  src="/logo.png"
-                  alt="Lychee"
-                  width={30}
-                  height={30}
-                  className="size-[30px] object-contain block rounded-full"
-                  priority
-                />
-              </span>
-              <span className="pr-2 font-black text-xl leading-none text-primary">
-                Lychee
+    <header className="sticky top-0 z-50 w-full bg-background">
+      <div className="relative mx-auto flex h-14 w-full max-w-[min(100%,88rem)] items-center px-3 sm:px-5">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <Link href="/" className="flex shrink-0 items-center gap-2 pr-2">
+            <Image
+              src="/logo.png"
+              alt=""
+              width={28}
+              height={28}
+              className="size-7 rounded-full object-contain"
+              priority
+            />
+            <span className="font-black text-lg leading-none text-primary">Lychee</span>
+          </Link>
+          <nav className="hidden h-full items-center lg:flex">
+            <ul className="flex h-14 items-center">
+              <ProductsNavDropdown data={productsNav} />
+            </ul>
+            <NewsNavDropdown />
+            <Link
+              href="/jarvis"
+              className="ml-1 inline-flex h-full items-center gap-1.5 px-3 text-sm font-medium text-primary/70 transition-colors hover:text-primary"
+            >
+              MCP
+              <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-white">
+                New
               </span>
             </Link>
-
-            <NavMenu productsNav={productsNav} />
-
-            <div className="flex flex-row items-center gap-1 md:gap-3 shrink-0">
-              <div className="flex items-center space-x-3">
-                {!user ? (
-                  <>
-                    <TryForFreeLink
-                      className="bg-secondary h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-fit px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12] hover:bg-secondary/80 transition-all ease-out active:scale-95"
-                      href={tryForFreeHref}
-                      onClick={handleTryForFreeClick}
-                    >
-                      {siteConfig.hero.cta.primary.text}
-                    </TryForFreeLink>
-                    <Link
-                      className="h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-fit px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"
-                      href="/login"
-                    >
-                      Log in
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      className="h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-fit px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"
-                      href={WORKSPACE_ENTRY_PATH}
-                    >
-                      Dashboard
-                    </Link>
-                    <Link
-                      href={WORKSPACE_ENTRY_PATH}
-                      className="hidden md:flex items-center justify-center h-8 w-8 rounded-full border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95 overflow-hidden"
-                      aria-label="Open dashboard"
-                    >
-                      <Image src={"/mrpink_pfp.jpg"} alt="Avatar" height={32} width={32} />
-                    </Link>
-                  </>
-                )}
-              </div>
-              <button
-                className="md:hidden border border-border size-8 rounded-md cursor-pointer flex items-center justify-center"
-                onClick={toggleDrawer}
-                type="button"
-                aria-label={isDrawerOpen ? "Close menu" : "Open menu"}
-              >
-                {isDrawerOpen ? <X className="size-5" /> : <Menu className="size-5" />}
-              </button>
-            </div>
-          </div>
+          </nav>
         </div>
-      </motion.div>
+
+        <div className="min-w-0 flex-1 px-2 lg:hidden">
+          <JarvisNavSearch className="max-w-none" />
+        </div>
+        <div className="hidden min-w-0 flex-1 lg:block" aria-hidden />
+
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="hidden items-center gap-4 lg:flex">
+            <Link href={pricingHref} className="text-sm font-medium text-primary/70 hover:text-primary">
+              Pricing
+            </Link>
+            <span className="text-border" aria-hidden>
+              |
+            </span>
+            {!user ? (
+              <Link href="/login" className="text-sm font-medium text-primary/70 hover:text-primary">
+                Login
+              </Link>
+            ) : (
+              <Link href={WORKSPACE_ENTRY_PATH} className="text-sm font-medium text-primary/70 hover:text-primary">
+                Dashboard
+              </Link>
+            )}
+          </div>
+          <button
+            className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border lg:hidden"
+            onClick={() => setIsDrawerOpen((v) => !v)}
+            type="button"
+            aria-label={isDrawerOpen ? "Close menu" : "Open menu"}
+          >
+            {isDrawerOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
+        </div>
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 hidden h-14 lg:block">
+        <div className="pointer-events-auto absolute left-1/2 top-1/2 w-[min(28rem,calc(100vw-32rem))] -translate-x-1/2 -translate-y-1/2">
+          <JarvisNavSearch className="mx-auto max-w-none" />
+        </div>
+      </div>
 
       <AnimatePresence>
-        {isDrawerOpen && (
+        {isDrawerOpen ? (
           <>
             <motion.div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 z-40 bg-black/40 lg:hidden"
               initial="hidden"
               animate="visible"
               exit="exit"
               variants={overlayVariants}
-              transition={{ duration: 0.2 }}
-              onClick={handleOverlayClick}
+              onClick={closeDrawer}
             />
-
             <motion.div
-              className="fixed inset-x-0 w-[95%] mx-auto bottom-3 bg-background border border-border p-4 rounded-xl shadow-lg"
+              className="fixed inset-x-3 bottom-3 z-50 rounded-xl border border-border bg-background p-4 shadow-lg lg:hidden"
               initial="hidden"
               animate="visible"
               exit="exit"
               variants={drawerVariants}
             >
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <Link href="/" className="flex gap-1.5 items-center pr-3">
-                    <span className="flex shrink-0 items-center justify-center">
-                      <Image
-                        src="/logo.png"
-                        alt="Lychee"
-                        width={24}
-                        height={24}
-                        className="size-6 object-contain block rounded-full"
-                      />
-                    </span>
-                    <span className="pt-2 font-black text-xl leading-none text-primary">
-                      Lychee
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-medium">Menu</span>
+                <button type="button" onClick={closeDrawer} aria-label="Close menu">
+                  <X className="size-5" />
+                </button>
+              </div>
+              <ul className="overflow-y-auto rounded-md border border-border">
+                <ProductsNavDropdown data={productsNav} variant="mobile" />
+                <li className="list-none">
+                  <NewsNavDropdown variant="mobile" onNavigate={closeDrawer} />
+                </li>
+                <li className="border-b border-border p-3">
+                  <Link href="/jarvis" onClick={closeDrawer} className="inline-flex items-center gap-2 text-sm font-medium">
+                    MCP
+                    <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">
+                      New
                     </span>
                   </Link>
-                  <button
-                    onClick={toggleDrawer}
-                    className="border border-border rounded-md p-1 cursor-pointer"
-                    type="button"
-                    aria-label="Close menu"
+                </li>
+                <li className="border-b border-border p-3">
+                  <Link href={pricingHref} onClick={closeDrawer} className="text-sm font-medium">
+                    Pricing
+                  </Link>
+                </li>
+              </ul>
+              <div className="mt-3 flex flex-col gap-2">
+                {!user ? (
+                  <Link
+                    href="/login"
+                    onClick={closeDrawer}
+                    className="flex h-9 items-center justify-center rounded-full border border-border text-sm"
                   >
-                    <X className="size-5" />
-                  </button>
-                </div>
-
-                <motion.ul
-                  className="flex flex-col text-sm mb-4 border border-border rounded-md"
-                  variants={drawerMenuContainerVariants}
-                >
-                  <ProductsNavDropdown data={productsNav} variant="mobile" />
-                  <AnimatePresence>
-                    {getNavLinksForPathname(pathname).map((item) => (
-                      <motion.li
-                        key={item.id}
-                        className="p-2.5 border-b border-border last:border-b-0"
-                        variants={drawerMenuVariants}
-                      >
-                        <a
-                          href={item.href}
-                          onClick={(e) => {
-                            if (isAbsoluteHomeHashHref(item.href)) {
-                              e.preventDefault();
-                              const hash = item.href.slice(2);
-                              if (pathname === "/") {
-                                const element = document.getElementById(hash);
-                                if (element) {
-                                  const top =
-                                    element.getBoundingClientRect().top +
-                                    window.pageYOffset -
-                                    100;
-                                  window.scrollTo({ top, behavior: "smooth" });
-                                }
-                                setIsDrawerOpen(false);
-                                return;
-                              }
-                              window.location.href = item.href;
-                              setIsDrawerOpen(false);
-                              return;
-                            }
-                            if (item.href.startsWith("#") && item.href.length > 1) {
-                              e.preventDefault();
-                              const id = item.href.slice(1);
-                              document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-                              setIsDrawerOpen(false);
-                              return;
-                            }
-                            // Absolute routes (e.g. /changelog) — navigate normally.
-                            setIsDrawerOpen(false);
-                          }}
-                          className={cn(
-                            "underline-offset-4 hover:text-primary/80 transition-colors",
-                            (normalizeMarketingPathname(pathname) ===
-                              normalizeMarketingPathname(item.href) ||
-                              (activeSection &&
-                                activeSection === navHrefToSectionId(item.href) &&
-                                navHrefIsInPageScrollSpy(item.href, pathname)))
-                              ? "text-primary font-medium"
-                              : "text-primary/60",
-                          )}
-                        >
-                          {item.name}
-                        </a>
-                      </motion.li>
-                    ))}
-                  </AnimatePresence>
-                </motion.ul>
-
-                <div className="flex flex-col gap-2">
-                  {!user ? (
-                    <>
-                      <TryForFreeLink
-                        href={tryForFreeHref}
-                        onClick={handleTryForFreeClick}
-                        className="bg-secondary h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-full px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12] hover:bg-secondary/80 transition-all ease-out active:scale-95"
-                      >
-                        {siteConfig.hero.cta.primary.text}
-                      </TryForFreeLink>
-                      <Link
-                        href="/login"
-                        className="h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-full px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"
-                      >
-                        Log in
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      <Link
-                        href={WORKSPACE_ENTRY_PATH}
-                        className="h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-full px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"
-                      >
-                        Dashboard
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await handleLogout();
-                          setIsDrawerOpen(false);
-                        }}
-                        className="h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-full px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"
-                      >
-                        Logout
-                      </button>
-                    </>
-                  )}
-                </div>
+                    Login
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      href={WORKSPACE_ENTRY_PATH}
+                      onClick={closeDrawer}
+                      className="flex h-9 items-center justify-center rounded-full border border-border text-sm"
+                    >
+                      Dashboard
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleLogout();
+                        closeDrawer();
+                      }}
+                      className="flex h-9 items-center justify-center rounded-full border border-border text-sm"
+                    >
+                      Logout
+                    </button>
+                  </>
+                )}
               </div>
             </motion.div>
           </>
-        )}
+        ) : null}
       </AnimatePresence>
     </header>
   );
