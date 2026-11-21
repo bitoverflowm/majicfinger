@@ -25,8 +25,8 @@ export const POLL_INTERVAL_MS = 8_000;
 export const STREAM_HEARTBEAT_MS = 15_000;
 export const MAP_UPDATE_CADENCE_MS = 350;
 
-export const MOBILE_POINT_CAP = 25;
-export const DESKTOP_POINT_CAP = 50;
+export const MOBILE_POINT_CAP = 40;
+export const DESKTOP_POINT_CAP = 80;
 export const PREVIEW_STORY_CAP = 3;
 
 export const NWS_USER_AGENT = "Lychee War Room (https://lycheedata.com; kash@lycheedata.com)";

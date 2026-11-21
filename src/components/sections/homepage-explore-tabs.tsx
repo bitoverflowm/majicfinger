@@ -295,11 +295,12 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
 
         <div className="mt-4">
           {tab === "war-room" ? (
-            <div className="relative min-h-[28rem] overflow-hidden rounded-[1.5rem] bg-[#070b14] sm:min-h-[34rem]">
+            <div className="relative h-[min(88svh,58rem)] min-h-[32rem] overflow-hidden rounded-[1.5rem] bg-[#070b14]">
               <GlobeStage
                 enhance="auto"
                 features={features}
                 initialCenter={center}
+                keepGlobe
                 interactive
                 onSelect={(id) => {
                   window.location.assign(warRoomHref({ market: id }));
@@ -308,7 +309,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
               />
               <Link
                 href="/war-room"
-                className="absolute bottom-4 right-4 z-10 inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-medium text-slate-950 shadow-lg"
+                className="absolute bottom-4 left-4 z-10 inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-medium text-slate-950 shadow-lg"
               >
                 Open War Room
               </Link>

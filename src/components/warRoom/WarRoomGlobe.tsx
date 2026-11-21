@@ -26,6 +26,8 @@ export type WarRoomGlobeProps = {
   className?: string;
   interactive?: boolean;
   initialCenter?: [number, number] | null;
+  /** Homepage: stay zoomed out so the globe stays visible even with a user location. */
+  keepGlobe?: boolean;
 };
 
 const SOURCE_ID = "war-room-markets";
@@ -49,6 +51,7 @@ export function WarRoomGlobe({
   className,
   interactive = true,
   initialCenter = null,
+  keepGlobe = false,
 }: WarRoomGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
@@ -103,11 +106,12 @@ export function WarRoomGlobe({
       );
       const start = async (style: string | object) => {
         const startCenter = centerRef.current || [-40, 28];
+        const globeZoom = keepGlobe ? 1.55 : centerRef.current ? 3.2 : 1.35;
         const instance = new maplibregl.Map({
           container: containerRef.current as HTMLDivElement,
           style: style as never,
           center: startCenter,
-          zoom: centerRef.current ? 3.2 : 1.35,
+          zoom: globeZoom,
           attributionControl: false,
           interactive,
           fadeDuration: reduceMotion ? 0 : 300,
@@ -242,17 +246,21 @@ export function WarRoomGlobe({
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [interactive]);
+  }, [interactive, keepGlobe]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !initialCenter) return;
     try {
-      map.easeTo({ center: initialCenter, zoom: Math.max(map.getZoom(), 3.2), duration: 800 });
+      map.easeTo({
+        center: initialCenter,
+        zoom: keepGlobe ? Math.min(map.getZoom(), 1.6) : Math.max(map.getZoom(), 3.2),
+        duration: 800,
+      });
     } catch {
       /* ignore */
     }
-  }, [initialCenter]);
+  }, [initialCenter, keepGlobe]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -264,14 +272,14 @@ export function WarRoomGlobe({
     }
     const match = (features?.features || []).find((f) => String(f.properties?.id) === selectedMarketId);
     const coords = match?.geometry?.coordinates;
-    if (coords && interactive) {
+    if (coords && interactive && !keepGlobe) {
       try {
         map.easeTo({ center: coords, zoom: Math.max(map.getZoom(), 2.6), duration: 500 });
       } catch {
         /* ignore */
       }
     }
-  }, [selectedMarketId, features, interactive]);
+  }, [selectedMarketId, features, interactive, keepGlobe]);
 
   return (
     <div

@@ -9,7 +9,7 @@ import {
   GEOPOLITICS_TITLE_RE,
   SOURCE_TIMEOUT_MS,
 } from "./constants";
-import { locateMarket, pointGeometry } from "./geography";
+import { isWeatherSeries, locateMarket, pointGeometry, WEATHER_CITY_SERIES } from "./geography";
 import { warRoomMarketId, warRoomSignalId } from "./ids";
 import { fetchKalshiHighNySeries, fetchNwsNyc, weatherStoryFromLive } from "./weather";
 
@@ -61,9 +61,12 @@ export function fromKalshiFeatured(market, observedTs) {
   const last = toNum(market.lastPriceDollars ?? market.last_price_dollars);
   const prev = toNum(market.raw?.previous_price_dollars);
   const move = last != null && prev != null && prev > 0 ? Number((last - prev).toFixed(4)) : null;
-  const geopolitics = isGeopoliticsText(`${title} ${(market.tags || []).join(" ")} ${seriesTicker}`) ||
-    GEOPOLITICS_SERIES.includes(seriesTicker);
-  const category = geopolitics ? "geopolitics" : "other";
+  const weather = isWeatherSeries(seriesTicker);
+  const geopolitics =
+    !weather &&
+    (isGeopoliticsText(`${title} ${(market.tags || []).join(" ")} ${seriesTicker}`) ||
+      GEOPOLITICS_SERIES.includes(seriesTicker));
+  const category = weather ? "weather" : geopolitics ? "geopolitics" : "other";
   const id = warRoomMarketId("kalshi", ticker);
   const sourceTs = isoMaybe(market.closeTime || market.raw?.updated_time);
   const quote =
@@ -88,10 +91,10 @@ export function fromKalshiFeatured(market, observedTs) {
       seriesTicker,
       title,
       category,
-      desk: geopolitics ? "geopolitics" : "global",
+      desk: weather ? (geo ? "weather" : "global") : geopolitics && geo ? "geopolitics" : geo ? "global" : "global",
       status: String(market.status || "open"),
       region: geo?.region || "Global",
-      geometry: pointGeometry(geo),
+      geometry: pointGeometry(geo, ticker),
       precision: geo?.precision || "global",
       rulesUrl: `https://kalshi.com/markets/${(seriesTicker || ticker).toLowerCase()}`,
       marketUrl: `https://kalshi.com/markets/${(seriesTicker || ticker).toLowerCase()}`,
@@ -101,7 +104,7 @@ export function fromKalshiFeatured(market, observedTs) {
       ],
       featured: Boolean(market.featured),
       volume24h: toNum(market.volume24h),
-      matchConfidence: geopolitics ? 0.7 : 0.4,
+      matchConfidence: weather ? 0.85 : geopolitics ? 0.7 : geo ? 0.55 : 0.4,
       quote,
     },
     quote,
@@ -155,10 +158,10 @@ export function fromPolymarketFeatured(market, observedTs) {
       venueMarketId: conditionId,
       title,
       category: geopolitics ? "geopolitics" : "other",
-      desk: geopolitics ? "geopolitics" : geo ? "geopolitics" : "global",
+      desk: geopolitics ? "geopolitics" : "global",
       status: "open",
       region: geo?.region || "Global",
-      geometry: pointGeometry(geo),
+      geometry: pointGeometry(geo, conditionId),
       precision: geo?.precision || "global",
       rulesUrl: slug ? `https://polymarket.com/event/${slug}` : "https://polymarket.com",
       marketUrl: slug ? `https://polymarket.com/event/${slug}` : "https://polymarket.com",
@@ -212,12 +215,22 @@ export async function fetchLiveWarRoomSources() {
   const observedTs = isoNow();
   const weatherP = withTimeout(fetchKalshiHighNySeries(), SOURCE_TIMEOUT_MS, "kalshi-weather");
   const nwsP = withTimeout(fetchNwsNyc(), SOURCE_TIMEOUT_MS, "nws");
-  const kalshiP = withTimeout(fetchKalshiLiveFeaturedMarkets({ limit: 8 }), SOURCE_TIMEOUT_MS, "kalshi-featured");
-  const polyP = withTimeout(fetchPolymarketLiveFeaturedMarkets({ limit: 8 }), SOURCE_TIMEOUT_MS, "polymarket-featured");
-  const extraKalshiP = Promise.all(
-    GEOPOLITICS_SERIES.filter((s) => s !== "KXFED" && s !== "KXPRES").map((ticker) =>
-      fetchKalshiSeriesOpen(ticker).catch(() => []),
+  const kalshiP = withTimeout(fetchKalshiLiveFeaturedMarkets({ limit: 12 }), SOURCE_TIMEOUT_MS, "kalshi-featured");
+  const polyP = withTimeout(fetchPolymarketLiveFeaturedMarkets({ limit: 24 }), SOURCE_TIMEOUT_MS, "polymarket-featured");
+  const extraSeries = [
+    ...GEOPOLITICS_SERIES.filter((s) => s !== "KXFED" && s !== "KXPRES"),
+    ...WEATHER_CITY_SERIES,
+  ];
+  const extraKalshiP = withTimeout(
+    Promise.all(
+      extraSeries.map((ticker) =>
+        fetchKalshiSeriesOpen(ticker)
+          .then((markets) => ({ ticker, markets }))
+          .catch(() => ({ ticker, markets: [] })),
+      ),
     ),
+    12_000,
+    "kalshi-located-series",
   );
 
   const [weatherR, nwsR, kalshiR, polyR, extraR] = await Promise.allSettled([
@@ -280,9 +293,7 @@ export async function fetchLiveWarRoomSources() {
       const mapped = fromKalshiFeatured(row, observedTs);
       if (!mapped) continue;
       if (markets.some((m) => m.id === mapped.market.id)) continue;
-      if (mapped.market.category !== "geopolitics" && mapped.market.desk === "global") {
-        if (!isGeopoliticsText(mapped.market.title)) continue;
-      }
+      if (!mapped.market.geometry && mapped.market.category === "other") continue;
       markets.push(mapped.market);
       if (mapped.signal) {
         signals.push(mapped.signal);
@@ -299,12 +310,17 @@ export async function fetchLiveWarRoomSources() {
   }
 
   if (extraR.status === "fulfilled") {
+    const weatherSeries = new Set(WEATHER_CITY_SERIES);
     for (const batch of extraR.value || []) {
-      for (const raw of batch.slice(0, 2)) {
+      const ticker = String(batch?.ticker || "");
+      const rows = Array.isArray(batch?.markets) ? batch.markets : [];
+      const take = weatherSeries.has(ticker) ? 1 : 2;
+      const ranked = [...rows].sort((a, b) => (toNum(b.volume_24h_fp) || 0) - (toNum(a.volume_24h_fp) || 0));
+      for (const raw of ranked.slice(0, take)) {
         const mapped = fromKalshiFeatured(
           {
             ticker: raw.ticker,
-            seriesTicker: raw.series_ticker,
+            seriesTicker: raw.series_ticker || ticker,
             title: raw.title || raw.yes_sub_title,
             lastPriceDollars: toNum(raw.last_price_dollars),
             raw,
@@ -315,8 +331,10 @@ export async function fetchLiveWarRoomSources() {
         );
         if (!mapped) continue;
         if (markets.some((m) => m.id === mapped.market.id)) continue;
-        mapped.market.category = "geopolitics";
-        mapped.market.desk = mapped.market.geometry ? "geopolitics" : "global";
+        if (!weatherSeries.has(ticker)) {
+          mapped.market.category = "geopolitics";
+          mapped.market.desk = mapped.market.geometry ? "geopolitics" : "global";
+        }
         markets.push(mapped.market);
       }
     }
@@ -324,15 +342,10 @@ export async function fetchLiveWarRoomSources() {
 
   if (polyR.status === "fulfilled") {
     freshness.polymarket = { asOf: observedTs, status: "ok", ageMs: 0 };
-    let geoCount = 0;
     for (const row of polyR.value || []) {
       const mapped = fromPolymarketFeatured(row, observedTs);
       if (!mapped) continue;
-      if (mapped.market.category !== "geopolitics" && !mapped.market.geometry) {
-        if (geoCount >= 4) continue;
-      }
-      if (mapped.market.category === "geopolitics") geoCount += 1;
-      else if (geoCount >= 4 && !mapped.market.geometry) continue;
+      if (!mapped.market.geometry && mapped.market.category !== "geopolitics") continue;
       markets.push(mapped.market);
       if (mapped.signal) {
         signals.push(mapped.signal);
@@ -345,7 +358,6 @@ export async function fetchLiveWarRoomSources() {
           createdAt: observedTs,
         });
       }
-      if (geoCount >= 6) break;
     }
   } else {
     freshness.polymarket = {
