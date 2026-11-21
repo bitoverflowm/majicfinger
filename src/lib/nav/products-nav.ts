@@ -178,6 +178,14 @@ export function getProductsNavData(): ProductsNavData {
     ],
     products: [
       {
+        id: "war-room",
+        label: "War Room",
+        href: "/war-room",
+        description:
+          "A live globe of prediction-market stories — weather, geopolitics, odds, and evidence.",
+        badge: "New",
+      },
+      {
         id: "jarvis",
         label: "Jarvis",
         href: "/jarvis",
