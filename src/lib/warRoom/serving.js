@@ -4,8 +4,12 @@ import {
   CATEGORIES,
   matchesCategory,
   normalizeCategory,
+  normalizeExploreFeed,
 } from "@/lib/markets/exploreCategories";
-import { fetchPolymarketMarketsByTagSlug } from "@/lib/polymarketLive/fetchPolymarketLiveFeaturedMarkets";
+import {
+  fetchPolymarketMarketsByExploreFeed,
+  fetchPolymarketMarketsByTagSlug,
+} from "@/lib/polymarketLive/fetchPolymarketLiveFeaturedMarkets";
 import { fetchLiveWarRoomSources, fromPolymarketFeatured } from "./adapters";
 import {
   DESKTOP_POINT_CAP,
@@ -149,6 +153,27 @@ function matchesDesk(market, desk) {
 }
 
 /**
+ * Map Gamma/explore rows into War Room markets, skipping ids already present.
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {string} observedTs
+ * @param {Set<string>} existingIds
+ * @param {(market: Record<string, unknown>) => boolean} [accept]
+ */
+function mapBoostedMarkets(rows, observedTs, existingIds, accept) {
+  /** @type {Array<Record<string, unknown>>} */
+  const out = [];
+  for (const row of rows) {
+    const mapped = fromPolymarketFeatured(row, observedTs);
+    if (!mapped?.market) continue;
+    if (existingIds.has(mapped.market.id)) continue;
+    if (accept && !accept(mapped.market)) continue;
+    existingIds.add(mapped.market.id);
+    out.push(mapped.market);
+  }
+  return out;
+}
+
+/**
  * When a category chip is active, pull volume-ranked Polymarket markets for that
  * tag so the globe / rail aren't limited to the small featured pool.
  * @param {string} category
@@ -162,20 +187,59 @@ async function categoryPolymarketBoost(category, observedTs, existingIds) {
   if (!tagSlug) return [];
   try {
     const rows = await fetchPolymarketMarketsByTagSlug(tagSlug, { limit: 64 });
-    /** @type {Array<Record<string, unknown>>} */
-    const out = [];
-    for (const row of rows) {
-      const mapped = fromPolymarketFeatured(row, observedTs);
-      if (!mapped?.market) continue;
-      if (existingIds.has(mapped.market.id)) continue;
-      if (!matchesCategory(mapped.market, category)) continue;
-      existingIds.add(mapped.market.id);
-      out.push(mapped.market);
-    }
-    return out;
+    return mapBoostedMarkets(rows, observedTs, existingIds, (market) =>
+      matchesCategory(market, category),
+    );
   } catch {
     return [];
   }
+}
+
+/**
+ * When an Explore feed chip is active, pull that Gamma ranking onto the globe.
+ * @param {string} exploreFeed
+ * @param {string} observedTs
+ * @param {Set<string>} existingIds
+ */
+async function exploreFeedPolymarketBoost(exploreFeed, observedTs, existingIds) {
+  if (!exploreFeed) return [];
+  try {
+    const rows = await fetchPolymarketMarketsByExploreFeed(exploreFeed, { limit: 64 });
+    return mapBoostedMarkets(rows, observedTs, existingIds);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} markets
+ * @param {string} exploreFeed
+ */
+function sortMarketsForExploreFeed(markets, exploreFeed) {
+  const rows = [...markets];
+  if (exploreFeed === "competitive") {
+    return rows.sort((a, b) => {
+      const ap = Math.abs((Number(a.quote?.price) || 0.5) - 0.5);
+      const bp = Math.abs((Number(b.quote?.price) || 0.5) - 0.5);
+      if (ap !== bp) return ap - bp;
+      return (Number(b.volume24h) || 0) - (Number(a.volume24h) || 0);
+    });
+  }
+  if (exploreFeed === "trending") {
+    return rows.sort((a, b) => {
+      const am = Math.abs(Number(a.quote?.move) || 0);
+      const bm = Math.abs(Number(b.quote?.move) || 0);
+      if (bm !== am) return bm - am;
+      return (Number(b.volume24h) || 0) - (Number(a.volume24h) || 0);
+    });
+  }
+  // volume / liquidity / new / closed / default — volume first, then move.
+  return rows.sort((a, b) => {
+    const av = Number(a.volume24h) || 0;
+    const bv = Number(b.volume24h) || 0;
+    if (bv !== av) return bv - av;
+    return Math.abs(Number(b.quote?.move) || 0) - Math.abs(Number(a.quote?.move) || 0);
+  });
 }
 
 function signalsForMarket(bundle, marketId) {
@@ -375,6 +439,7 @@ export async function getWarRoomPreview(opts = {}) {
  *   desk?: string;
  *   market?: string;
  *   category?: string;
+ *   exploreFeed?: string;
  *   mobile?: boolean;
  *   cursor?: string;
  *   forceFixture?: boolean;
@@ -383,29 +448,62 @@ export async function getWarRoomPreview(opts = {}) {
 export async function getWarRoomSnapshot(opts = {}) {
   const desk = normalizeDesk(opts.desk);
   const category = normalizeCategory(opts.category);
+  const exploreFeed = normalizeExploreFeed(opts.exploreFeed);
   const bundle = await loadWarRoomBundle(opts);
   const marketId = String(opts.market || "").trim();
   const existingIds = new Set(bundle.markets.map((market) => market.id));
-  const boosted = category
-    ? await categoryPolymarketBoost(category, bundle.asOf, existingIds)
+
+  // Explore feed and category chips are mutually exclusive (same as Holder Explore).
+  const feedBoosted = exploreFeed
+    ? await exploreFeedPolymarketBoost(exploreFeed, bundle.asOf, existingIds)
     : [];
-  const pool = boosted.length ? [...bundle.markets, ...boosted] : bundle.markets;
+  const categoryBoosted =
+    !exploreFeed && category
+      ? await categoryPolymarketBoost(category, bundle.asOf, existingIds)
+      : [];
+
+  /** @type {Array<Record<string, unknown>>} */
+  let pool;
+  if (feedBoosted.length) {
+    // Keep Kalshi desk rows so the globe stays multi-venue while Polymarket follows the feed.
+    const kalshi = bundle.markets.filter((market) => market.venue === "kalshi");
+    pool = [...feedBoosted];
+    for (const market of kalshi) {
+      if (existingIds.has(market.id)) continue;
+      existingIds.add(market.id);
+      pool.push(market);
+    }
+  } else if (categoryBoosted.length) {
+    pool = [...bundle.markets, ...categoryBoosted];
+  } else {
+    pool = bundle.markets;
+  }
+
   const filtered = pool.filter(
-    (market) => matchesDesk(market, desk) && matchesCategory(market, category),
+    (market) =>
+      matchesDesk(market, desk) &&
+      (exploreFeed || matchesCategory(market, category)),
   );
-  const byVolume = [...filtered].sort((a, b) => {
-    const av = Number(a.volume24h) || 0;
-    const bv = Number(b.volume24h) || 0;
-    if (bv !== av) return bv - av;
-    return Math.abs(Number(b.quote?.move) || 0) - Math.abs(Number(a.quote?.move) || 0);
-  });
+  const ranked = sortMarketsForExploreFeed(filtered, exploreFeed);
   const marketById = new Map(pool.map((market) => [market.id, market]));
+  const filteredIds = new Set(ranked.map((market) => market.id));
   const cap = opts.mobile ? MOBILE_POINT_CAP : DESKTOP_POINT_CAP;
-  const features = byVolume.map(featureFromMarket).filter(Boolean).slice(0, cap);
-  const feed = byVolume.slice(0, FEED_ROW_CAP).map((market) => feedRow(bundle, market));
-  const activity = activityRows(bundle).filter((row) =>
-    activityMatchesCategory(row, category, marketById),
-  );
+  const features = ranked.map(featureFromMarket).filter(Boolean).slice(0, cap);
+  const feed = ranked.slice(0, FEED_ROW_CAP).map((market) => feedRow(bundle, market));
+  const activity = activityRows(bundle).filter((row) => {
+    if (category && !activityMatchesCategory(row, category, marketById)) return false;
+    if (!exploreFeed) return true;
+    if (row.marketId && filteredIds.has(row.marketId)) return true;
+    if (row.kind !== "headline") return false;
+    const related = Array.isArray(row.data?.markets) ? row.data.markets : [];
+    for (const item of related) {
+      const condition = String(item?.condition_id || item?.conditionId || "").trim();
+      const ticker = String(item?.ticker || "").trim().toUpperCase();
+      if (condition && filteredIds.has(`polymarket:${condition}`)) return true;
+      if (ticker && filteredIds.has(`kalshi:${ticker}`)) return true;
+    }
+    return false;
+  });
   const newsPings = activity
     .filter((row) => row.kind === "headline" && row.geometry?.type === "Point")
     .slice(0, NEWS_ACTIVITY_CAP)
@@ -421,10 +519,15 @@ export async function getWarRoomSnapshot(opts = {}) {
       },
     }));
   const selected = marketId
-    ? filtered.find((m) => m.id === marketId) ||
-      pool.find((m) => m.id === marketId && matchesDesk(m, desk) && matchesCategory(m, category))
+    ? ranked.find((m) => m.id === marketId) ||
+      pool.find(
+        (m) =>
+          m.id === marketId &&
+          matchesDesk(m, desk) &&
+          (exploreFeed || matchesCategory(m, category)),
+      )
     : null;
-  const selectedValid = selected ? selected : marketId ? null : byVolume[0] || null;
+  const selectedValid = selected ? selected : marketId ? null : ranked[0] || null;
   const invalidMarket = Boolean(marketId && parseWarRoomMarketId(marketId) && !selectedValid);
   const missingMarket = Boolean(marketId && !parseWarRoomMarketId(marketId));
 
@@ -439,6 +542,7 @@ export async function getWarRoomSnapshot(opts = {}) {
     freshness: bundle.freshness,
     desk,
     category: category || null,
+    exploreFeed: exploreFeed || null,
     cursor: cursorFor(bundle, desk),
     features: { type: "FeatureCollection", features },
     pings: { type: "FeatureCollection", features: newsPings },
@@ -449,7 +553,9 @@ export async function getWarRoomSnapshot(opts = {}) {
       ? pool.length
         ? category
           ? "no_markets_in_category"
-          : "no_markets_in_desk"
+          : exploreFeed
+            ? "no_markets_in_feed"
+            : "no_markets_in_desk"
         : "no_snapshot"
       : invalidMarket || missingMarket
         ? "invalid_market"

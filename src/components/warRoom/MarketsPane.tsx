@@ -87,7 +87,9 @@ export function MarketsPane({
           ? "Nothing in this desk right now."
           : emptyReason === "no_markets_in_category"
             ? "No markets in this category right now."
-            : "Waiting for live markets…"}
+            : emptyReason === "no_markets_in_feed"
+              ? "No markets in this feed right now."
+              : "Waiting for live markets…"}
       </div>
     );
   }

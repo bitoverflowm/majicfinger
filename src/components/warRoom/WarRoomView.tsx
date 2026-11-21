@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCompactScreen } from "@/lib/desktopOnly";
-import { CATEGORIES } from "@/lib/markets/exploreCategories";
+import { CATEGORIES, EXPLORE_FEEDS, EXPLORE_TOP_FEEDS } from "@/lib/markets/exploreCategories";
 import { cn } from "@/lib/utils";
 
 import { ActivityPane, type ActivityRow } from "./ActivityPane";
@@ -65,6 +65,7 @@ export function WarRoomView({
   const [detailOpen, setDetailOpen] = useState(false);
   const [feedRevealed, setFeedRevealed] = useState(false);
   const [categoryId, setCategoryId] = useState("");
+  const [exploreFeedId, setExploreFeedId] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
 
   const market = controlledMarket ?? localMarket;
@@ -95,20 +96,37 @@ export function WarRoomView({
     desk: "all",
     market,
     category: categoryId,
+    exploreFeed: exploreFeedId,
     fixture,
     mobile: compact,
   });
 
+  const clearSelectionChrome = useCallback(() => {
+    setActivityId(null);
+    setDetail(null);
+    setDetailOpen(false);
+    setFocusTarget(null);
+    setMarket(null);
+  }, [setMarket]);
+
+  const pickExploreFeed = useCallback(
+    (next: string) => {
+      // Match Holder Explore: feed chips clear category filters.
+      setExploreFeedId(next === "tradable" ? "" : next);
+      setCategoryId("");
+      clearSelectionChrome();
+    },
+    [clearSelectionChrome],
+  );
+
   const pickCategory = useCallback(
     (next: string) => {
+      // Match Holder Explore: category chips clear feed rankings.
       setCategoryId(next);
-      setActivityId(null);
-      setDetail(null);
-      setDetailOpen(false);
-      setFocusTarget(null);
-      setMarket(null);
+      setExploreFeedId("");
+      clearSelectionChrome();
     },
-    [setMarket],
+    [clearSelectionChrome],
   );
 
   const features = (snapshot?.features as { type: "FeatureCollection"; features: never[] }) || {
@@ -271,43 +289,97 @@ export function WarRoomView({
     </div>
   );
 
+  const chipClass = (selected: boolean) =>
+    cn(
+      "shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors",
+      selected
+        ? "bg-white font-medium text-slate-950"
+        : "text-slate-300 hover:bg-white/10 hover:text-white",
+    );
+
+  const exploreFeedGroups = useMemo(() => {
+    const groups: Array<{ label: string; feeds: typeof EXPLORE_FEEDS }> = [];
+    for (const item of EXPLORE_FEEDS) {
+      const label = EXPLORE_TOP_FEEDS.has(item.id) ? "Top markets by" : "";
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) last.feeds.push(item);
+      else groups.push({ label, feeds: [item] });
+    }
+    return groups;
+  }, []);
+
   const categoryBar = (
-    <div
-      role="tablist"
-      aria-label="Market categories"
-      className="pointer-events-auto absolute left-1/2 top-3 z-20 flex max-w-[min(100%,52rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-full border border-white/10 bg-black/70 px-1.5 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-md"
-    >
-      <button
-        type="button"
-        role="tab"
-        aria-selected={!categoryId}
-        onClick={() => pickCategory("")}
-        className={cn(
-          "shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors",
-          !categoryId
-            ? "bg-white font-medium text-slate-950"
-            : "text-slate-300 hover:bg-white/10 hover:text-white",
-        )}
+    <div className="pointer-events-auto absolute left-1/2 top-3 z-20 flex max-w-[min(100%,56rem)] -translate-x-1/2 flex-col gap-1 rounded-2xl border border-white/10 bg-black/70 px-1.5 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-md">
+      <div
+        role="tablist"
+        aria-label="Markets to show"
+        className="flex max-w-full items-end gap-1 overflow-x-auto"
       >
-        All
-      </button>
-      {CATEGORIES.map((category) => (
-        <button
-          key={category.id}
-          type="button"
-          role="tab"
-          aria-selected={categoryId === category.id}
-          onClick={() => pickCategory(category.id)}
-          className={cn(
-            "shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors",
-            categoryId === category.id
-              ? "bg-white font-medium text-slate-950"
-              : "text-slate-300 hover:bg-white/10 hover:text-white",
-          )}
-        >
-          {category.label}
-        </button>
-      ))}
+        {exploreFeedGroups.map((group) =>
+          group.label ? (
+            <div key={group.label} role="group" aria-label={group.label} className="flex shrink-0 flex-col gap-0.5">
+              <span className="px-1 text-[9px] font-medium uppercase tracking-[0.12em] text-slate-500">
+                {group.label}
+              </span>
+              <div className="flex items-center gap-1">
+                {group.feeds.map((feed) => {
+                  const selected = exploreFeedId
+                    ? exploreFeedId === feed.id
+                    : !categoryId && feed.id === "tradable";
+                  return (
+                    <button
+                      key={feed.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => pickExploreFeed(feed.id)}
+                      className={chipClass(selected)}
+                    >
+                      {feed.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            group.feeds.map((feed) => {
+              const selected = exploreFeedId
+                ? exploreFeedId === feed.id
+                : !categoryId && feed.id === "tradable";
+              return (
+                <button
+                  key={feed.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => pickExploreFeed(feed.id)}
+                  className={chipClass(selected)}
+                >
+                  {feed.label}
+                </button>
+              );
+            })
+          ),
+        )}
+      </div>
+      <div
+        role="tablist"
+        aria-label="Categories"
+        className="flex max-w-full items-center gap-1 overflow-x-auto border-t border-white/10 pt-1"
+      >
+        {CATEGORIES.map((category) => (
+          <button
+            key={category.id}
+            type="button"
+            role="tab"
+            aria-selected={categoryId === category.id}
+            onClick={() => pickCategory(categoryId === category.id ? "" : category.id)}
+            className={chipClass(categoryId === category.id)}
+          >
+            {category.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 

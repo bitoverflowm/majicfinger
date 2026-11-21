@@ -389,3 +389,51 @@ export async function fetchPolymarketMarketsByTagSlug(tagSlug, opts = {}) {
   });
   return marketsFromPayload(payload).filter((market) => market.outcomes.length >= 2);
 }
+
+/** Gamma list queries mirroring Holder Explore feeds. */
+const EXPLORE_FEED_QUERIES = {
+  new: { closed: false, order: "createdAt", ascending: false },
+  closed: { closed: true, order: "closedTime", ascending: false },
+  volume: { closed: false, order: "volume24hr", ascending: false },
+  liquidity: { closed: false, order: "liquidityNum", ascending: false },
+  competitive: { closed: false, order: "volume24hr", ascending: false },
+  trending: { closed: false, order: "volume24hr", ascending: false },
+};
+
+/**
+ * Markets for a Holder Explore feed chip (War Room globe tags).
+ *
+ * @param {string} feedId
+ * @param {{ limit?: number }} [opts]
+ * @returns {Promise<FeaturedPolymarketMarket[]>}
+ */
+export async function fetchPolymarketMarketsByExploreFeed(feedId, opts = {}) {
+  const id = String(feedId || "").trim().toLowerCase();
+  const query = EXPLORE_FEED_QUERIES[id];
+  if (!query) return [];
+  const limit = Math.max(1, Math.min(100, Math.floor(Number(opts.limit) || 64)));
+  const payload = await gammaGet("/markets", {
+    ...query,
+    limit,
+  });
+  let markets = marketsFromPayload(payload).filter((market) => market.outcomes.length >= 2);
+  if (id === "competitive") {
+    markets = markets
+      .map((market) => {
+        const yes =
+          market.outcomes.find((o) => String(o.outcome).toLowerCase() === "yes") || market.outcomes[0];
+        const price = featuredOutcomePriceDollars(yes?.lastPrice);
+        if (price == null || price < 0.2 || price > 0.8) return null;
+        return { market, distance: Math.abs(price - 0.5) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.distance - b.distance || (b.market.volume24h || 0) - (a.market.volume24h || 0))
+      .map((entry) => entry.market);
+  }
+  if (id === "trending") {
+    markets = markets
+      .filter((market) => (market.volume24h || 0) >= 5_000)
+      .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0));
+  }
+  return markets;
+}

@@ -39,12 +39,14 @@ export function useWarRoomData({
   desk,
   market,
   category,
+  exploreFeed,
   fixture,
   mobile,
 }: {
   desk: string;
   market: string;
   category?: string;
+  exploreFeed?: string;
   fixture?: boolean;
   mobile?: boolean;
 }) {
@@ -60,6 +62,7 @@ export function useWarRoomData({
         desk,
         market,
         category: category || undefined,
+        exploreFeed: exploreFeed || undefined,
         fixture,
         mobile: mobile ? "1" : undefined,
       })}`,
@@ -70,7 +73,7 @@ export function useWarRoomData({
     setSnapshot(body);
     setError(null);
     return body as Snapshot;
-  }, [desk, market, category, fixture, mobile]);
+  }, [desk, market, category, exploreFeed, fixture, mobile]);
 
   const loadDetail = useCallback(
     async (id: string) => {

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   CATEGORIES,
+  EXPLORE_TOP_FEEDS,
   FEEDS,
   cachedFeed,
   cachedStats,
@@ -53,8 +54,6 @@ const FEED_SORTS = {
   trending: ["movers", "volume", "closing"],
   competitive: ["competitive", "volume", "closing"],
 };
-
-const TOP_FEEDS = new Set(["closed", "volume", "liquidity", "competitive"]);
 
 function sortsFor(feed) {
   return FEED_SORTS[feed] || FEED_SORTS.tradable;
@@ -602,7 +601,7 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
   );
   const feedGroups = [];
   for (const item of FEEDS) {
-    const label = TOP_FEEDS.has(item.id) ? "Top markets by" : "";
+    const label = EXPLORE_TOP_FEEDS.has(item.id) ? "Top markets by" : "";
     const last = feedGroups[feedGroups.length - 1];
     if (last && last.label === label) last.feeds.push(item);
     else feedGroups.push({ label, feeds: [item] });

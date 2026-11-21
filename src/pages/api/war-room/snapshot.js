@@ -1,10 +1,10 @@
 import { rejectIfAnonymousRateLimited } from "@/lib/kalshiLive/anonymousIpRateLimit";
-import { normalizeCategory } from "@/lib/markets/exploreCategories";
+import { normalizeCategory, normalizeExploreFeed } from "@/lib/markets/exploreCategories";
 import { deskAndMarketFromQuery } from "@/lib/warRoom/href";
 import { getWarRoomSnapshot, snapshotCacheControl } from "@/lib/warRoom/serving";
 
 /**
- * GET /api/war-room/snapshot?desk=&market=&category=&cursor=&mobile=1
+ * GET /api/war-room/snapshot?desk=&market=&category=&exploreFeed=&cursor=&mobile=1
  */
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -28,12 +28,16 @@ export default async function handler(req, res) {
   const category = normalizeCategory(
     Array.isArray(req.query.category) ? req.query.category[0] : req.query.category,
   );
+  const exploreFeed = normalizeExploreFeed(
+    Array.isArray(req.query.exploreFeed) ? req.query.exploreFeed[0] : req.query.exploreFeed,
+  );
 
   try {
     const snapshot = await getWarRoomSnapshot({
       desk,
       market,
       category,
+      exploreFeed,
       cursor,
       mobile,
       forceFixture: fixture,
