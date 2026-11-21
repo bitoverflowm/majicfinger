@@ -33,3 +33,14 @@ test("resolveMarketLocation places known entities at HQ", () => {
 test("resolveMarketLocation returns null when nothing matches", () => {
   assert.equal(resolveMarketLocation({ title: "Will the purple widget ship?" }), null);
 });
+
+test("resolveMarketLocation places weather cities on the real city", () => {
+  const sg = resolveMarketLocation({
+    title: "Will the highest temperature in Singapore be 30°C on November 22?",
+  });
+  assert.equal(sg.region, "Singapore");
+  assert.ok(sg.lon > 100 && sg.lat > 0 && sg.lat < 5);
+  const hk = resolveMarketLocation({ title: "Highest temperature in Hong Kong on November 21?" });
+  assert.equal(hk.region, "Hong Kong");
+  assert.ok(hk.lon > 110);
+});

@@ -3,9 +3,10 @@
  *
  * Resolution order:
  * 1. Sports club / franchise → home stadium city
- * 2. Crypto markets → New York City
- * 3. Known people / companies → HQ city
- * 4. Broad US topical cues → Washington / US centroid
+ * 2. Named cities (weather temps, geopolitics titles, etc.)
+ * 3. Crypto markets → New York City
+ * 4. Known people / companies → HQ city
+ * 5. Broad US topical cues → Washington / US centroid
  *
  * Import `resolveMarketLocation` anywhere you need the same rules (War Room,
  * news pings, research cards, etc.).
@@ -150,6 +151,57 @@ const SPORTS_HOMES = [
   { keys: ["world cup", "fifa world cup"], region: "United States", lon: -98.5795, lat: 39.8283, venue: undefined },
 ];
 
+/**
+ * City centroids for Polymarket/Kalshi weather titles (“Highest temperature in Singapore…”)
+ * and other city-named markets. Longest key wins.
+ * @type {Array<{ keys: string[]; region: string; lon: number; lat: number }>}
+ */
+const CITY_HOMES = [
+  // Polymarket daily-temperature cities (intl)
+  { keys: ["singapore"], region: "Singapore", lon: 103.8198, lat: 1.3521 },
+  { keys: ["hong kong"], region: "Hong Kong", lon: 114.1694, lat: 22.3193 },
+  { keys: ["tokyo"], region: "Tokyo", lon: 139.6917, lat: 35.6895 },
+  { keys: ["seoul", "incheon"], region: "Seoul", lon: 126.978, lat: 37.5665 },
+  { keys: ["busan"], region: "Busan", lon: 129.0756, lat: 35.1796 },
+  { keys: ["taipei"], region: "Taipei", lon: 121.5654, lat: 25.033 },
+  { keys: ["beijing"], region: "Beijing", lon: 116.4074, lat: 39.9042 },
+  { keys: ["shanghai"], region: "Shanghai", lon: 121.4737, lat: 31.2304 },
+  { keys: ["shenzhen"], region: "Shenzhen", lon: 114.0579, lat: 22.5431 },
+  { keys: ["guangzhou"], region: "Guangzhou", lon: 113.2644, lat: 23.1291 },
+  { keys: ["chengdu"], region: "Chengdu", lon: 104.0665, lat: 30.5728 },
+  { keys: ["london"], region: "London", lon: -0.1276, lat: 51.5074 },
+  { keys: ["paris"], region: "Paris", lon: 2.3522, lat: 48.8566 },
+  { keys: ["munich"], region: "Munich", lon: 11.5761, lat: 48.1372 },
+  { keys: ["amsterdam"], region: "Amsterdam", lon: 4.9041, lat: 52.3676 },
+  { keys: ["milan"], region: "Milan", lon: 9.19, lat: 45.4642 },
+  { keys: ["madrid"], region: "Madrid", lon: -3.7038, lat: 40.4168 },
+  { keys: ["warsaw"], region: "Warsaw", lon: 21.0122, lat: 52.2297 },
+  { keys: ["helsinki"], region: "Helsinki", lon: 24.9384, lat: 60.1699 },
+  { keys: ["moscow"], region: "Moscow", lon: 37.6173, lat: 55.7558 },
+  { keys: ["istanbul"], region: "Istanbul", lon: 28.9784, lat: 41.0082 },
+  { keys: ["ankara"], region: "Ankara", lon: 32.8597, lat: 39.9334 },
+  { keys: ["tel aviv"], region: "Tel Aviv", lon: 34.7818, lat: 32.0853 },
+  { keys: ["jeddah"], region: "Jeddah", lon: 39.1925, lat: 21.4858 },
+  { keys: ["toronto"], region: "Toronto", lon: -79.3832, lat: 43.6532 },
+  { keys: ["mexico city"], region: "Mexico City", lon: -99.1332, lat: 19.4326 },
+  { keys: ["sao paulo", "são paulo"], region: "São Paulo", lon: -46.6333, lat: -23.5505 },
+  { keys: ["wellington"], region: "Wellington", lon: 174.7762, lat: -41.2865 },
+  { keys: ["auckland"], region: "Auckland", lon: 174.7633, lat: -36.8485 },
+  { keys: ["jakarta"], region: "Jakarta", lon: 106.8456, lat: -6.2088 },
+  { keys: ["manila"], region: "Manila", lon: 120.9842, lat: 14.5995 },
+  { keys: ["kuala lumpur"], region: "Kuala Lumpur", lon: 101.6869, lat: 3.139 },
+  { keys: ["lucknow"], region: "Lucknow", lon: 80.9462, lat: 26.8467 },
+  // US weather regulars
+  { keys: ["new york", "nyc"], region: "New York City", lon: -73.9654, lat: 40.7829 },
+  { keys: ["miami"], region: "Miami", lon: -80.1918, lat: 25.7617 },
+  { keys: ["chicago"], region: "Chicago", lon: -87.6298, lat: 41.8781 },
+  { keys: ["los angeles"], region: "Los Angeles", lon: -118.2437, lat: 34.0522 },
+  { keys: ["dallas"], region: "Dallas", lon: -96.797, lat: 32.7767 },
+  { keys: ["atlanta"], region: "Atlanta", lon: -84.388, lat: 33.749 },
+  { keys: ["seattle"], region: "Seattle", lon: -122.3321, lat: 47.6062 },
+  { keys: ["austin"], region: "Austin", lon: -97.7431, lat: 30.2672 },
+];
+
 /** People / companies with a clear HQ city (prediction-market regulars). */
 const ENTITY_HOMES = [
   { keys: ["jensen huang", "nvidia"], region: "Santa Clara", lon: -121.9552, lat: 37.3541 },
@@ -210,6 +262,10 @@ export function resolveMarketLocation(input = {}) {
 
   const sports = matchCatalog(hay, SPORTS_HOMES, "sports_home");
   if (sports) return sports;
+
+  // Cities before crypto so “temperature in Singapore” isn’t dumped in NYC.
+  const city = matchCatalog(hay, CITY_HOMES, "city");
+  if (city) return city;
 
   const tags = Array.isArray(input.tags)
     ? input.tags.map((t) => String(t?.label ?? t ?? "").toLowerCase())

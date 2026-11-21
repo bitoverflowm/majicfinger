@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RotateCcw } from "lucide-react";
 
 import { useCompactScreen } from "@/lib/desktopOnly";
 import {
@@ -22,7 +23,9 @@ import {
   type WarRoomDetailTarget,
   type WarRoomNavigateRequest,
 } from "./WarRoomDetailCard";
+import { DashboardLoadingProgress } from "@/components/publicEmbed/DashboardLoadingProgress";
 import { WarRoomLayersRail } from "./WarRoomLayersRail";
+import { WAR_ROOM_LOAD_STEPS, WarRoomRailSkeleton } from "./WarRoomLoadingProgress";
 import { relatedMarketsForHeadline } from "./relatedMarkets";
 import { useWarRoomData } from "./useWarRoomData";
 
@@ -71,7 +74,8 @@ export function WarRoomView({
   className?: string;
 }) {
   const compactScreen = useCompactScreen();
-  const compact = compactScreen !== false;
+  /** Until the breakpoint is known, treat as desktop so we don't thrash mobile snapshot fetches. */
+  const compact = compactScreen === true;
   const [localMarket, setLocalMarket] = useState("");
   const [mobileView, setMobileView] = useState<"globe" | "feed" | "detail">("globe");
   const [activityId, setActivityId] = useState<string | null>(null);
@@ -81,6 +85,7 @@ export function WarRoomView({
   const [feedRevealed, setFeedRevealed] = useState(false);
   const [categoryId, setCategoryId] = useState("");
   const [exploreFeedId, setExploreFeedId] = useState("tradable");
+  const [mapResetNonce, setMapResetNonce] = useState(0);
   const [sessionTrades, setSessionTrades] = useState(0);
   const [sessionTraders, setSessionTraders] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -112,7 +117,7 @@ export function WarRoomView({
     [onMarketChange],
   );
 
-  const { snapshot, error, transport } = useWarRoomData({
+  const { snapshot, error, loading, transport } = useWarRoomData({
     desk: "all",
     market,
     category: categoryId,
@@ -120,6 +125,9 @@ export function WarRoomView({
     fixture,
     mobile: compact,
   });
+
+  /** Cold start only — never blank rails/globe once we have a snapshot. */
+  const coldStart = loading && !snapshot;
 
   const marketsRailLabel = useMemo(
     () => exploreMarketsByVolumeLabel({ exploreFeed: exploreFeedId, category: categoryId }),
@@ -158,16 +166,31 @@ export function WarRoomView({
     [clearSelectionChrome],
   );
 
-  const features = (snapshot?.features as { type: "FeatureCollection"; features: never[] }) || {
-    type: "FeatureCollection",
-    features: [],
-  };
-  const pings = (snapshot?.pings as { type: "FeatureCollection"; features: never[] }) || {
-    type: "FeatureCollection",
-    features: [],
-  };
-  const markets = (snapshot?.feed || []) as MarketRow[];
-  const activity = (snapshot?.activity || []) as ActivityRow[];
+  const resetMapView = useCallback(() => {
+    setFocusTarget(null);
+    setMapResetNonce((n) => n + 1);
+  }, []);
+
+  const emptyCollection = useMemo(
+    () => ({ type: "FeatureCollection" as const, features: [] as never[] }),
+    [],
+  );
+  const features = useMemo(() => {
+    const raw = snapshot?.features as { type?: string; features?: unknown } | null | undefined;
+    if (raw?.type === "FeatureCollection" && Array.isArray(raw.features)) {
+      return raw as { type: "FeatureCollection"; features: never[] };
+    }
+    return emptyCollection;
+  }, [snapshot?.features, emptyCollection]);
+  const pings = useMemo(() => {
+    const raw = snapshot?.pings as { type?: string; features?: unknown } | null | undefined;
+    if (raw?.type === "FeatureCollection" && Array.isArray(raw.features)) {
+      return raw as { type: "FeatureCollection"; features: never[] };
+    }
+    return emptyCollection;
+  }, [snapshot?.pings, emptyCollection]);
+  const markets = (Array.isArray(snapshot?.feed) ? snapshot.feed : []) as MarketRow[];
+  const activity = (Array.isArray(snapshot?.activity) ? snapshot.activity : []) as ActivityRow[];
   const selectedId = snapshot?.selectedMarketId || market || null;
 
   // Count fills (and unique traders) that arrive after the first snapshot while viewing.
@@ -489,12 +512,30 @@ export function WarRoomView({
       {!compact ? (
         <WarRoomLayersRail lockKind={embedded ? "pro" : "coming-soon"} />
       ) : null}
+      {loading ? (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3">
+          <DashboardLoadingProgress tone="dark" steps={WAR_ROOM_LOAD_STEPS} />
+        </div>
+      ) : null}
+      {!compact ? (
+        <button
+          type="button"
+          onClick={resetMapView}
+          className="pointer-events-auto absolute bottom-3 left-2 z-20 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/70 px-2 py-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-300 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur hover:bg-black/85 hover:text-white"
+          title="Reset map view"
+          aria-label="Reset map to opening view"
+        >
+          <RotateCcw className="size-3.5" />
+          Reset
+        </button>
+      ) : null}
       <GlobeStage
         enhance={embedded ? "auto" : compact ? "never" : "always"}
         features={features}
         pings={pings}
         selectedMarketId={selectedId}
         focusTarget={focusTarget}
+        resetNonce={mapResetNonce}
         keepGlobe={embedded}
         interactive
         onSelect={onSelectGlobe}
@@ -510,26 +551,38 @@ export function WarRoomView({
         <p className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
           {marketsRailLabel}
         </p>
-        <span className="shrink-0 text-[10px] text-slate-500">{statusLabel}</span>
+        <span className="shrink-0 text-[10px] text-slate-500">
+          {loading && snapshot ? "Updating…" : coldStart ? "Loading…" : statusLabel}
+        </span>
       </div>
       {error ? <p className="px-2.5 py-1 text-[11px] text-rose-300">{error}</p> : null}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col border-b border-white/10">
-          <MarketsPane
-            rows={markets}
-            selectedId={selectedId}
-            onSelect={openMarketDetail}
-            emptyReason={snapshot?.emptyReason}
-          />
+          {coldStart ? (
+            <WarRoomRailSkeleton rows={9} />
+          ) : (
+            <MarketsPane
+              rows={markets}
+              selectedId={selectedId}
+              onSelect={openMarketDetail}
+              emptyReason={snapshot?.emptyReason}
+            />
+          )}
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2.5 py-1.5">
             <p className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
               {activityRailLabel}
             </p>
-            <span className="shrink-0 text-[10px] text-slate-500">{activity.length}</span>
+            <span className="shrink-0 text-[10px] text-slate-500">
+              {coldStart ? "…" : activity.length}
+            </span>
           </div>
-          <ActivityPane rows={activity} selectedId={activityId} onSelect={selectActivity} />
+          {coldStart ? (
+            <WarRoomRailSkeleton rows={7} />
+          ) : (
+            <ActivityPane rows={activity} selectedId={activityId} onSelect={selectActivity} />
+          )}
         </div>
       </div>
     </aside>

@@ -190,10 +190,14 @@ async function categoryPolymarketBoost(category, observedTs, existingIds) {
   const tagSlug = definition.tags[0];
   if (!tagSlug) return [];
   try {
-    const rows = await fetchPolymarketMarketsByTagSlug(tagSlug, { limit: 64 });
-    return mapBoostedMarkets(rows, observedTs, existingIds, (market) =>
-      matchesCategory(market, category),
-    );
+    const rows = await fetchPolymarketMarketsByTagSlug(tagSlug, { limit: 120 });
+    // Trust Gamma's event tag filter — don't re-drop rows whose local tags omit the
+    // chip slug (e.g. politics events tagged "Elections" but not "politics").
+    return mapBoostedMarkets(rows, observedTs, existingIds).map((market) => ({
+      ...market,
+      category,
+      tags: [...new Set([...(market.tags || []), category, tagSlug].filter(Boolean))],
+    }));
   } catch {
     return [];
   }
@@ -434,6 +438,7 @@ export async function getWarRoomPreview(opts = {}) {
  *   mobile?: boolean;
  *   cursor?: string;
  *   forceFixture?: boolean;
+ *   shell?: boolean; // Skip Gamma boosts — fast paint from cached desk bundle.
  * }} [opts]
  */
 export async function getWarRoomSnapshot(opts = {}) {
@@ -444,34 +449,42 @@ export async function getWarRoomSnapshot(opts = {}) {
   const bundle = await loadWarRoomBundle(opts);
   const marketId = String(opts.market || "").trim();
   const existingIds = new Set(bundle.markets.map((market) => market.id));
+  const shell = Boolean(opts.shell);
 
-  const feedBoosted = exploreFeed
-    ? await exploreFeedPolymarketBoost(exploreFeed, bundle.asOf, existingIds)
-    : [];
-  const categoryBoosted = category
-    ? await categoryPolymarketBoost(category, bundle.asOf, existingIds)
-    : [];
+  // Shell skips the Gamma round-trips so the client can paint from the cached desk
+  // immediately, then replace with the boosted snapshot.
+  const feedBoosted =
+    !shell && exploreFeed ? await exploreFeedPolymarketBoost(exploreFeed, bundle.asOf, existingIds) : [];
+  const categoryBoosted =
+    !shell && category ? await categoryPolymarketBoost(category, bundle.asOf, existingIds) : [];
 
   /** @type {Array<Record<string, unknown>>} */
   let pool;
-  if (categoryBoosted.length) {
-    // Category view: tag-matched Polymarket + desk Kalshi that also match.
+  if (category && shell) {
+    // Fast path: filter the cached desk in-process (no Gamma). Full fetch replaces this.
+    pool = bundle.markets.filter((market) => matchesCategory(market, category));
+  } else if (category) {
+    // Category view: tag-matched Polymarket (via events) + matching Kalshi from the desk.
+    // Always prefer the boost when the chip is active — even if Gamma returned 0 rows —
+    // so we don't silently fall back to the unfiltered featured pool.
     const kalshi = bundle.markets.filter(
       (market) => market.venue === "kalshi" && matchesCategory(market, category),
     );
     pool = [...categoryBoosted];
+    const poolIds = new Set(pool.map((market) => market.id));
     for (const market of kalshi) {
-      if (existingIds.has(market.id)) continue;
-      existingIds.add(market.id);
+      if (poolIds.has(market.id)) continue;
+      poolIds.add(market.id);
       pool.push(market);
     }
   } else if (feedBoosted.length) {
     // Feed view: Gamma ranking + desk Kalshi for multi-venue density.
     const kalshi = bundle.markets.filter((market) => market.venue === "kalshi");
     pool = [...feedBoosted];
+    const poolIds = new Set(pool.map((market) => market.id));
     for (const market of kalshi) {
-      if (existingIds.has(market.id)) continue;
-      existingIds.add(market.id);
+      if (poolIds.has(market.id)) continue;
+      poolIds.add(market.id);
       pool.push(market);
     }
   } else {

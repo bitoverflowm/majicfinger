@@ -48,14 +48,40 @@ export type WarRoomGlobeProps = {
   initialCenter?: [number, number] | null;
   /** Homepage: stay zoomed out so the globe stays visible even with a user location. */
   keepGlobe?: boolean;
+  /** Increment to ease the camera back to the opening globe framing. */
+  resetNonce?: number;
 };
+
+/** Opening camera — shared by mount + the War Room reset control. */
+export const WAR_ROOM_HOME_CENTER: [number, number] = [-40, 28];
+export function warRoomHomeZoom(keepGlobe: boolean) {
+  return keepGlobe ? 1.55 : 1.35;
+}
 
 const SOURCE_ID = "war-room-markets";
 const PING_SOURCE_ID = "war-room-pings";
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
-/** Prefer news layers first so rose pings win when stacked on a market. */
-const HIT_LAYERS = ["wr-news-points", "wr-news-halo", "wr-points", "wr-selected", "wr-halo"] as const;
-const HIT_PAD_PX = 10;
+
+function asCollection(input: FeatureCollection | FeatureCollection["features"] | null | undefined): FeatureCollection {
+  if (input && typeof input === "object" && !Array.isArray(input)) {
+    const collection = input as FeatureCollection;
+    if (collection.type === "FeatureCollection" && Array.isArray(collection.features)) {
+      return collection;
+    }
+  }
+  if (Array.isArray(input)) return { type: "FeatureCollection", features: input };
+  return EMPTY;
+}
+/** Prefer news layers first so rose pings win when stacked on a market. Include labels so title text is clickable. */
+const HIT_LAYERS = [
+  "wr-news-points",
+  "wr-news-halo",
+  "wr-labels",
+  "wr-points",
+  "wr-selected",
+  "wr-halo",
+] as const;
+const HIT_PAD_PX = 22;
 
 function pickHit(
   map: import("maplibre-gl").Map,
@@ -100,6 +126,7 @@ export function WarRoomGlobe({
   interactive = true,
   initialCenter = null,
   keepGlobe = false,
+  resetNonce = 0,
 }: WarRoomGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
@@ -112,8 +139,8 @@ export function WarRoomGlobe({
   const focusLngLatRef = useRef<[number, number] | null>(null);
   const centerRef = useRef(initialCenter);
   centerRef.current = initialCenter;
-  const pendingRef = useRef<FeatureCollection>(features || EMPTY);
-  const pendingPingsRef = useRef<FeatureCollection>(pings || EMPTY);
+  const pendingRef = useRef<FeatureCollection>(asCollection(features));
+  const pendingPingsRef = useRef<FeatureCollection>(asCollection(pings));
   const knownIdsRef = useRef<Set<string>>(new Set());
   const selectedRef = useRef(selectedMarketId);
   selectedRef.current = selectedMarketId;
@@ -121,8 +148,8 @@ export function WarRoomGlobe({
   const focusKeyRef = useRef<string | number | null>(null);
 
   useEffect(() => {
-    pendingRef.current = features || EMPTY;
-    pendingPingsRef.current = pings || EMPTY;
+    pendingRef.current = asCollection(features);
+    pendingPingsRef.current = asCollection(pings);
     const map = mapRef.current;
     if (!map) return;
     const source = map.getSource(SOURCE_ID) as { setData?: (d: FeatureCollection) => void } | undefined;
@@ -131,12 +158,13 @@ export function WarRoomGlobe({
     if (flushTimer.current) return;
     flushTimer.current = window.setTimeout(() => {
       flushTimer.current = null;
-      const next = pendingRef.current;
-      const nextIds = new Set(next.features.map((f) => String(f.properties?.id || f.id || "")));
+      const next = asCollection(pendingRef.current);
+      const rows = Array.isArray(next.features) ? next.features : [];
+      const nextIds = new Set(rows.map((f) => String(f.properties?.id || f.id || "")));
       const entering = [...nextIds].filter((id) => id && !knownIdsRef.current.has(id));
       knownIdsRef.current = nextIds;
       source.setData?.(next);
-      pingSource?.setData?.(pendingPingsRef.current);
+      pingSource?.setData?.(asCollection(pendingPingsRef.current));
       if (selectedRef.current) {
         try {
           map.setFilter("wr-selected", ["==", ["get", "id"], selectedRef.current]);
@@ -180,13 +208,19 @@ export function WarRoomGlobe({
         mod.default?.Map ? mod.default : mod
       );
       const start = async (style: string | object) => {
-        const startCenter = centerRef.current || [-40, 28];
-        const globeZoom = keepGlobe ? 1.55 : centerRef.current ? 3.2 : 1.35;
+        const startCenter = centerRef.current || WAR_ROOM_HOME_CENTER;
+        const globeZoom = keepGlobe
+          ? warRoomHomeZoom(true)
+          : centerRef.current
+            ? 3.2
+            : warRoomHomeZoom(false);
         const instance = new maplibregl.Map({
           container: containerRef.current as HTMLDivElement,
           style: style as never,
           center: startCenter,
           zoom: globeZoom,
+          pitch: 0,
+          bearing: 0,
           attributionControl: false,
           maplibreLogo: false,
           interactive,
@@ -254,11 +288,11 @@ export function WarRoomGlobe({
                   ["linear"],
                   ["zoom"],
                   1,
-                  ["case", ["==", ["feature-state", "pulse"], 1], 3.2, 2.1],
+                  ["case", ["==", ["feature-state", "pulse"], 1], 4.2, 3.2],
                   4,
-                  ["case", ["==", ["feature-state", "pulse"], 1], 4.5, 2.8],
+                  ["case", ["==", ["feature-state", "pulse"], 1], 6, 4.2],
                   7,
-                  ["case", ["==", ["feature-state", "pulse"], 1], 6, 3.6],
+                  ["case", ["==", ["feature-state", "pulse"], 1], 8, 5.5],
                 ],
                 "circle-color": [
                   "match",
@@ -476,6 +510,31 @@ export function WarRoomGlobe({
       map.off("moveend", publishAnchor);
     };
   }, [focusTarget]);
+
+  useEffect(() => {
+    if (!resetNonce) return;
+    const map = mapRef.current;
+    if (!map) return;
+    focusLngLatRef.current = null;
+    focusKeyRef.current = null;
+    onAnchorChangeRef.current?.(null);
+    try {
+      map.easeTo({
+        center: centerRef.current || WAR_ROOM_HOME_CENTER,
+        zoom: keepGlobe
+          ? warRoomHomeZoom(true)
+          : centerRef.current
+            ? 3.2
+            : warRoomHomeZoom(false),
+        pitch: 0,
+        bearing: 0,
+        duration: 900,
+        essential: true,
+      });
+    } catch {
+      /* ignore */
+    }
+  }, [resetNonce, keepGlobe]);
 
   return (
     <div

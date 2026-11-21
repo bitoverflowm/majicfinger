@@ -37,6 +37,7 @@ export function GlobeStage({
   pings,
   focusTarget,
   onAnchorChange,
+  resetNonce,
   ...globeProps
 }: GlobeStageProps) {
   const [ready, setReady] = useState(enhance === "always");
@@ -73,6 +74,7 @@ export function GlobeStage({
             {...globeProps}
             pings={pings}
             focusTarget={focusTarget}
+            resetNonce={resetNonce}
             onAnchorChange={onAnchorChange}
             className="h-full w-full"
             onFail={onFail}

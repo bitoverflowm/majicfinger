@@ -372,6 +372,9 @@ export async function fetchPolymarketLiveFeaturedMarkets(opts = {}) {
 /**
  * Volume-ranked open markets for a Polymarket tag (War Room category chips).
  *
+ * Gamma's `/markets?tag_slug=` ignores the tag (returns global volume).
+ * `/events?tag_slug=` filters correctly — flatten nested markets from those events.
+ *
  * @param {string} tagSlug
  * @param {{ limit?: number }} [opts]
  * @returns {Promise<FeaturedPolymarketMarket[]>}
@@ -379,15 +382,27 @@ export async function fetchPolymarketLiveFeaturedMarkets(opts = {}) {
 export async function fetchPolymarketMarketsByTagSlug(tagSlug, opts = {}) {
   const slug = String(tagSlug || "").trim().toLowerCase();
   if (!slug) return [];
-  const limit = Math.max(1, Math.min(100, Math.floor(Number(opts.limit) || 48)));
-  const payload = await gammaGet("/markets", {
+  const want = Math.max(1, Math.min(300, Math.floor(Number(opts.limit) || 64)));
+  // Events can nest many markets (daily temp buckets); pull enough events then cap markets.
+  const eventLimit = Math.min(100, Math.max(24, Math.ceil(want / 2)));
+  const payload = await gammaGet("/events", {
     closed: false,
     tag_slug: slug,
     order: "volume24hr",
     ascending: false,
-    limit,
+    limit: eventLimit,
   });
-  return marketsFromPayload(payload).filter((market) => market.outcomes.length >= 2);
+  const seen = new Set();
+  return marketsFromEventsPayload(payload)
+    .filter((market) => {
+      if (market.outcomes.length < 2) return false;
+      const key = marketKey(market);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
+    .slice(0, want);
 }
 
 /** Gamma list queries mirroring Holder Explore feeds. */

@@ -207,16 +207,14 @@ function ChartCanvas({
       windows={LIVELINE_WINDOWS}
       onWindowChange={onWindowChange}
       windowStyle="rounded"
-      exaggerate
       scrub
-      degen
       badge
       badgeVariant="default"
       loading={loading}
       emptyText="Waiting for live prices"
       formatValue={formatProb}
-      /* Keep the exaggerated line inside the plot box (windows + badge + axis). */
-      padding={{ top: 36, right: 52, bottom: 18, left: 10 }}
+      /* No exaggerate — it shrinks Y margin to ~1% so momentum overshoots the box. */
+      padding={{ top: 40, right: 56, bottom: 28, left: 12 }}
       className={cn("h-full min-h-0 w-full", className)}
       style={{ backgroundColor: "transparent" }}
     />

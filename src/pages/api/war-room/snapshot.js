@@ -31,6 +31,7 @@ export default async function handler(req, res) {
   const exploreFeed = normalizeExploreFeed(
     Array.isArray(req.query.exploreFeed) ? req.query.exploreFeed[0] : req.query.exploreFeed,
   );
+  const shell = ["1", "true"].includes(String(req.query.shell || "").toLowerCase());
 
   try {
     const snapshot = await getWarRoomSnapshot({
@@ -41,6 +42,7 @@ export default async function handler(req, res) {
       cursor,
       mobile,
       forceFixture: fixture,
+      shell,
     });
     res.setHeader("Cache-Control", snapshot.fixture ? "private, no-store" : snapshotCacheControl());
     return res.status(200).json(snapshot);

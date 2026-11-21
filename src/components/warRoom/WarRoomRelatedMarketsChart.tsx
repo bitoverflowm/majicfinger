@@ -274,12 +274,12 @@ export function WarRoomRelatedMarketsChart({
       windows={LIVELINE_WINDOWS}
       onWindowChange={setWindowSecs}
       windowStyle="rounded"
-      exaggerate
       scrub
       seriesToggleCompact
       loading={loading && !series.length}
       emptyText="Waiting for related prices"
       formatValue={formatProb}
+      padding={{ top: 36, right: 52, bottom: 24, left: 10 }}
       className="h-full min-h-0 w-full"
       style={{ backgroundColor: "transparent" }}
     />
