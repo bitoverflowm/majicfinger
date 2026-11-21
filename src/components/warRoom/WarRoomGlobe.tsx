@@ -25,6 +25,7 @@ export type WarRoomGlobeProps = {
   onFail?: () => void;
   className?: string;
   interactive?: boolean;
+  initialCenter?: [number, number] | null;
 };
 
 const SOURCE_ID = "war-room-markets";
@@ -47,6 +48,7 @@ export function WarRoomGlobe({
   onFail,
   className,
   interactive = true,
+  initialCenter = null,
 }: WarRoomGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
@@ -54,6 +56,8 @@ export function WarRoomGlobe({
   onSelectRef.current = onSelect;
   const onFailRef = useRef(onFail);
   onFailRef.current = onFail;
+  const centerRef = useRef(initialCenter);
+  centerRef.current = initialCenter;
   const pendingRef = useRef<FeatureCollection>(features || EMPTY);
   const selectedRef = useRef(selectedMarketId);
   selectedRef.current = selectedMarketId;
@@ -98,11 +102,12 @@ export function WarRoomGlobe({
         mod.default?.Map ? mod.default : mod
       );
       const start = async (style: string | object) => {
+        const startCenter = centerRef.current || [-40, 28];
         const instance = new maplibregl.Map({
           container: containerRef.current as HTMLDivElement,
           style: style as never,
-          center: [-40, 28],
-          zoom: 1.35,
+          center: startCenter,
+          zoom: centerRef.current ? 3.2 : 1.35,
           attributionControl: false,
           interactive,
           fadeDuration: reduceMotion ? 0 : 300,
@@ -238,6 +243,16 @@ export function WarRoomGlobe({
       mapRef.current = null;
     };
   }, [interactive]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !initialCenter) return;
+    try {
+      map.easeTo({ center: initialCenter, zoom: Math.max(map.getZoom(), 3.2), duration: 800 });
+    } catch {
+      /* ignore */
+    }
+  }, [initialCenter]);
 
   useEffect(() => {
     const map = mapRef.current;

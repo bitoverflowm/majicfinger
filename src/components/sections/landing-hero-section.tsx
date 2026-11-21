@@ -1,7 +1,6 @@
 import { siteConfig } from "@/lib/config";
 import { WORKSPACE_ENTRY_PATH } from "@/lib/workspaceEntry";
 import Link from "next/link";
-import { CompanyShowcase } from "./company-showcase";
 import { DashboardDemoSectionLazy } from "./dashboard-demo-section-lazy";
 import { DemoScrollLink } from "./demo-scroll-link";
 import { HeroDescription } from "./hero-description";
@@ -57,7 +56,6 @@ export function LandingHeroSection({ showDemo = false }: { showDemo?: boolean })
       </div>
 
       {showDemo ? <DashboardDemoSectionLazy framed /> : null}
-      <CompanyShowcase />
     </section>
   );
 }

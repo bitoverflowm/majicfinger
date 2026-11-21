@@ -39,6 +39,7 @@ export function JarvisComingPromo({ variant = "section" }: Props) {
   const pathname = usePathname() || "";
   if (pathname === "/jarvis" || pathname.startsWith("/jarvis/")) return null;
   if (pathname.startsWith("/dashboard") || pathname.startsWith("/checkout")) return null;
+  if (variant === "banner" && pathname === "/") return null;
 
   const bf = blackFridayActive();
 
