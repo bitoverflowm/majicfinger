@@ -34,11 +34,52 @@ const CATEGORY_TAGS = new Map(CATEGORIES.map((category) => [category.id, new Set
 const CATEGORY_IDS = new Set(CATEGORIES.map((category) => category.id));
 const EXPLORE_FEED_IDS = new Set(EXPLORE_FEEDS.map((feed) => feed.id));
 
-/** @param {string} [raw] */
+/**
+ * Normalize an Explore feed id. Empty / all → `tradable`.
+ * @param {string} [raw]
+ */
 export function normalizeExploreFeed(raw) {
   const id = String(raw || "").trim().toLowerCase();
-  if (!id || id === "tradable" || id === "all") return "";
-  return EXPLORE_FEED_IDS.has(id) ? id : "";
+  if (!id || id === "all") return "tradable";
+  return EXPLORE_FEED_IDS.has(id) ? id : "tradable";
+}
+
+/**
+ * Right-rail markets heading for War Room — always volume-sorted language.
+ * @param {{ exploreFeed?: string | null; category?: string | null }} [opts]
+ */
+export function exploreMarketsByVolumeLabel({ exploreFeed, category } = {}) {
+  const categoryId = normalizeCategory(category);
+  if (categoryId) {
+    const label = CATEGORIES.find((row) => row.id === categoryId)?.label || categoryId;
+    return `${label} markets by volume`;
+  }
+  const feedId = normalizeExploreFeed(exploreFeed);
+  const feed = EXPLORE_FEEDS.find((row) => row.id === feedId);
+  const name = feed?.label || "All tradable markets";
+  if (feedId === "volume") return "Top markets by volume";
+  return `${name} by volume`;
+}
+
+/**
+ * Right-rail activity heading for War Room.
+ * @param {{ exploreFeed?: string | null; category?: string | null }} [opts]
+ */
+export function exploreActivityLabel({ exploreFeed, category } = {}) {
+  const categoryId = normalizeCategory(category);
+  if (categoryId) {
+    const label = CATEGORIES.find((row) => row.id === categoryId)?.label || categoryId;
+    return `${label} trades · news`;
+  }
+  const feedId = normalizeExploreFeed(exploreFeed);
+  if (feedId === "tradable") return "All tradable trades · news";
+  if (feedId === "new") return "Just listed trades · news";
+  if (feedId === "closed") return "Recently closed trades · news";
+  if (feedId === "volume") return "Volume trades · news";
+  if (feedId === "liquidity") return "Liquidity trades · news";
+  if (feedId === "competitive") return "Competitive trades · news";
+  if (feedId === "trending") return "Trending trades · news";
+  return "Trades · news";
 }
 
 /** @param {unknown} raw */

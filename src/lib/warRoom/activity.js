@@ -89,6 +89,7 @@ async function fetchPolymarketTrades(observedTs) {
         size,
         side,
         outcome: row.outcome || null,
+        traderId: String(row.proxyWallet || row.maker_address || row.taker_address || "").trim() || null,
       },
     });
   }
@@ -153,7 +154,13 @@ async function fetchKalshiTrades(markets, observedTs) {
         observedAt: observedTs,
         geometry: geometry || null,
         region: market?.region || null,
-        data: { notionalUsd: notional, price, size: count, side: row.taker_side || null },
+        data: {
+          notionalUsd: notional,
+          price,
+          size: count,
+          side: row.taker_side || null,
+          traderId: String(row.taker_user_id || row.maker_user_id || row.user_id || "").trim() || null,
+        },
       });
     }
   }

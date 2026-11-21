@@ -392,6 +392,7 @@ export async function fetchPolymarketMarketsByTagSlug(tagSlug, opts = {}) {
 
 /** Gamma list queries mirroring Holder Explore feeds. */
 const EXPLORE_FEED_QUERIES = {
+  tradable: { closed: false, order: "volume24hr", ascending: false },
   new: { closed: false, order: "createdAt", ascending: false },
   closed: { closed: true, order: "closedTime", ascending: false },
   volume: { closed: false, order: "volume24hr", ascending: false },

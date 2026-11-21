@@ -22,6 +22,7 @@ export type ActivityRow = {
     publisher?: string | null;
     markets?: Array<Record<string, unknown>>;
     snippet?: string | null;
+    traderId?: string | null;
   } | null;
 };
 

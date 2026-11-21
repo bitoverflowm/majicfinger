@@ -4,10 +4,17 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCompactScreen } from "@/lib/desktopOnly";
-import { CATEGORIES, EXPLORE_FEEDS, EXPLORE_TOP_FEEDS } from "@/lib/markets/exploreCategories";
+import {
+  CATEGORIES,
+  EXPLORE_FEEDS,
+  EXPLORE_TOP_FEEDS,
+  exploreActivityLabel,
+  exploreMarketsByVolumeLabel,
+} from "@/lib/markets/exploreCategories";
 import { cn } from "@/lib/utils";
 
 import { ActivityPane, type ActivityRow } from "./ActivityPane";
+import { formatVolume } from "./format";
 import { GlobeStage } from "./GlobeStage";
 import { MarketsPane, type MarketRow } from "./MarketsPane";
 import {
@@ -17,6 +24,13 @@ import {
 } from "./WarRoomDetailCard";
 import { relatedMarketsForHeadline } from "./relatedMarkets";
 import { useWarRoomData } from "./useWarRoomData";
+
+function formatCount(n: number) {
+  if (!Number.isFinite(n) || n < 0) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
+  return String(Math.round(n));
+}
 
 type FocusTarget = {
   center: [number, number];
@@ -65,8 +79,13 @@ export function WarRoomView({
   const [detailOpen, setDetailOpen] = useState(false);
   const [feedRevealed, setFeedRevealed] = useState(false);
   const [categoryId, setCategoryId] = useState("");
-  const [exploreFeedId, setExploreFeedId] = useState("");
+  const [exploreFeedId, setExploreFeedId] = useState("tradable");
+  const [sessionTrades, setSessionTrades] = useState(0);
+  const [sessionTraders, setSessionTraders] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const seenTradeIdsRef = useRef<Set<string>>(new Set());
+  const seenTraderIdsRef = useRef<Set<string>>(new Set());
+  const sessionPrimedRef = useRef(false);
 
   const market = controlledMarket ?? localMarket;
 
@@ -96,10 +115,19 @@ export function WarRoomView({
     desk: "all",
     market,
     category: categoryId,
-    exploreFeed: exploreFeedId,
+    exploreFeed: categoryId ? undefined : exploreFeedId || "tradable",
     fixture,
     mobile: compact,
   });
+
+  const marketsRailLabel = useMemo(
+    () => exploreMarketsByVolumeLabel({ exploreFeed: exploreFeedId, category: categoryId }),
+    [exploreFeedId, categoryId],
+  );
+  const activityRailLabel = useMemo(
+    () => exploreActivityLabel({ exploreFeed: exploreFeedId, category: categoryId }),
+    [exploreFeedId, categoryId],
+  );
 
   const clearSelectionChrome = useCallback(() => {
     setActivityId(null);
@@ -112,7 +140,7 @@ export function WarRoomView({
   const pickExploreFeed = useCallback(
     (next: string) => {
       // Match Holder Explore: feed chips clear category filters.
-      setExploreFeedId(next === "tradable" ? "" : next);
+      setExploreFeedId(next || "tradable");
       setCategoryId("");
       clearSelectionChrome();
     },
@@ -123,7 +151,7 @@ export function WarRoomView({
     (next: string) => {
       // Match Holder Explore: category chips clear feed rankings.
       setCategoryId(next);
-      setExploreFeedId("");
+      setExploreFeedId(next ? "" : "tradable");
       clearSelectionChrome();
     },
     [clearSelectionChrome],
@@ -140,6 +168,58 @@ export function WarRoomView({
   const markets = (snapshot?.feed || []) as MarketRow[];
   const activity = (snapshot?.activity || []) as ActivityRow[];
   const selectedId = snapshot?.selectedMarketId || market || null;
+
+  // Count fills (and unique traders) that arrive after the first snapshot while viewing.
+  useEffect(() => {
+    if (!activity.length) return;
+    if (!sessionPrimedRef.current) {
+      for (const row of activity) {
+        if (row.kind === "headline") continue;
+        seenTradeIdsRef.current.add(row.id);
+        const traderId = String(row.data?.traderId || "").trim();
+        if (traderId) seenTraderIdsRef.current.add(traderId);
+      }
+      sessionPrimedRef.current = true;
+      return;
+    }
+    let addedTrades = 0;
+    let addedTraders = 0;
+    for (const row of activity) {
+      if (row.kind === "headline") continue;
+      if (!seenTradeIdsRef.current.has(row.id)) {
+        seenTradeIdsRef.current.add(row.id);
+        addedTrades += 1;
+      }
+      const traderId = String(row.data?.traderId || "").trim();
+      if (traderId && !seenTraderIdsRef.current.has(traderId)) {
+        seenTraderIdsRef.current.add(traderId);
+        addedTraders += 1;
+      }
+    }
+    if (addedTrades) setSessionTrades((n) => n + addedTrades);
+    if (addedTraders) setSessionTraders((n) => n + addedTraders);
+  }, [activity]);
+
+  const viewStats = useMemo(() => {
+    const mapMarkets = features.features?.length || 0;
+    const news = (pings.features?.length || 0) || activity.filter((row) => row.kind === "headline").length;
+    const volume = markets.reduce((sum, row) => sum + (Number(row.volume24h) || 0), 0);
+    const tradersInView = new Set<string>();
+    const marketIds = new Set(markets.map((row) => row.id));
+    for (const row of activity) {
+      if (row.kind === "headline") continue;
+      if (row.marketId && !marketIds.has(row.marketId)) continue;
+      const traderId = String(row.data?.traderId || "").trim();
+      if (traderId) tradersInView.add(traderId);
+    }
+    return {
+      markets: mapMarkets || markets.length,
+      news,
+      trades: sessionTrades,
+      volume,
+      traders: Math.max(sessionTraders, tradersInView.size),
+    };
+  }, [features.features, pings.features, markets, activity, sessionTrades, sessionTraders]);
 
   const marketById = useMemo(() => {
     const map = new Map<string, MarketRow>();
@@ -300,7 +380,7 @@ export function WarRoomView({
   const exploreFeedGroups = useMemo(() => {
     const groups: Array<{ label: string; feeds: typeof EXPLORE_FEEDS }> = [];
     for (const item of EXPLORE_FEEDS) {
-      const label = EXPLORE_TOP_FEEDS.has(item.id) ? "Top markets by" : "";
+      const label = EXPLORE_TOP_FEEDS.has(item.id) ? "Sort markets by" : "";
       const last = groups[groups.length - 1];
       if (last && last.label === label) last.feeds.push(item);
       else groups.push({ label, feeds: [item] });
@@ -323,9 +403,7 @@ export function WarRoomView({
               </span>
               <div className="flex items-center gap-1">
                 {group.feeds.map((feed) => {
-                  const selected = exploreFeedId
-                    ? exploreFeedId === feed.id
-                    : !categoryId && feed.id === "tradable";
+                  const selected = !categoryId && exploreFeedId === feed.id;
                   return (
                     <button
                       key={feed.id}
@@ -343,9 +421,7 @@ export function WarRoomView({
             </div>
           ) : (
             group.feeds.map((feed) => {
-              const selected = exploreFeedId
-                ? exploreFeedId === feed.id
-                : !categoryId && feed.id === "tradable";
+              const selected = !categoryId && exploreFeedId === feed.id;
               return (
                 <button
                   key={feed.id}
@@ -383,9 +459,32 @@ export function WarRoomView({
     </div>
   );
 
+  const viewStatsOverlay = (
+    <div
+      aria-label="World view stats"
+      className="pointer-events-none absolute right-3 top-3 z-20 flex flex-col items-end gap-1 text-right"
+    >
+      {(
+        [
+          { key: "markets", label: "markets", value: formatCount(viewStats.markets), color: "text-sky-300" },
+          { key: "news", label: "breaking news", value: formatCount(viewStats.news), color: "text-rose-300" },
+          { key: "trades", label: "trades this session", value: formatCount(viewStats.trades), color: "text-amber-300" },
+          { key: "volume", label: "volume tracked", value: formatVolume(viewStats.volume), color: "text-emerald-300" },
+          { key: "traders", label: "traders", value: formatCount(viewStats.traders), color: "text-violet-300" },
+        ] as const
+      ).map((stat) => (
+        <div key={stat.key} className="leading-none">
+          <span className={cn("font-mono text-[11px] tabular-nums", stat.color)}>{stat.value}</span>
+          <span className="ml-1.5 text-[9px] uppercase tracking-[0.12em] text-slate-500">{stat.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+
   const globe = (
     <div className="relative h-full w-full">
       {categoryBar}
+      {viewStatsOverlay}
       <GlobeStage
         enhance={embedded ? "auto" : compact ? "never" : "always"}
         features={features}
@@ -404,10 +503,10 @@ export function WarRoomView({
   const feed = (
     <aside className="flex h-full min-h-0 w-full flex-col bg-[#07090f] text-slate-100">
       <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2.5 py-1.5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-          Top Markets by Volume
+        <p className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+          {marketsRailLabel}
         </p>
-        <span className="text-[10px] text-slate-500">{statusLabel}</span>
+        <span className="shrink-0 text-[10px] text-slate-500">{statusLabel}</span>
       </div>
       {error ? <p className="px-2.5 py-1 text-[11px] text-rose-300">{error}</p> : null}
       <div className="flex min-h-0 flex-1 flex-col">
@@ -421,10 +520,10 @@ export function WarRoomView({
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2.5 py-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-              Trades · News
+            <p className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+              {activityRailLabel}
             </p>
-            <span className="text-[10px] text-slate-500">{activity.length}</span>
+            <span className="shrink-0 text-[10px] text-slate-500">{activity.length}</span>
           </div>
           <ActivityPane rows={activity} selectedId={activityId} onSelect={selectActivity} />
         </div>
