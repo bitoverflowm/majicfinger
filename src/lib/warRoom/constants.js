@@ -28,6 +28,10 @@ export const MAP_UPDATE_CADENCE_MS = 350;
 export const MOBILE_POINT_CAP = 40;
 export const DESKTOP_POINT_CAP = 80;
 export const PREVIEW_STORY_CAP = 3;
+/** Cap headlines shown as map pings + activity rows (newest keep the slots). */
+export const NEWS_ACTIVITY_CAP = 20;
+/** Cap live trade rows in the activity pane. */
+export const TRADE_ACTIVITY_CAP = 40;
 
 export const NWS_USER_AGENT = "Lychee War Room (https://lycheedata.com; kash@lycheedata.com)";
 

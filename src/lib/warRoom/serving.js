@@ -3,10 +3,12 @@ import { fetchLiveWarRoomSources } from "./adapters";
 import {
   DESKTOP_POINT_CAP,
   MOBILE_POINT_CAP,
+  NEWS_ACTIVITY_CAP,
   POLL_INTERVAL_MS,
   PREVIEW_CACHE_TTL_MS,
   PREVIEW_STORY_CAP,
   SNAPSHOT_CACHE_TTL_MS,
+  TRADE_ACTIVITY_CAP,
   WAR_ROOM_MODEL_VERSION,
 } from "./constants";
 import { allowFixtureFallback, isWarRoomFixtureForced } from "./flags";
@@ -46,6 +48,7 @@ function normalizeBundle(raw, { fixture = false, stale = false } = {}) {
     markets: ranked,
     signals: sortSignals(raw.signals || []),
     links: Array.isArray(raw.links) ? raw.links : [],
+    activity: Array.isArray(raw.activity) ? raw.activity : [],
     featuredMarketId: raw.featuredMarketId || ranked.find(isFeaturedWeatherMarket)?.id || ranked[0]?.id || null,
   };
 }
@@ -67,6 +70,7 @@ async function loadLiveBundle() {
         markets: live.markets,
         signals: live.signals,
         links: live.links,
+        activity: live.activity,
         featuredMarketId: live.featuredMarketId,
         pollIntervalMs: POLL_INTERVAL_MS,
       });
@@ -200,11 +204,65 @@ function feedRow(bundle, market) {
     price: quote?.price ?? null,
     move: quote?.move ?? null,
     moveWindow: quote?.moveWindow ?? null,
+    volume24h: Number.isFinite(Number(market.volume24h)) ? Number(market.volume24h) : null,
+    imageUrl:
+      market.imageUrl ||
+      (market.venue === "polymarket" ? "/polymarket.png" : market.venue === "kalshi" ? "/kalshi.png" : null),
+    avatarUrl:
+      market.avatarUrl ||
+      market.imageUrl ||
+      (market.venue === "polymarket" ? "/polymarket.png" : market.venue === "kalshi" ? "/kalshi.png" : null),
+    slug: market.slug || null,
+    venueMarketId: market.venueMarketId || null,
+    tokenIds: Array.isArray(market.outcomes)
+      ? market.outcomes.map((o) => o?.tokenId).filter(Boolean)
+      : [],
+    outcomes: Array.isArray(market.outcomes) ? market.outcomes : [],
     quoteAt: quote?.sourceTs || quote?.observedTs || null,
     signalSummary: signal?.summary || null,
     signalKind: signal?.kind || null,
     href: warRoomHref({ desk: marketDesk(market) === "global" ? "all" : marketDesk(market), market: market.id }),
   };
+}
+
+function activityRows(bundle) {
+  const fromBundle = Array.isArray(bundle.activity) ? bundle.activity : [];
+  if (fromBundle.length) {
+    return fromBundle
+      .slice()
+      .sort((a, b) => Date.parse(String(b.occurredAt || 0)) - Date.parse(String(a.occurredAt || 0)))
+      .slice(0, TRADE_ACTIVITY_CAP + NEWS_ACTIVITY_CAP)
+      .map((row) => ({
+        id: row.id,
+        kind: row.kind,
+        venue: row.venue || row.source,
+        marketId: row.marketId || null,
+        title: row.title || row.summary,
+        summary: row.summary || row.title,
+        occurredAt: row.occurredAt || row.observedAt || null,
+        region: row.region || null,
+        geometry: row.geometry || null,
+        sourceUrl: row.sourceUrl || null,
+        data: row.data || null,
+      }));
+  }
+  // Fixture / older bundles: derive from signals.
+  return sortSignals(bundle.signals || [])
+    .filter((s) => s.kind === "fill" || s.kind === "headline")
+    .slice(0, TRADE_ACTIVITY_CAP + NEWS_ACTIVITY_CAP)
+    .map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      venue: row.source,
+      marketId: row.marketId || null,
+      title: row.summary,
+      summary: row.summary,
+      occurredAt: row.occurredAt || row.observedAt || null,
+      region: null,
+      geometry: row.geometry || null,
+      sourceUrl: row.sourceUrl || null,
+      data: row.data || null,
+    }));
 }
 
 function featureFromMarket(market) {
@@ -282,11 +340,32 @@ export async function getWarRoomSnapshot(opts = {}) {
   const bundle = await loadWarRoomBundle(opts);
   const marketId = String(opts.market || "").trim();
   const filtered = bundle.markets.filter((market) => matchesDesk(market, desk));
+  const byVolume = [...filtered].sort((a, b) => {
+    const av = Number(a.volume24h) || 0;
+    const bv = Number(b.volume24h) || 0;
+    if (bv !== av) return bv - av;
+    return Math.abs(Number(b.quote?.move) || 0) - Math.abs(Number(a.quote?.move) || 0);
+  });
   const cap = opts.mobile ? MOBILE_POINT_CAP : DESKTOP_POINT_CAP;
-  const features = filtered.map(featureFromMarket).filter(Boolean).slice(0, cap);
-  const feed = filtered.map((market) => feedRow(bundle, market));
+  const features = byVolume.map(featureFromMarket).filter(Boolean).slice(0, cap);
+  const feed = byVolume.map((market) => feedRow(bundle, market));
+  const activity = activityRows(bundle);
+  const newsPings = activity
+    .filter((row) => row.kind === "headline" && row.geometry?.type === "Point")
+    .slice(0, NEWS_ACTIVITY_CAP)
+    .map((row) => ({
+      type: "Feature",
+      id: row.id,
+      geometry: row.geometry,
+      properties: {
+        id: row.id,
+        kind: "headline",
+        title: row.title,
+        marker: "news",
+      },
+    }));
   const selected = marketId ? filtered.find((m) => m.id === marketId) || bundle.markets.find((m) => m.id === marketId) : null;
-  const selectedValid = selected && matchesDesk(selected, desk) ? selected : marketId ? null : filtered[0] || null;
+  const selectedValid = selected && matchesDesk(selected, desk) ? selected : marketId ? null : byVolume[0] || null;
   const invalidMarket = Boolean(marketId && parseWarRoomMarketId(marketId) && !selectedValid);
   const missingMarket = Boolean(marketId && !parseWarRoomMarketId(marketId));
 
@@ -302,7 +381,9 @@ export async function getWarRoomSnapshot(opts = {}) {
     desk,
     cursor: cursorFor(bundle, desk),
     features: { type: "FeatureCollection", features },
+    pings: { type: "FeatureCollection", features: newsPings },
     feed,
+    activity,
     selectedMarketId: selectedValid?.id || null,
     emptyReason: !filtered.length
       ? bundle.markets.length

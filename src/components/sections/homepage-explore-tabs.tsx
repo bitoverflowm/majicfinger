@@ -1,11 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-import { GlobeStage } from "@/components/warRoom/GlobeStage";
-import { useWarRoomData } from "@/components/warRoom/useWarRoomData";
-import { warRoomHref } from "@/lib/warRoom/href";
+import { WarRoomView, type WarRoomNavigateRequest } from "@/components/warRoom/WarRoomView";
 import { DashboardDemoSectionLazy } from "@/components/sections/dashboard-demo-section-lazy";
 import { HOMEPAGE_DEMO_SECTION_CLASS } from "@/components/sections/dashboard-demo-layout";
 import { terminalTab } from "@/components/terminals/openTerminalTab";
@@ -33,32 +30,44 @@ const DEMO_STAGE_CLASS =
 
 export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) {
   const [tab, setTab] = useState<TabId>("war-room");
-  const [center, setCenter] = useState<[number, number] | null>(null);
-  const { snapshot } = useWarRoomData({ desk: "all", market: "", fixture });
+  const [holderSubject, setHolderSubject] = useState<{
+    kind: "market";
+    conditionId: string;
+    title: string;
+    slug?: string;
+  } | null>(null);
+  const [analyzeVenue, setAnalyzeVenue] = useState<"kalshi" | "polymarket" | null>(null);
 
   const holderStart = useMemo(() => {
     const terminal = findTerminal("holder");
     if (!terminal) return null;
-    const startTab = terminalTab(terminal, null, []);
+    const startTab = terminalTab(terminal, holderSubject, []);
     return {
       workspaceStartTabs: [startTab],
       activeWorkspaceStartTabId: startTab.id,
     };
-  }, []);
+  }, [holderSubject]);
 
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setCenter([pos.coords.longitude, pos.coords.latitude]),
-      () => {},
-      { enableHighAccuracy: false, maximumAge: 86_400_000, timeout: 4000 },
-    );
+  const onNavigate = useCallback((request: WarRoomNavigateRequest) => {
+    if (request.type === "holders") {
+      setHolderSubject({
+        kind: "market",
+        conditionId: request.conditionId,
+        title: request.title,
+        slug: request.slug || undefined,
+      });
+      setTab("holders");
+      return;
+    }
+    if (request.type === "markets") {
+      setAnalyzeVenue(request.venue);
+      setTab("markets");
+      return;
+    }
+    if (request.type === "war-room-market") {
+      setTab("war-room");
+    }
   }, []);
-
-  const features = (snapshot?.features as { type: "FeatureCollection"; features: never[] }) || {
-    type: "FeatureCollection",
-    features: [],
-  };
 
   const showTerminalDemo = tab === "past" || tab === "present" || tab === "markets";
   const showHolderDemo = tab === "holders";
@@ -93,39 +102,35 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
       <div className="mt-4">
         {tab === "war-room" ? (
           <div className={DEMO_STAGE_CLASS}>
-            <GlobeStage
-              enhance="auto"
-              features={features}
-              initialCenter={center}
-              keepGlobe
-              interactive
-              onSelect={(id) => {
-                window.location.assign(warRoomHref({ market: id }));
-              }}
+            <WarRoomView
+              fixture={fixture}
+              embedded
               className="absolute inset-0"
+              onNavigate={onNavigate}
             />
-            <Link
-              href="/war-room"
-              className="absolute bottom-4 left-4 z-10 inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-medium text-slate-950 shadow-lg sm:left-6 lg:left-10"
-            >
-              Open War Room
-            </Link>
           </div>
         ) : null}
 
         {showTerminalDemo ? (
           <DashboardDemoSectionLazy
-            key="terminal-demo"
+            key={`terminal-demo-${tab}-${analyzeVenue || "all"}`}
             force
             framed
             sectionId="explore-demo"
             className={EXPLORE_DEMO_SECTION_CLASS}
+            integrationId={
+              tab === "markets"
+                ? analyzeVenue === "kalshi"
+                  ? "kalshiLive"
+                  : "polymarket"
+                : undefined
+            }
           />
         ) : null}
 
         {showHolderDemo && holderStart ? (
           <DashboardDemoSectionLazy
-            key="holders"
+            key={`holders-${holderSubject?.conditionId || "browse"}`}
             force
             framed
             sectionId="explore-demo"

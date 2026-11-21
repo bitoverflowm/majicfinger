@@ -4,6 +4,7 @@ import {
   featuredOutcomePriceDollars,
   fetchPolymarketLiveFeaturedMarkets,
 } from "@/lib/polymarketLive/fetchPolymarketLiveFeaturedMarkets";
+import { fetchWarRoomActivity } from "./activity";
 import {
   GEOPOLITICS_SERIES,
   GEOPOLITICS_TITLE_RE,
@@ -104,6 +105,8 @@ export function fromKalshiFeatured(market, observedTs) {
       ],
       featured: Boolean(market.featured),
       volume24h: toNum(market.volume24h),
+      imageUrl: String(market.imageUrl || market.image || "").trim() || "/kalshi.png",
+      avatarUrl: String(market.imageUrl || market.image || "").trim() || "/kalshi.png",
       matchConfidence: weather ? 0.85 : geopolitics ? 0.7 : geo ? 0.55 : 0.4,
       quote,
     },
@@ -172,6 +175,8 @@ export function fromPolymarketFeatured(market, observedTs) {
       })),
       featured: Boolean(market.featured),
       volume24h: toNum(market.volume24h),
+      imageUrl: String(market.imageUrl || "").trim() || "/polymarket.png",
+      avatarUrl: String(market.imageUrl || "").trim() || "/polymarket.png",
       matchConfidence: geopolitics ? 0.75 : 0.4,
       quote,
       slug,
@@ -368,12 +373,37 @@ export async function fetchLiveWarRoomSources() {
     };
   }
 
+  let activity = [];
+  try {
+    const liveActivity = await fetchWarRoomActivity({ markets, observedTs });
+    activity = liveActivity.activity || [];
+    Object.assign(freshness, liveActivity.freshness || {});
+    for (const item of activity) {
+      if (item?.kind !== "headline" && item?.kind !== "fill") continue;
+      signals.push(item);
+      if (item.marketId) {
+        links.push({
+          marketId: item.marketId,
+          signalId: item.id,
+          matchMethod: item.kind === "headline" ? "news_title" : "venue_id",
+          reason: item.kind === "headline" ? "News pulse" : "Live trade",
+          confidence: item.kind === "headline" ? 0.55 : 1,
+          createdAt: observedTs,
+        });
+      }
+    }
+  } catch {
+    freshness.trades = { asOf: observedTs, status: "error", ageMs: 0 };
+    freshness.news = { asOf: observedTs, status: "error", ageMs: 0 };
+  }
+
   return {
     observedTs,
     freshness,
     markets,
     signals,
     links,
+    activity,
     featuredMarketId,
     liveOk: markets.length > 0,
   };

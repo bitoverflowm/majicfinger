@@ -34,6 +34,9 @@ export function GlobeStage({
   enhance = "auto",
   onTapPoster,
   className,
+  pings,
+  focusTarget,
+  onAnchorChange,
   ...globeProps
 }: GlobeStageProps) {
   const [ready, setReady] = useState(enhance === "always");
@@ -66,7 +69,14 @@ export function GlobeStage({
       <GlobePoster className={cn("absolute inset-0", showGlobe ? "opacity-0" : "opacity-100")} />
       {showGlobe ? (
         <div className="absolute inset-0">
-          <WarRoomGlobe {...globeProps} className="h-full w-full" onFail={onFail} />
+          <WarRoomGlobe
+            {...globeProps}
+            pings={pings}
+            focusTarget={focusTarget}
+            onAnchorChange={onAnchorChange}
+            className="h-full w-full"
+            onFail={onFail}
+          />
         </div>
       ) : onTapPoster ? (
         <button

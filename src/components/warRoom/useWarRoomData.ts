@@ -15,7 +15,9 @@ type Snapshot = {
   desk: string;
   cursor?: string;
   features: { type: "FeatureCollection"; features: unknown[] };
+  pings?: { type: "FeatureCollection"; features: unknown[] };
   feed: Array<Record<string, unknown>>;
+  activity?: Array<Record<string, unknown>>;
   selectedMarketId?: string | null;
   emptyReason?: string | null;
   status?: string;

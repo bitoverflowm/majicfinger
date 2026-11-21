@@ -27,7 +27,19 @@ type FeatureCollection = {
 
 export type WarRoomGlobeProps = {
   features: FeatureCollection | null;
+  /** Transient news / event pings (separate layer + color). */
+  pings?: FeatureCollection | null;
   selectedMarketId?: string | null;
+  /** Fly the camera here (trade / news / market click). */
+  focusTarget?: {
+    center: [number, number];
+    zoom?: number;
+    pitch?: number;
+    bearing?: number;
+    key?: string | number;
+  } | null;
+  /** Screen coords of the focused ping, relative to the map container. */
+  onAnchorChange?: (point: { x: number; y: number } | null) => void;
   onSelect?: (id: string) => void;
   onFail?: () => void;
   className?: string;
@@ -38,6 +50,7 @@ export type WarRoomGlobeProps = {
 };
 
 const SOURCE_ID = "war-room-markets";
+const PING_SOURCE_ID = "war-room-pings";
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 function applyProjection(map: {
@@ -52,7 +65,10 @@ function applyProjection(map: {
 
 export function WarRoomGlobe({
   features,
+  pings = null,
   selectedMarketId,
+  focusTarget = null,
+  onAnchorChange,
   onSelect,
   onFail,
   className,
@@ -66,23 +82,36 @@ export function WarRoomGlobe({
   onSelectRef.current = onSelect;
   const onFailRef = useRef(onFail);
   onFailRef.current = onFail;
+  const onAnchorChangeRef = useRef(onAnchorChange);
+  onAnchorChangeRef.current = onAnchorChange;
+  const focusLngLatRef = useRef<[number, number] | null>(null);
   const centerRef = useRef(initialCenter);
   centerRef.current = initialCenter;
   const pendingRef = useRef<FeatureCollection>(features || EMPTY);
+  const pendingPingsRef = useRef<FeatureCollection>(pings || EMPTY);
+  const knownIdsRef = useRef<Set<string>>(new Set());
   const selectedRef = useRef(selectedMarketId);
   selectedRef.current = selectedMarketId;
   const flushTimer = useRef<number | null>(null);
+  const focusKeyRef = useRef<string | number | null>(null);
 
   useEffect(() => {
     pendingRef.current = features || EMPTY;
+    pendingPingsRef.current = pings || EMPTY;
     const map = mapRef.current;
     if (!map) return;
     const source = map.getSource(SOURCE_ID) as { setData?: (d: FeatureCollection) => void } | undefined;
+    const pingSource = map.getSource(PING_SOURCE_ID) as { setData?: (d: FeatureCollection) => void } | undefined;
     if (!source?.setData) return;
     if (flushTimer.current) return;
     flushTimer.current = window.setTimeout(() => {
       flushTimer.current = null;
-      source.setData?.(pendingRef.current);
+      const next = pendingRef.current;
+      const nextIds = new Set(next.features.map((f) => String(f.properties?.id || f.id || "")));
+      const entering = [...nextIds].filter((id) => id && !knownIdsRef.current.has(id));
+      knownIdsRef.current = nextIds;
+      source.setData?.(next);
+      pingSource?.setData?.(pendingPingsRef.current);
       if (selectedRef.current) {
         try {
           map.setFilter("wr-selected", ["==", ["get", "id"], selectedRef.current]);
@@ -90,8 +119,22 @@ export function WarRoomGlobe({
           /* layer may not exist yet */
         }
       }
+      for (const id of entering) {
+        try {
+          map.setFeatureState({ source: SOURCE_ID, id }, { pulse: 1 });
+          window.setTimeout(() => {
+            try {
+              map.setFeatureState({ source: SOURCE_ID, id }, { pulse: 0 });
+            } catch {
+              /* gone */
+            }
+          }, 900);
+        } catch {
+          /* promoteId may not be ready */
+        }
+      }
     }, MAP_UPDATE_CADENCE_MS);
-  }, [features, selectedMarketId]);
+  }, [features, pings, selectedMarketId]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -161,7 +204,12 @@ export function WarRoomGlobe({
               type: "circle",
               source: SOURCE_ID,
               paint: {
-                "circle-radius": ["case", ["==", ["get", "marker"], "weather"], 14, 11],
+                "circle-radius": [
+                  "case",
+                  ["==", ["feature-state", "pulse"], 1],
+                  22,
+                  ["case", ["==", ["get", "marker"], "weather"], 14, 11],
+                ],
                 "circle-color": [
                   "match",
                   ["get", "marker"],
@@ -171,7 +219,7 @@ export function WarRoomGlobe({
                   "#fbbf24",
                   "#93c5fd",
                 ],
-                "circle-opacity": 0.18,
+                "circle-opacity": ["case", ["==", ["feature-state", "pulse"], 1], 0.35, 0.18],
               },
             });
             instance.addLayer({
@@ -179,7 +227,12 @@ export function WarRoomGlobe({
               type: "circle",
               source: SOURCE_ID,
               paint: {
-                "circle-radius": ["case", ["==", ["get", "marker"], "weather"], 6.5, 5.5],
+                "circle-radius": [
+                  "case",
+                  ["==", ["feature-state", "pulse"], 1],
+                  9,
+                  ["case", ["==", ["get", "marker"], "weather"], 6.5, 5.5],
+                ],
                 "circle-color": [
                   "match",
                   ["get", "marker"],
@@ -224,6 +277,32 @@ export function WarRoomGlobe({
                 "text-halo-color": WAR_ROOM_SPACE_BLACK,
                 "text-halo-width": 1.2,
                 "text-opacity": 0.9,
+              },
+            });
+            instance.addSource(PING_SOURCE_ID, {
+              type: "geojson",
+              data: pendingPingsRef.current,
+              promoteId: "id",
+            });
+            instance.addLayer({
+              id: "wr-news-halo",
+              type: "circle",
+              source: PING_SOURCE_ID,
+              paint: {
+                "circle-radius": 16,
+                "circle-color": "#c4b5fd",
+                "circle-opacity": 0.28,
+              },
+            });
+            instance.addLayer({
+              id: "wr-news-points",
+              type: "circle",
+              source: PING_SOURCE_ID,
+              paint: {
+                "circle-radius": 5.5,
+                "circle-color": "#a78bfa",
+                "circle-stroke-width": 1.2,
+                "circle-stroke-color": WAR_ROOM_SPACE_BLACK,
               },
             });
           }
@@ -307,6 +386,48 @@ export function WarRoomGlobe({
       }
     }
   }, [selectedMarketId, features, interactive, keepGlobe]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !focusTarget?.center) {
+      focusLngLatRef.current = null;
+      onAnchorChangeRef.current?.(null);
+      return;
+    }
+    const key = focusTarget.key ?? `${focusTarget.center[0]},${focusTarget.center[1]}`;
+    focusLngLatRef.current = focusTarget.center;
+    const publishAnchor = () => {
+      try {
+        const pt = map.project(focusLngLatRef.current as [number, number]);
+        onAnchorChangeRef.current?.({ x: pt.x, y: pt.y });
+      } catch {
+        onAnchorChangeRef.current?.(null);
+      }
+    };
+    if (focusKeyRef.current !== key) {
+      focusKeyRef.current = key;
+      try {
+        const currentBearing = typeof map.getBearing === "function" ? map.getBearing() : 0;
+        map.easeTo({
+          center: focusTarget.center,
+          zoom: focusTarget.zoom ?? 4.6,
+          pitch: focusTarget.pitch ?? 48,
+          bearing: focusTarget.bearing ?? currentBearing + 52,
+          duration: 1100,
+          essential: true,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    publishAnchor();
+    map.on("move", publishAnchor);
+    map.on("moveend", publishAnchor);
+    return () => {
+      map.off("move", publishAnchor);
+      map.off("moveend", publishAnchor);
+    };
+  }, [focusTarget]);
 
   return (
     <div

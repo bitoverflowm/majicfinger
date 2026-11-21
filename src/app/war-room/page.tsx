@@ -11,7 +11,7 @@ export const metadata = {
 
 function WarRoomFallback() {
   return (
-    <div className="flex h-[100svh] flex-col bg-[#070b14]">
+    <div className="flex h-[100svh] flex-col bg-black">
       <div className="border-b border-white/10 px-4 py-2 text-sm text-slate-300">War Room</div>
       <GlobePoster className="min-h-0 flex-1" />
     </div>

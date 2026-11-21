@@ -265,6 +265,10 @@ export function weatherStoryFromLive(seriesPack, nws, observedTs) {
     ],
     featured: true,
     volume24h: toNum(featured.volume_24h_fp) ?? toNum(featured.volume_fp),
+    imageUrl:
+      String(featured.image_url || featured.featured_image_url || "").trim() || "/kalshi.png",
+    avatarUrl:
+      String(featured.image_url || featured.featured_image_url || "").trim() || "/kalshi.png",
     matchConfidence: 1,
     quote,
     thresholds,

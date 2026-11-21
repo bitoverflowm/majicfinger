@@ -45,7 +45,16 @@ export function venueLabel(venue: string | null | undefined) {
   if (v === "kalshi") return "Kalshi";
   if (v === "polymarket") return "Polymarket";
   if (v === "nws") return "NWS";
+  if (v === "news") return "News";
   return venue || "Source";
+}
+
+export function formatVolume(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  const n = Number(value);
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
+  return `$${Math.round(n)}`;
 }
 
 export function signalKindLabel(kind: string | null | undefined) {
