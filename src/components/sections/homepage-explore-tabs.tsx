@@ -268,8 +268,8 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
   );
 
   return (
-    <section id="demo" className="w-full px-4 pb-16 sm:px-6 lg:px-10">
-      <div className="mx-auto w-full max-w-[min(100%,72rem)]">
+    <section id="demo" className="w-full pb-16">
+      <div className="mx-auto w-full max-w-[min(100%,72rem)] px-4 sm:px-6 lg:px-10">
         <div role="tablist" aria-label="Explore Lychee" className="flex flex-wrap gap-2">
           {TABS.map((item) => {
             const selected = tab === item.id;
@@ -292,54 +292,58 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
             );
           })}
         </div>
+      </div>
 
-        <div className="mt-4">
-          {tab === "war-room" ? (
-            <div className="relative h-[min(88svh,58rem)] min-h-[32rem] overflow-hidden rounded-[1.5rem] bg-[#070b14]">
-              <GlobeStage
-                enhance="auto"
-                features={features}
-                initialCenter={center}
-                keepGlobe
-                interactive
-                onSelect={(id) => {
-                  window.location.assign(warRoomHref({ market: id }));
-                }}
-                className="absolute inset-0"
+      <div className="mt-4">
+        {tab === "war-room" ? (
+          <div className="relative left-1/2 h-[min(88svh,58rem)] min-h-[32rem] w-screen max-w-[100vw] -translate-x-1/2 overflow-hidden bg-[#070b14]">
+            <GlobeStage
+              enhance="auto"
+              features={features}
+              initialCenter={center}
+              keepGlobe
+              interactive
+              onSelect={(id) => {
+                window.location.assign(warRoomHref({ market: id }));
+              }}
+              className="absolute inset-0"
+            />
+            <Link
+              href="/war-room"
+              className="absolute bottom-4 left-4 z-10 inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-medium text-slate-950 shadow-lg sm:left-6 lg:left-10"
+            >
+              Open War Room
+            </Link>
+          </div>
+        ) : null}
+
+        {tab === "past" || tab === "present" || tab === "holders" ? (
+          <div className="mx-auto w-full max-w-[min(100%,72rem)] px-4 sm:px-6 lg:px-10">
+            {tab === "past" ? (
+              <DemoPicker
+                heading="Analyze the Past"
+                subtext="Pull closed Kalshi and Polymarket markets, trade history, and the news archive — same sources as the terminal demo."
+                pills={pastPills}
               />
-              <Link
-                href="/war-room"
-                className="absolute bottom-4 left-4 z-10 inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-medium text-slate-950 shadow-lg"
-              >
-                Open War Room
-              </Link>
-            </div>
-          ) : null}
+            ) : null}
 
-          {tab === "past" ? (
-            <DemoPicker
-              heading="Analyze the Past"
-              subtext="Pull closed Kalshi and Polymarket markets, trade history, and the news archive — same sources as the terminal demo."
-              pills={pastPills}
-            />
-          ) : null}
+            {tab === "present" ? (
+              <DemoPicker
+                heading="Monitor the present"
+                subtext="Live Kalshi, Polymarket, and supporting feeds. Pick a source the way you would in the terminal."
+                pills={presentPills}
+              />
+            ) : null}
 
-          {tab === "present" ? (
-            <DemoPicker
-              heading="Monitor the present"
-              subtext="Live Kalshi, Polymarket, and supporting feeds. Pick a source the way you would in the terminal."
-              pills={presentPills}
-            />
-          ) : null}
-
-          {tab === "holders" ? (
-            <DemoPicker
-              heading="Holders"
-              subtext="Open the Holder Terminal or run the Polymarket holder analysis recipe."
-              pills={holderPills}
-            />
-          ) : null}
-        </div>
+            {tab === "holders" ? (
+              <DemoPicker
+                heading="Holders"
+                subtext="Open the Holder Terminal or run the Polymarket holder analysis recipe."
+                pills={holderPills}
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </section>
   );
