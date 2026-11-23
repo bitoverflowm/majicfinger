@@ -1,4 +1,5 @@
 import { CONNECT_WORKSPACE_SCROLL_OFFSET_PX } from "@/lib/connectHubLayout";
+import { nodeContains } from "@/lib/domNode";
 
 /** Step 2 viewport anchor — sheet / chart / dashboard; never scroll to compose. */
 export const CONNECT_HOME_ANALYZE_ANCHOR_ID = "connect-home-analyze-anchor";
@@ -291,7 +292,7 @@ export function scrollConnectComposeTargetIntoView(
   if (!targetEl || typeof document === "undefined") return false;
 
   const composeEl = document.getElementById(CONNECT_HOME_COMPOSE_ID);
-  if (composeEl?.contains(targetEl)) {
+  if (nodeContains(composeEl, targetEl)) {
     if (onlyIfNeeded && isVisibleInScrollRoot(composeEl, targetEl, insetTop)) {
       return true;
     }

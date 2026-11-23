@@ -27,6 +27,7 @@ import {
 import { KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS } from "@/lib/kalshiLive/liveMarketAttributeQuery";
 import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { cn } from "@/lib/utils";
+import { nodeContains } from "@/lib/domNode";
 import { SearchFeatureTip } from "@/components/dashboardComposer/buildFeatureTips";
 
 const STATUS_OPTIONS = [
@@ -354,7 +355,9 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
     const frame = window.requestAnimationFrame(() => portalInputRef.current?.focus());
     const onReflow = (event) => {
       const list = listRef.current;
-      if (list && event?.target && (event.target === list || list.contains(event.target))) return;
+      const target = event?.target;
+      // resize targets Window; capture scroll can too. Node.contains(Window) throws.
+      if (list && (target === list || nodeContains(list, target))) return;
       measure();
     };
     window.addEventListener("resize", onReflow);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { nodeContains } from "@/lib/domNode";
 
 function isScrollableY(el) {
   if (!el) return false;
@@ -41,7 +42,7 @@ export function useConnectDemoScrollContainment({ enabled, scrollRef, trapRootRe
     if (!scrollRoot || !trapRoot) return undefined;
 
     const onWheel = (e) => {
-      if (!trapRoot.contains(e.target)) return;
+      if (!nodeContains(trapRoot, e.target)) return;
 
       const primary = findScrollableTarget(e.target, trapRoot, scrollRoot);
       if (canScrollY(primary, e.deltaY)) return;

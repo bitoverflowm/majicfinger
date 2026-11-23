@@ -14,6 +14,7 @@ import {
   polymarketSuggestionStatusTags,
 } from "@/lib/polymarketLive/polymarketPublicSearch";
 import { cn } from "@/lib/utils";
+import { nodeContains } from "@/lib/domNode";
 
 /** @typedef {import("@/lib/polymarketLive/polymarketPublicSearch").PolymarketPublicSearchSuggestion} PolymarketPublicSearchSuggestion */
 
@@ -349,7 +350,7 @@ export function PolymarketLiveSearch({
   useEffect(() => {
     if (!suggestOpen && !suggestLoading) return undefined;
     const onPointerDown = (event) => {
-      if (containerRef.current?.contains(event.target)) return;
+      if (nodeContains(containerRef.current, event.target)) return;
       pointerInsideRef.current = false;
       dismissSuggestions();
     };
@@ -604,7 +605,7 @@ export function PolymarketLiveSearch({
               return;
             }
             const next = e.relatedTarget;
-            if (next && containerRef.current?.contains(next)) return;
+            if (nodeContains(containerRef.current, next)) return;
             dismissSuggestions();
           }}
           onKeyDown={(e) => {

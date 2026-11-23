@@ -194,6 +194,7 @@ import { integrationProfile } from "@/components/dashboardComposer/integrationSo
 import { requestCardForSheet, stampRunSheets } from "@/components/dashboardComposer/integrationProvenance";
 import { attachJoinRegistry } from "@/components/dashboardComposer/replayTabQueries";
 import { cn } from "@/lib/utils";
+import { nodeContains } from "@/lib/domNode";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { sheetRecords } from "@/components/dashboardComposer/integrationRunSheets";
 import { assignSummaryInput, buildSummaryGrid, describeSummaryFormula, settleSummaryCells, SUMMARY_ROW_COUNT, summaryCellKey, summaryExamples } from "@/components/dashboardComposer/summarySheet";
@@ -656,7 +657,7 @@ function SheetTabBar({ tabs, active, onSelect }) {
   useEffect(() => {
     if (!open) return undefined;
     const close = (event) => {
-      if (!frameRef.current?.contains(event.target)) setOpen(false);
+      if (!nodeContains(frameRef.current, event.target)) setOpen(false);
     };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
