@@ -19,6 +19,11 @@ import { landingPageV2Config } from "@/lib/landingPageV2Config";
 import { flushJourneyQueue } from "@/lib/analytics/journeyClient";
 import { getOrCreateVisitorSessionId } from "@/lib/analytics/visitorSession";
 import { requestCheckoutSession } from "@/lib/checkout/sessionClient";
+import {
+  buildCheckoutElementsOptions,
+  checkoutConfirmOptions,
+  shouldInitCheckoutElements,
+} from "@/lib/checkout/stripeContactEmail";
 import { checkoutEntryPage, msSinceCheckoutClick, trackCheckoutStep } from "@/lib/checkout/trackCheckoutStep";
 import { isKnownCheckoutQuery } from "@/lib/stripe/checkoutPlanQuery";
 
@@ -318,20 +323,23 @@ export default function CheckoutClient({ plan, cycle, referral }) {
   const stripePromise = stripeFor(publishableKey);
   const options = useMemo(
     () =>
-      !fatal && clientSecret && publishableKey
-        ? {
+      shouldInitCheckoutElements({
+        fatal,
+        clientSecret,
+        publishableKey,
+        sessionId: meta.sessionId,
+      })
+        ? buildCheckoutElementsOptions({
             clientSecret,
-            elementsOptions: {
-              appearance: appearanceFor(theme),
-              // Keep Stripe's skeleton visible while the session Promise and iframe finish.
-              loader: "always",
-            },
-            ...(meta.email ? { defaultValues: { email: meta.email } } : {}),
-          }
+            appearance: appearanceFor(theme),
+            email: meta.email,
+          })
         : null,
+    // Wait for the session so defaultValues.email is known at Stripe init.
     // Stripe reads appearance/email once at mount; theme flips go through changeAppearance.
+    // Never call updateEmail() later — Contact Details is mounted and owns email.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [clientSecret, publishableKey, fatal],
+    [clientSecret, publishableKey, fatal, meta.sessionId, meta.email],
   );
 
   const showSlow = slow && !formReady && !fatal;
@@ -512,12 +520,6 @@ function ConnectedCheckout({
     // Only re-theme when the site theme flips.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme, Boolean(checkout)]);
-
-  // Prefill from the session response when Stripe mounted before it arrived.
-  useEffect(() => {
-    if (!checkout || !email || typeof checkout.updateEmail !== "function") return;
-    Promise.resolve(checkout.updateEmail(email)).catch(() => {});
-  }, [checkout, email]);
 
   useEffect(() => {
     if (slow) track("form_slow", { ms: msSinceCheckoutClick(mountedAt), sessionMs: sessionMs ?? undefined }, { once: true });
@@ -843,7 +845,7 @@ function PaymentForm({ checkout, summary, promoCodes, journey, track, onReady })
     track("submit", { email: journey.current.email || undefined });
     const started = Date.now();
     try {
-      const result = await checkout.confirm({ redirect: "if_required" });
+      const result = await checkout.confirm(checkoutConfirmOptions());
       if (result.type === "error") {
         const message = result.error?.message || "Your payment didn't go through. Try another method.";
         setError(message);
@@ -925,6 +927,7 @@ function PaymentForm({ checkout, summary, promoCodes, journey, track, onReady })
       <ContactDetailsElement
         onFocus={() => track("contact_started", {}, { once: true })}
         onChange={(event) => {
+          // Element owns the session email (including Link). Do not call updateEmail().
           journey.current.email = event?.value?.email || "";
         }}
       />
