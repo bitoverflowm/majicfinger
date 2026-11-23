@@ -111,6 +111,7 @@ import "@/lib/polymarketLive/polymarketRealtimeSeed.test.js";
 import "@/lib/polymarketLive/polymarketLiveRequestHistory.test.js";
 import "@/lib/polymarketLive/polymarketPublicSearch.test.js";
 import "@/lib/checkout/stripeContactEmail.test.js";
+import "@/lib/domNode.test.js";
 
 function test(name, fn) {
   try {
