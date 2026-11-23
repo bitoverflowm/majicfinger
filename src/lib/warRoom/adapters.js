@@ -256,7 +256,7 @@ export async function fetchLiveWarRoomSources() {
           .catch(() => ({ ticker, markets: [] })),
       ),
     ),
-    12_000,
+    SOURCE_TIMEOUT_MS,
     "kalshi-located-series",
   );
 

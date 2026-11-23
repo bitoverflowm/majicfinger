@@ -470,3 +470,37 @@ export async function fetchPolymarketMarketsByExploreFeed(feedId, opts = {}) {
   }
   return markets;
 }
+
+/**
+ * Single-market Gamma lookup by condition id (War Room globe / deep links).
+ * The featured pool is capped and does not contain every tradable marker.
+ *
+ * @param {string} conditionId
+ * @returns {Promise<FeaturedPolymarketMarket | null>}
+ */
+export async function fetchPolymarketMarketByConditionId(conditionId) {
+  const id = String(conditionId || "").trim();
+  if (!id) return null;
+  const needle = id.toLowerCase();
+  const pick = (payload) => {
+    const markets = marketsFromPayload(payload);
+    return (
+      markets.find((market) => String(market.conditionId || "").toLowerCase() === needle) ||
+      markets[0] ||
+      null
+    );
+  };
+  try {
+    const open = await gammaGet("/markets", { condition_ids: id, limit: 5, closed: false });
+    const hit = pick(open);
+    if (hit) return hit;
+  } catch {
+    /* try closed */
+  }
+  try {
+    const closed = await gammaGet("/markets", { condition_ids: id, limit: 5, closed: true });
+    return pick(closed);
+  } catch {
+    return null;
+  }
+}

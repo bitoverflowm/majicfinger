@@ -4,6 +4,7 @@ import { parseWarRoomMarketId, warRoomMarketId } from "./ids.js";
 import { buildFixtureBundle } from "./fixture.js";
 import { isFeaturedWeatherMarket, rankMarkets } from "./ranking.js";
 import { FEATURED_WEATHER_SERIES } from "./constants.js";
+import { getWarRoomMarket, rememberWarRoomMarkets, resetWarRoomCache } from "./serving.js";
 
 function test(name, fn) {
   try {
@@ -54,4 +55,33 @@ test("fixture bundle exposes weather story, geopolitics, and labeled flag", () =
   assert.ok(bundle.markets.some((m) => m.category === "geopolitics"));
   assert.ok(bundle.featuredMarketId.startsWith("kalshi:KXHIGHNY"));
   assert.ok(bundle.signals.length >= 6);
+});
+
+test("getWarRoomMarket rejects junk ids without a live fetch", async () => {
+  const t0 = Date.now();
+  const detail = await getWarRoomMarket("nope");
+  assert.equal(detail.status, "invalid_id");
+  assert.equal(detail.market, null);
+  assert.ok(Date.now() - t0 < 250, `invalid id was too slow: ${Date.now() - t0}ms`);
+});
+
+test("getWarRoomMarket serves a remembered snapshot/globe market immediately", async () => {
+  resetWarRoomCache();
+  rememberWarRoomMarkets([
+    {
+      id: "polymarket:0x74ffa67463041114d94d56cbc2c06c78696327dd4c873e71229b2717d964f853",
+      venue: "polymarket",
+      venueMarketId: "0x74ffa67463041114d94d56cbc2c06c78696327dd4c873e71229b2717d964f853",
+      title: "Globe marker",
+      status: "open",
+    },
+  ]);
+  const t0 = Date.now();
+  const detail = await getWarRoomMarket(
+    "polymarket:0x74ffa67463041114d94d56cbc2c06c78696327dd4c873e71229b2717d964f853",
+  );
+  assert.equal(detail.status, "ok");
+  assert.equal(detail.market.title, "Globe marker");
+  assert.ok(Date.now() - t0 < 250, `remembered market was too slow: ${Date.now() - t0}ms`);
+  resetWarRoomCache();
 });

@@ -366,6 +366,32 @@ function toFeaturedMarket(market, extra = {}) {
 }
 
 /**
+ * Single-market Kalshi lookup by ticker (War Room globe / deep links).
+ *
+ * @param {string} ticker
+ * @returns {Promise<FeaturedKalshiMarket | null>}
+ */
+export async function fetchKalshiLiveMarketByTicker(ticker) {
+  const id = String(ticker || "").trim().toUpperCase();
+  if (!id) return null;
+  try {
+    const body = await kalshiGet(`markets/${encodeURIComponent(id)}`);
+    const raw =
+      body?.market && typeof body.market === "object"
+        ? /** @type {Record<string, unknown>} */ (body.market)
+        : body && typeof body === "object" && String(body.ticker || "").trim()
+          ? /** @type {Record<string, unknown>} */ (body)
+          : null;
+    if (!raw || !String(raw.ticker || "").trim()) return null;
+    return toFeaturedMarket(raw, {
+      seriesTicker: String(raw.series_ticker || "").trim().toUpperCase(),
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @param {FeaturedKalshiMarket[]} pool
  * @param {{ limit: number; excludeTickers?: string[] }} opts
  * @returns {FeaturedKalshiMarket[]}

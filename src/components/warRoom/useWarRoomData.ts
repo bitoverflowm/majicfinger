@@ -79,15 +79,6 @@ async function fetchSnapshot(params: {
   };
 }
 
-async function fetchDetail(id: string, fixture?: boolean) {
-  const res = await fetch(`/api/war-room/market${qs({ id, fixture })}`, {
-    credentials: "same-origin",
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok && res.status !== 404) throw new Error(body.error || res.statusText);
-  return body as Detail;
-}
-
 export function useWarRoomData({
   desk,
   market,
@@ -104,19 +95,20 @@ export function useWarRoomData({
   mobile?: boolean;
 }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [detail, setDetail] = useState<Detail>(null);
   const [error, setError] = useState<string | null>(null);
   /** True while a filter/view change is fetching — never blanks existing UI. */
   const [loading, setLoading] = useState(true);
 
   const hiddenRef = useRef(false);
   const filterGenRef = useRef(0);
+  const pollInflightRef = useRef(false);
   const marketRef = useRef(market);
   marketRef.current = market;
 
   // Only filter/view inputs — not `market`, or every ping click would flash loading.
   const filterKey = `${desk}|${category || ""}|${exploreFeed || ""}|${fixture ? 1 : 0}|${mobile ? 1 : 0}`;
-  const wantsBoost = Boolean(category || (exploreFeed && exploreFeed !== "tradable"));
+  // Tradable still Gamma-boosts 200+ markers — paint the desk shell first.
+  const wantsBoost = Boolean(category || exploreFeed);
 
   useEffect(() => {
     const gen = ++filterGenRef.current;
@@ -163,18 +155,6 @@ export function useWarRoomData({
           mobile,
         });
         if (!applySnapshot(body)) return;
-
-        // Detail never blocks rails/globe — load after the snapshot lands.
-        const selected = body.selectedMarketId || marketRef.current;
-        if (selected) {
-          fetchDetail(selected, fixture)
-            .then((nextDetail) => {
-              if (!cancelled && filterGenRef.current === gen) setDetail(nextDetail);
-            })
-            .catch(() => {});
-        } else {
-          setDetail(null);
-        }
       } catch (err) {
         if (!cancelled && filterGenRef.current === gen) {
           setError(err instanceof Error ? err.message : "Failed to load");
@@ -189,31 +169,14 @@ export function useWarRoomData({
     };
   }, [filterKey, desk, category, exploreFeed, fixture, mobile, wantsBoost]);
 
-  // Market taps: refresh detail only, keep rails/globe as-is.
-  useEffect(() => {
-    const selected = market || snapshot?.selectedMarketId;
-    if (!selected) {
-      setDetail(null);
-      return;
-    }
-    let cancelled = false;
-    fetchDetail(selected, fixture)
-      .then((body) => {
-        if (!cancelled) setDetail(body);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [market, snapshot?.selectedMarketId, fixture]);
-
   useEffect(() => {
     const onVis = () => {
       hiddenRef.current = document.hidden;
     };
     document.addEventListener("visibilitychange", onVis);
     const interval = window.setInterval(() => {
-      if (hiddenRef.current) return;
+      if (hiddenRef.current || pollInflightRef.current) return;
+      pollInflightRef.current = true;
       // Silent background refresh — no loading chrome.
       fetchSnapshot({
         desk,
@@ -227,7 +190,10 @@ export function useWarRoomData({
           setSnapshot(body);
           setError(null);
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => {
+          pollInflightRef.current = false;
+        });
     }, snapshot?.pollIntervalMs || POLL_INTERVAL_MS);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
@@ -261,7 +227,7 @@ export function useWarRoomData({
     }
   }, [desk, category, exploreFeed, fixture, mobile]);
 
-  return { snapshot, detail, error, loading, transport: "poll" as const, reload };
+  return { snapshot, detail: null as Detail, error, loading, transport: "poll" as const, reload };
 }
 
 export function useWarRoomPreview(fixture?: boolean) {

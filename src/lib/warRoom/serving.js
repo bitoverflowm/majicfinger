@@ -7,8 +7,12 @@ import {
   normalizeCategory,
   normalizeExploreFeed,
 } from "@/lib/markets/exploreCategories";
-import { fetchKalshiLiveMarketsBySeriesCategories } from "@/lib/kalshiLive/fetchKalshiLiveFeaturedMarkets";
 import {
+  fetchKalshiLiveMarketByTicker,
+  fetchKalshiLiveMarketsBySeriesCategories,
+} from "@/lib/kalshiLive/fetchKalshiLiveFeaturedMarkets";
+import {
+  fetchPolymarketMarketByConditionId,
   fetchPolymarketMarketsByExploreFeed,
   fetchPolymarketMarketsByTagSlug,
 } from "@/lib/polymarketLive/fetchPolymarketLiveFeaturedMarkets";
@@ -34,8 +38,101 @@ import { sortSignals } from "./timeline";
 
 /** @typedef {"poll"} WarRoomTransport */
 
+const MARKET_LOOKUP_TIMEOUT_MS = 4_000;
+const BOOST_CACHE_TTL_MS = SNAPSHOT_CACHE_TTL_MS * 2;
+const RECENT_MARKET_TTL_MS = 10 * 60_000;
+
 let liveMemo = { at: 0, bundle: null, inflight: null };
 let lastGoodLive = /** @type {ReturnType<typeof normalizeBundle> | null} */ (null);
+/** @type {Map<string, { at: number; market: Record<string, unknown> }>} */
+const recentMarkets = new Map();
+/** @type {Map<string, { at: number; markets: Array<Record<string, unknown>>; inflight: Promise<Array<Record<string, unknown>>> | null }>} */
+const boostMemo = new Map();
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+    }),
+  ]);
+}
+
+function rememberMarkets(markets) {
+  const now = Date.now();
+  for (const market of markets || []) {
+    const id = String(market?.id || "").trim();
+    if (!id) continue;
+    recentMarkets.set(id, { at: now, market });
+  }
+  if (recentMarkets.size > 2_000) {
+    const cutoff = now - RECENT_MARKET_TTL_MS;
+    for (const [id, row] of recentMarkets) {
+      if (row.at < cutoff) recentMarkets.delete(id);
+    }
+  }
+}
+
+function rememberedMarket(id) {
+  const hit = recentMarkets.get(id);
+  if (!hit) return null;
+  if (Date.now() - hit.at > RECENT_MARKET_TTL_MS) {
+    recentMarkets.delete(id);
+    return null;
+  }
+  return hit.market;
+}
+
+/** @internal test helper: seed globe/snapshot markets without a live fetch. */
+export function rememberWarRoomMarkets(markets) {
+  rememberMarkets(markets);
+}
+
+function peekLiveBundle() {
+  return liveMemo.bundle || lastGoodLive;
+}
+
+function emptyBundleFor(market) {
+  return normalizeBundle({
+    asOf: nowIso(),
+    fixture: false,
+    markets: market ? [market] : [],
+    signals: [],
+    links: [],
+    activity: [],
+    featuredMarketId: market?.id || null,
+  });
+}
+
+async function cachedBoost(key, loader) {
+  const now = Date.now();
+  const hit = boostMemo.get(key);
+  if (hit && !hit.inflight && Array.isArray(hit.markets) && now - hit.at < BOOST_CACHE_TTL_MS) {
+    return hit.markets;
+  }
+  if (!hit?.inflight) {
+    const inflight = Promise.resolve()
+      .then(loader)
+      .then((markets) => {
+        const rows = Array.isArray(markets) ? markets : [];
+        boostMemo.set(key, { at: Date.now(), markets: rows, inflight: null });
+        return rows;
+      })
+      .catch((err) => {
+        const prev = boostMemo.get(key);
+        boostMemo.set(key, {
+          at: prev?.at || 0,
+          markets: prev?.markets || [],
+          inflight: null,
+        });
+        throw err;
+      });
+    boostMemo.set(key, { at: hit?.at || 0, markets: hit?.markets || [], inflight });
+  }
+  const current = boostMemo.get(key);
+  if (current?.markets?.length) return current.markets;
+  return current?.inflight || [];
+}
 
 function nowIso(ms = Date.now()) {
   return new Date(ms).toISOString();
@@ -72,31 +169,37 @@ async function loadLiveBundle() {
   if (liveMemo.bundle && now - liveMemo.at < SNAPSHOT_CACHE_TTL_MS) {
     return liveMemo.bundle;
   }
-  if (liveMemo.inflight) return liveMemo.inflight;
 
-  liveMemo.inflight = fetchLiveWarRoomSources()
-    .then((live) => {
-      if (!live.liveOk) throw new Error("No live War Room markets");
-      const bundle = normalizeBundle({
-        asOf: live.observedTs,
-        fixture: false,
-        freshness: live.freshness,
-        markets: live.markets,
-        signals: live.signals,
-        links: live.links,
-        activity: live.activity,
-        featuredMarketId: live.featuredMarketId,
-        pollIntervalMs: POLL_INTERVAL_MS,
+  if (!liveMemo.inflight) {
+    liveMemo.inflight = fetchLiveWarRoomSources()
+      .then((live) => {
+        if (!live.liveOk) throw new Error("No live War Room markets");
+        const bundle = normalizeBundle({
+          asOf: live.observedTs,
+          fixture: false,
+          freshness: live.freshness,
+          markets: live.markets,
+          signals: live.signals,
+          links: live.links,
+          activity: live.activity,
+          featuredMarketId: live.featuredMarketId,
+          pollIntervalMs: POLL_INTERVAL_MS,
+        });
+        rememberMarkets(bundle.markets);
+        liveMemo = { at: Date.now(), bundle, inflight: null };
+        lastGoodLive = bundle;
+        return bundle;
+      })
+      .catch((err) => {
+        liveMemo.inflight = null;
+        throw err;
       });
-      liveMemo = { at: Date.now(), bundle, inflight: null };
-      lastGoodLive = bundle;
-      return bundle;
-    })
-    .catch((err) => {
-      liveMemo.inflight = null;
-      throw err;
-    });
+  }
 
+  // Serve the last good bundle immediately while a refresh runs so market
+  // lookups and homepage polls don't stall the Next server for ~12s.
+  const stale = liveMemo.bundle || lastGoodLive;
+  if (stale) return stale;
   return liveMemo.inflight;
 }
 
@@ -192,14 +295,18 @@ async function categoryPolymarketBoost(category, observedTs, existingIds) {
   const tagSlug = definition.tags[0];
   if (!tagSlug) return [];
   try {
-    const rows = await fetchPolymarketMarketsByTagSlug(tagSlug, { limit: 120 });
-    // Trust Gamma's event tag filter — don't re-drop rows whose local tags omit the
-    // chip slug (e.g. politics events tagged "Elections" but not "politics").
-    return mapBoostedMarkets(rows, observedTs, existingIds).map((market) => ({
-      ...market,
-      category,
-      tags: [...new Set([...(market.tags || []), category, tagSlug].filter(Boolean))],
-    }));
+    const boosted = await cachedBoost(`poly-tag:${tagSlug}`, async () => {
+      const rows = await fetchPolymarketMarketsByTagSlug(tagSlug, { limit: 120 });
+      // Trust Gamma's event tag filter — don't re-drop rows whose local tags omit the
+      // chip slug (e.g. politics events tagged "Elections" but not "politics").
+      return mapBoostedMarkets(rows, observedTs, new Set()).map((market) => ({
+        ...market,
+        category,
+        tags: [...new Set([...(market.tags || []), category, tagSlug].filter(Boolean))],
+      }));
+    });
+    for (const market of boosted) existingIds.add(market.id);
+    return boosted;
   } catch {
     return [];
   }
@@ -216,24 +323,32 @@ async function categoryKalshiBoost(category, observedTs, existingIds) {
   const kalshiCategories = kalshiSeriesCategoriesForWarRoom(category);
   if (!kalshiCategories.length) return [];
   try {
-    const rows = await fetchKalshiLiveMarketsBySeriesCategories({
-      categories: kalshiCategories,
-      limit: 100,
-    });
-    /** @type {Array<Record<string, unknown>>} */
-    const out = [];
-    for (const row of rows) {
-      const mapped = fromKalshiFeatured(row, observedTs);
-      if (!mapped?.market) continue;
-      if (existingIds.has(mapped.market.id)) continue;
-      existingIds.add(mapped.market.id);
-      out.push({
-        ...mapped.market,
-        category,
-        tags: [...new Set([...(mapped.market.tags || []), category, ...kalshiCategories].filter(Boolean))],
+    const boosted = await cachedBoost(`kalshi-cat:${kalshiCategories.join(",")}`, async () => {
+      const rows = await fetchKalshiLiveMarketsBySeriesCategories({
+        categories: kalshiCategories,
+        limit: 100,
       });
-    }
-    return out;
+      /** @type {Array<Record<string, unknown>>} */
+      const out = [];
+      const seen = new Set();
+      for (const row of rows) {
+        const mapped = fromKalshiFeatured(row, observedTs);
+        if (!mapped?.market) continue;
+        if (seen.has(mapped.market.id)) continue;
+        seen.add(mapped.market.id);
+        out.push({
+          ...mapped.market,
+          category,
+          tags: [...new Set([...(mapped.market.tags || []), category, ...kalshiCategories].filter(Boolean))],
+        });
+      }
+      return out;
+    });
+    return boosted.filter((market) => {
+      if (existingIds.has(market.id)) return false;
+      existingIds.add(market.id);
+      return true;
+    });
   } catch {
     return [];
   }
@@ -249,15 +364,19 @@ async function categoryKalshiBoost(category, observedTs, existingIds) {
 async function exploreFeedPolymarketBoost(exploreFeed, observedTs, existingIds) {
   if (!exploreFeed) return [];
   try {
-    // Tradable / volume feeds should fill the desktop point cap; others stay denser but lighter.
-    const limit =
-      exploreFeed === "tradable" || exploreFeed === "volume" || exploreFeed === "liquidity"
-        ? 220
-        : exploreFeed === "new" || exploreFeed === "trending" || exploreFeed === "competitive"
-          ? 160
-          : 100;
-    const rows = await fetchPolymarketMarketsByExploreFeed(exploreFeed, { limit });
-    return mapBoostedMarkets(rows, observedTs, existingIds);
+    const boosted = await cachedBoost(`poly-feed:${exploreFeed}`, async () => {
+      // Tradable / volume feeds should fill the desktop point cap; others stay denser but lighter.
+      const limit =
+        exploreFeed === "tradable" || exploreFeed === "volume" || exploreFeed === "liquidity"
+          ? 220
+          : exploreFeed === "new" || exploreFeed === "trending" || exploreFeed === "competitive"
+            ? 160
+            : 100;
+      const rows = await fetchPolymarketMarketsByExploreFeed(exploreFeed, { limit });
+      return mapBoostedMarkets(rows, observedTs, new Set());
+    });
+    for (const market of boosted) existingIds.add(market.id);
+    return boosted;
   } catch {
     return [];
   }
@@ -530,6 +649,8 @@ export async function getWarRoomSnapshot(opts = {}) {
     pool = bundle.markets;
   }
 
+  rememberMarkets(pool);
+
   const filtered = pool.filter(
     (market) =>
       matchesDesk(market, desk) && (!category || matchesCategory(market, category)),
@@ -648,28 +769,22 @@ function researchLinks(market) {
   return links;
 }
 
-/**
- * @param {string} id
- * @param {{ forceFixture?: boolean }} [opts]
- */
-export async function getWarRoomMarket(id, opts = {}) {
-  const bundle = await loadWarRoomBundle(opts);
-  const parsed = parseWarRoomMarketId(id);
-  const market = bundle.markets.find((row) => row.id === id) || null;
-  if (!market) {
-    return {
-      version: WAR_ROOM_MODEL_VERSION,
-      asOf: bundle.asOf,
-      fixture: bundle.fixture,
-      fixtureLabel: bundle.fixtureLabel,
-      status: parsed ? "not_found" : "invalid_id",
-      market: null,
-      quote: null,
-      timeline: [],
-      links: [],
-      freshness: bundle.freshness,
-    };
-  }
+function missingMarketPayload(bundle, parsed) {
+  return {
+    version: WAR_ROOM_MODEL_VERSION,
+    asOf: bundle?.asOf || nowIso(),
+    fixture: Boolean(bundle?.fixture),
+    fixtureLabel: bundle?.fixtureLabel || null,
+    status: parsed ? "not_found" : "invalid_id",
+    market: null,
+    quote: null,
+    timeline: [],
+    links: [],
+    freshness: bundle?.freshness || {},
+  };
+}
+
+function marketDetailPayload(bundle, market) {
   const timeline = signalsForMarket(bundle, market.id);
   const resolved = market.status === "resolved" || market.status === "closed";
   return {
@@ -695,6 +810,82 @@ export async function getWarRoomMarket(id, opts = {}) {
   };
 }
 
+async function lookupVenueMarket(parsed) {
+  try {
+    if (parsed.venue === "polymarket") {
+      const row = await withTimeout(
+        fetchPolymarketMarketByConditionId(parsed.venueMarketId),
+        MARKET_LOOKUP_TIMEOUT_MS,
+        "polymarket-market",
+      );
+      if (!row) return null;
+      return fromPolymarketFeatured(row, nowIso())?.market || null;
+    }
+    if (parsed.venue === "kalshi") {
+      const row = await withTimeout(
+        fetchKalshiLiveMarketByTicker(parsed.venueMarketId),
+        MARKET_LOOKUP_TIMEOUT_MS,
+        "kalshi-market",
+      );
+      if (!row) return null;
+      return fromKalshiFeatured(row, nowIso())?.market || null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function findKnownMarket(id, bundle) {
+  return bundle?.markets?.find((row) => row.id === id) || rememberedMarket(id) || null;
+}
+
+/**
+ * @param {string} id
+ * @param {{ forceFixture?: boolean }} [opts]
+ */
+export async function getWarRoomMarket(id, opts = {}) {
+  const parsed = parseWarRoomMarketId(id);
+
+  if (opts.forceFixture || isWarRoomFixtureForced()) {
+    const bundle = await loadWarRoomBundle(opts);
+    const market = bundle.markets.find((row) => row.id === id) || null;
+    if (!market) return missingMarketPayload(bundle, parsed);
+    return marketDetailPayload(bundle, market);
+  }
+
+  if (!parsed) {
+    return missingMarketPayload(peekLiveBundle() || emptyBundleFor(null), parsed);
+  }
+
+  const cachedBundle = peekLiveBundle();
+  let market = findKnownMarket(id, cachedBundle);
+  if (market) {
+    rememberMarkets([market]);
+    return marketDetailPayload(cachedBundle || emptyBundleFor(market), market);
+  }
+
+  // Globe markers come from Gamma/explore boosts, not the small featured pool.
+  // Look the contract up directly instead of waiting ~12s on the full live bundle
+  // and then 404ing.
+  market = await lookupVenueMarket(parsed);
+  if (market) {
+    rememberMarkets([market]);
+    return marketDetailPayload(cachedBundle || emptyBundleFor(market), market);
+  }
+
+  if (cachedBundle) {
+    return missingMarketPayload(cachedBundle, parsed);
+  }
+
+  // Cold process with no snapshot yet: wait once for the featured pool.
+  const bundle = await loadWarRoomBundle(opts);
+  market = bundle.markets.find((row) => row.id === id) || null;
+  if (!market) return missingMarketPayload(bundle, parsed);
+  rememberMarkets([market]);
+  return marketDetailPayload(bundle, market);
+}
+
 export function previewCacheControl() {
   const ttl = Math.round(PREVIEW_CACHE_TTL_MS / 1000);
   return `public, s-maxage=${ttl}, stale-while-revalidate=${ttl * 2}`;
@@ -709,4 +900,6 @@ export function snapshotCacheControl() {
 export function resetWarRoomCache() {
   liveMemo = { at: 0, bundle: null, inflight: null };
   lastGoodLive = null;
+  recentMarkets.clear();
+  boostMemo.clear();
 }
