@@ -12,6 +12,8 @@ import { toast } from "sonner"
 
 import { Separator } from "@/components/ui/separator";
 import { loadWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
+import { clearGuestDemoDashboardStorage } from "@/lib/workspaceProjectScope";
+import { forgetOwnerSheetRecords } from "@/components/dashboardComposer/sheetRecordCache";
 
 import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
 import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
@@ -151,6 +153,14 @@ const DashBody = ({ user }) => {
     }, [freeRunStarting, runYourselfSessionActive]);
     const membershipLocked = !isDemo && !!user && dashboardAccessLocked && !freeRunStarting;
     const wasOnForkProjectRef = useRef(false);
+
+    // Homepage `#demo` guests: wipe prior anonymous canvas before the workspace hydrates.
+    useLayoutEffect(() => {
+      if (!contextStateV2?.landingDemo) return undefined;
+      clearGuestDemoDashboardStorage("local");
+      void forgetOwnerSheetRecords("local");
+      return undefined;
+    }, [contextStateV2?.landingDemo]);
 
     useEffect(() => {
       if (isDemo || typeof window === "undefined") return;

@@ -12,7 +12,6 @@ import {
   DataTypeFeatureTip,
   EnrichmentsFeatureTip,
   SaveRunFeatureTip,
-  SheetLimitFeatureTip,
 } from "@/components/dashboardComposer/buildFeatureTips";
 import { dismissFeatureTip } from "@/components/ui/feature-tip";
 import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
@@ -165,7 +164,7 @@ import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
 import { newBlankTabName, newStartTabId, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
-import { DEMO_RUN_SHEET_LIMIT, getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
+import { getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
 import { evaluateColumnFormula, FORMULA_FUNCTIONS, FORMULA_REFERENCE_NOTES, formulaSuggestions } from "@/lib/columnFormula";
 import { useUser } from "@/lib/hooks";
 import {
@@ -4314,7 +4313,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit, join, integrationId, tableId, settledPreviewKey, previewSearchError]);
 
   const marketCap = getJoinMarketCap(user, { isDemo: !!ctx?.landingDemo });
-  const runSheetLimit = ctx?.landingDemo ? DEMO_RUN_SHEET_LIMIT : Infinity;
+  // Demo dashboard no longer caps how many sheets/charts one pull may place.
+  const runSheetLimit = Infinity;
   const traderJoinNames = useMemo(() => {
     if (!liveTraderList) return [];
     const source = Array.isArray(traderImportRows) ? traderImportRows : filteredRows;
@@ -9421,14 +9421,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       }
       return next;
     });
-    const capNote =
-      skippedSheets + stage.dropped() > 0 ? ` · Demo pulls stop at ${runSheetLimit.toLocaleString()} sheets. Upgrade for more.` : "";
     reporter.succeed("place", {
-      result: (placement.pageId
+      result: placement.pageId
         ? `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on a new tab`
         : placement.append
           ? `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} added on this tab`
-          : `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on this tab`) + capNote,
+          : `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on this tab`,
     });
     reporter.finish();
     } catch (err) {
@@ -10218,7 +10216,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               );
             }}
             marketCap={marketCap}
-            demoSheetLimit={Number.isFinite(runSheetLimit) ? runSheetLimit : null}
+            demoSheetLimit={null}
             queryRows={
               polymarketJoinCatalog.length
                 ? polymarketJoinMarkets.length
@@ -11091,15 +11089,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <ResultSheetTabs tabs={previewTabs} active={previewSheet} onSelect={showPreview} />
         )}
         </SheetTabsReportContext.Provider>
-        {ctx?.landingDemo && step === "enrich" && enrichPicks.has("join") && sheetTabs?.count > 1 ? (
-          <SheetLimitFeatureTip
-            anchorRef={sheetTabsRef}
-            sheets={sheetTabs.count - 1}
-            total={sheetTabs.count}
-            cap={runSheetLimit}
-            onUpgrade={() => exitLandingDemoToSection("pricing")}
-          />
-        ) : null}
         <div className="min-h-0 flex-1 p-4">
           {showSummarizeExplainer ? (
             <SummarizeExplainer measure={summaryMeasure} />

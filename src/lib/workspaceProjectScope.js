@@ -85,3 +85,24 @@ export function forgetWorkspaceProject(userId, project) {
     // Storage blocked; nothing to clean.
   }
 }
+
+/**
+ * Homepage `#demo` guests share the unsigned `local` storage owner with anonymous dashboards.
+ * Clear that canvas / tab / doc cache so a prior guest session cannot seed Historical (etc.).
+ */
+export function clearGuestDemoDashboardStorage(owner = "local") {
+  if (typeof localStorage === "undefined") return;
+  const id = String(owner || "local");
+  const canvasPrefix = `lycheeWorkspaceCanvas:v1:${id}:`;
+  const exact = new Set([`lycheeWorkspaceStartTabs:${id}`, `lycheeWorkspaceDashboardDoc:v1:${id}`]);
+  try {
+    const doomed = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key && (key.startsWith(canvasPrefix) || exact.has(key))) doomed.push(key);
+    }
+    for (const key of doomed) localStorage.removeItem(key);
+  } catch {
+    // Storage blocked; nothing to clean.
+  }
+}

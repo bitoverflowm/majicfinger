@@ -3,8 +3,7 @@
 import { createContext, memo, startTransition, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { BarChart3, Copy, Database, Download, Lock, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
-import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
+import { BarChart3, Copy, Database, Download, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
 import { retryImport } from "@/lib/retryImport";
 import { toast } from "sonner";
 import {
@@ -44,7 +43,7 @@ import {
   updateWorkspaceTab,
 } from "@/lib/workspaceStartTabs";
 import { defaultMarginsForTab, resolveTabMargins, sameTabMargins, sanitizeTabMargins } from "@/lib/workspaceTabMargins";
-import { scopedLocalOwner, workspaceProjectScope } from "@/lib/workspaceProjectScope";
+import { clearGuestDemoDashboardStorage, scopedLocalOwner, workspaceProjectScope } from "@/lib/workspaceProjectScope";
 import { useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { ActivityRichTableView } from "@/components/dashboardComposer/activityRichTableView";
@@ -99,6 +98,7 @@ import {
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
 import {
   estimateBlocksBytes,
+  forgetOwnerSheetRecords,
   forgetSheetRecords,
   rememberSheetRecords,
   restoreSheetRecords,
@@ -534,6 +534,15 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
   useEffect(() => {
     if (publishedDoc || !owner) return undefined;
     if (owner === "local") {
+      // Homepage `#demo` guests must not revive prior anonymous WorkspaceCanvas widgets.
+      // DashBody also clears guest storage on mount; skip the localStorage read here either way.
+      if (ctx?.landingDemo) {
+        clearGuestDemoDashboardStorage(owner);
+        void forgetOwnerSheetRecords(owner);
+        setBlocksByPage((prev) => ((prev[pageId] || []).length ? prev : { ...prev, [pageId]: [] }));
+        setReady(true);
+        return undefined;
+      }
       const loaded = readCanvasBlocks(storageKey);
       setBlocksByPage((prev) => ((prev[pageId] || []).length ? prev : { ...prev, [pageId]: loaded }));
       setReady(true);
@@ -846,7 +855,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
   // A write still waiting when the tab changes or the page closes goes out first.
   const localWriteRef = useRef(null);
   useEffect(() => {
-    if (readOnly || !ready || !storageKey) return undefined;
+    // Guest demo stays in-memory only so a later #demo visit cannot load old Trades widgets.
+    if (readOnly || !ready || !storageKey || ctx?.landingDemo) return undefined;
     const previous = localWriteRef.current;
     if (previous && previous.key !== storageKey) previous.run();
     const write = {
@@ -871,15 +881,16 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
       window.clearTimeout(timer);
       cancelIdle?.();
     };
-  }, [blocks, owner, pageId, readOnly, ready, storageKey]);
+  }, [blocks, ctx?.landingDemo, owner, pageId, readOnly, ready, storageKey]);
   useEffect(() => {
+    if (ctx?.landingDemo) return undefined;
     const flush = () => localWriteRef.current?.run();
     window.addEventListener("pagehide", flush);
     return () => {
       window.removeEventListener("pagehide", flush);
       flush();
     };
-  }, []);
+  }, [ctx?.landingDemo]);
 
   // Full rows come back only for the tab on screen; a tab loaded in the background keeps its saved rows until opened.
   const restoredRef = useRef(new Set());
@@ -2970,70 +2981,6 @@ function blocksTopToBottom(blocks) {
   return (blocks || []).slice().sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
 }
 
-const DEMO_OPEN_SHEETS = 3;
-
-/** Landing demo: the first sheets stay open with their charts; everything else is behind the upgrade. */
-function demoLockedIds(blocks) {
-  const ordered = blocksTopToBottom(blocks);
-  const open = new Set(ordered.filter((block) => block.type === "sheet").slice(0, DEMO_OPEN_SHEETS).map((block) => block.id));
-  if (!open.size) return new Set();
-  return new Set(
-    ordered.filter((block) => !open.has(block.id) && !(block.type === "chart" && open.has(block.sourceSheetId))).map((block) => block.id),
-  );
-}
-
-/** Where the paywall starts: under the last open block, so the card never covers what the demo shows. */
-function paywallTop(blocks, lockedIds) {
-  const bottom = (block) => (block.y || 0) + (block.h || 0);
-  const locked = blocks.filter((block) => lockedIds.has(block.id));
-  const open = blocks.filter((block) => !lockedIds.has(block.id));
-  const firstLocked = Math.min(...locked.map((block) => block.y || 0));
-  const openBottom = open.length ? Math.max(...open.map(bottom)) + 16 : 0;
-  const lastLocked = Math.max(...locked.map(bottom));
-  return Math.max(0, Math.min(Math.max(firstLocked - 8, openBottom), lastLocked - 260));
-}
-
-function lockedSummary(blocks) {
-  const sheets = blocks.filter((block) => block.type === "sheet").length;
-  const charts = blocks.filter((block) => block.type === "chart").length;
-  const parts = [];
-  if (sheets) parts.push(`${sheets} more ${sheets === 1 ? "sheet" : "sheets"}`);
-  if (charts) parts.push(`${charts}${sheets ? "" : " more"} ${charts === 1 ? "chart" : "charts"}`);
-  if (!parts.length) return "More of your dashboard is waiting.";
-  return `${parts.join(" and ")} ${sheets + charts === 1 ? "is" : "are"} waiting.`;
-}
-
-function DemoPaywall({ top, locked }) {
-  return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 px-6" style={{ top }}>
-      <div className="sticky top-24 mx-auto mt-16 w-full max-w-[420px]">
-        <div
-          role="region"
-          aria-labelledby="demo-paywall-title"
-          className="pointer-events-auto rounded-xl border border-border/70 bg-background p-6 text-center shadow-lg"
-        >
-          <span className="mx-auto grid size-10 place-items-center rounded-full bg-[#e5f4ff] text-[#0d99ff] dark:bg-[#1f3347]">
-            <Lock className="size-4" strokeWidth={2.25} aria-hidden />
-          </span>
-          <h2 id="demo-paywall-title" className="mt-3 text-[15px] font-semibold text-foreground">
-            Unlock your full dashboard
-          </h2>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-            {lockedSummary(locked)} Continue your work by upgrading.
-          </p>
-          <button
-            type="button"
-            onClick={() => exitLandingDemoToSection("pricing")}
-            className="mt-5 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[#0d99ff] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0b87e0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0d99ff]/40"
-          >
-            Upgrade
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /** Freeform blocks for the dashboard currently on screen. */
 export function WorkspaceCanvas() {
   const canvas = useWorkspaceCanvas();
@@ -3048,13 +2995,9 @@ export function WorkspaceCanvas() {
 
   const pageTabId = tabIdFromPage(canvas?.pageId);
   const pageTab = ((canvas?.readOnly ? canvas?.previewTabs : ctx?.workspaceStartTabs) || []).find((tab) => tab?.id === pageTabId) || null;
-  // The demo shows everything a terminal tab opens; saving it is what takes a membership.
-  const demoPaywalled = !!ctx?.landingDemo && !canvas?.runFeed && !pageTab?.terminal;
   const exploreHolderCanvas =
     !!ctx?.landingDemo &&
     (ctx?.landingDemoSurface === "markets" || ctx?.landingDemoSurface === "holders");
-  const lockedIds = useMemo(() => (demoPaywalled ? demoLockedIds(blocks) : new Set()), [blocks, demoPaywalled]);
-  const lockedBlocks = blocks.filter((block) => lockedIds.has(block.id));
   // A preview keeps the layouts it works out here, since it saves nothing.
   const [previewLayouts, setPreviewLayouts] = useState({});
   const previewLayout = canvas?.readOnly && pageTab ? previewLayouts[pageTab.id] : null;
@@ -3089,11 +3032,9 @@ export function WorkspaceCanvas() {
   const dismissExportTip = exportTip.dismiss;
   const [exportTourId, setExportTourId] = useState("");
   const tipBlockId = useMemo(
-    () =>
-      blocksTopToBottom(blocks).find((block) => (block.type === "sheet" || block.type === "chart") && !lockedIds.has(block.id))?.id ||
-      "",
-    [blocks, lockedIds],
-  );
+    () => blocksTopToBottom(blocks).find((block) => block.type === "sheet" || block.type === "chart")?.id || "",
+    [blocks],
+  )
   const recipeTourOn = !!canvas?.tour && !!canvas?.ready && !canvas?.runFeed && !canvas?.readOnly;
   const exportTourDue =
     !!tipBlockId &&
@@ -3487,7 +3428,6 @@ export function WorkspaceCanvas() {
       key={block.id}
       block={block}
       booting={bootingIds.has(block.id)}
-      locked={lockedIds.has(block.id)}
       exportTour={exportTourId === block.id}
       onExportTourDone={endExportTour}
       selected={canvas.selectedId === block.id}
@@ -3553,7 +3493,6 @@ export function WorkspaceCanvas() {
       ) : (
         blockElements
       )}
-      {lockedBlocks.length ? <DemoPaywall top={paywallTop(blocks, lockedIds)} locked={lockedBlocks} /> : null}
       {editTip === "resize" && tipBlock ? (
         <div
           aria-hidden="true"

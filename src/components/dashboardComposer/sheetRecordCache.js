@@ -217,10 +217,7 @@ export async function restoreSheetRecords(owner, pageId, block) {
   return records;
 }
 
-/** Drops every sheet this browser kept for a tab. Resolves to the bytes freed. */
-export async function forgetSheetRecords(owner, pageId) {
-  if (!owner || !pageId) return 0;
-  const prefix = cacheKey(owner, pageId, "");
+async function forgetByPrefix(prefix) {
   for (const key of [...written.keys()]) {
     if (!key.startsWith(prefix)) continue;
     written.delete(key);
@@ -250,6 +247,18 @@ export async function forgetSheetRecords(owner, pageId) {
   } catch {
     return 0;
   }
+}
+
+/** Drops every sheet this browser kept for a tab. Resolves to the bytes freed. */
+export async function forgetSheetRecords(owner, pageId) {
+  if (!owner || !pageId) return 0;
+  return forgetByPrefix(cacheKey(owner, pageId, ""));
+}
+
+/** Drops every sheet this browser kept for an unsigned / demo storage owner. */
+export async function forgetOwnerSheetRecords(owner) {
+  if (!owner) return 0;
+  return forgetByPrefix(`${owner}:`);
 }
 
 /** Roughly what a tab's blocks take up, without serializing big sheets. */
