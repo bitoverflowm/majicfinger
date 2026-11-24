@@ -40,6 +40,8 @@ export const NEWS_PULSE_DEMO_ITEMS = [
   {
     id: "demo-fed-cut",
     headline: "Fed officials signal openness to a June rate cut if inflation cools further",
+    snippet:
+      "Several Fed officials said they could support easing in June if incoming data shows inflation still easing toward the 2% goal, while stressing policy remains data-dependent.",
     url: "https://www.reuters.com/",
     source: "Reuters",
     t: Date.parse("2026-03-12T14:22:00Z"),
@@ -70,6 +72,8 @@ export const NEWS_PULSE_DEMO_ITEMS = [
   {
     id: "demo-tariffs",
     headline: "White House weighs new auto tariffs as trade talks stall",
+    snippet:
+      "Administration officials are reviewing options for new auto tariffs after talks with trading partners stalled, according to people familiar with the discussions.",
     url: "https://www.bloomberg.com/",
     source: "Bloomberg",
     t: Date.parse("2026-03-12T11:05:00Z"),

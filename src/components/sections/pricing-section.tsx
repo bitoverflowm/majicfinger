@@ -551,7 +551,6 @@ export function PricingSection({
   description: descriptionOverride,
   id = "pricing",
   showHeader = true,
-  includeFree = true,
   defaultCycle,
   currentPlan = null,
   getAction,
@@ -561,8 +560,6 @@ export function PricingSection({
   description?: string;
   id?: string;
   showHeader?: boolean;
-  /** The Free column links to the demo; hide it where there's no free plan to pick (billing). */
-  includeFree?: boolean;
   /** Starting position of the weekly / monthly / annual toggle. Monthly unless the buyer came from the Black Friday offer. */
   defaultCycle?: BillingCycle;
   /** Highlights the member's tier; `cycle` marks the exact plan as current. */
@@ -607,7 +604,7 @@ export function PricingSection({
   };
   const title = titleOverride?.trim() || config.title;
   const description = descriptionOverride?.trim() || config.description;
-  const plans = config.plans.filter((plan) => includeFree || plan.tier !== "free");
+  const plans = config.plans;
   const { enterprise, venues } = config;
   const showCycleToggle = plans.some(hasBothCycles);
   const toggledPlans = plans.filter(hasBothCycles);

@@ -141,7 +141,6 @@ export const siteConfig = {
   },
   ctaSection: {
     title: "Get started with Lychee.",
-    subtext: "Free to explore here · Jarvis included in every paid plan at launch",
   },
   footerLinks: [
     {
@@ -150,6 +149,7 @@ export const siteConfig = {
         { id: 1, title: "Features", url: "/#features" },
         { id: 2, title: "Pricing", url: "#pricing" },
         { id: 3, title: "Dashboard", url: "/dashboard" },
+        { id: 28, title: "War Room", url: "/war-room" },
         { id: 4, title: "Charts", url: "/charts" },
         { id: 26, title: "MCP + Jarvis", url: "/jarvis" },
         { id: 20, title: "Kalshi vs Polymarket", url: "/kalshi-vs-polymarket-odds" },

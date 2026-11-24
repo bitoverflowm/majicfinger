@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ArrowRight, Check, Database, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Database, Newspaper, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,8 @@ import {
   isLivePreviewId,
   prefetchIntegrationPreviews,
 } from "@/components/dashboardComposer/integrationPreviewSample";
+import { HistoricalNewsPreview } from "@/components/dashboardComposer/historicalNewsPreview";
+import { NewsLivePreview } from "@/components/dashboardComposer/newsLivePreview";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { RecipePreviewPanel, RecipesSidebar } from "@/components/dashboardComposer/recipes/recipesSidebar";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
@@ -107,6 +109,70 @@ const RECIPE_VIEWS = {
   polymarketHolderAnalysis: PolymarketHolderAnalysisRecipe,
 };
 
+const loadHistoricalNewsBuild = () => import("@/components/dashboardComposer/historicalNewsBuild");
+
+const HistoricalNewsBuild = dynamic(
+  () => retryImport(loadHistoricalNewsBuild).then((m) => m.HistoricalNewsBuild),
+  {
+    loading: () => (
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <SpectrumLoadingState label="Loading" />
+      </div>
+    ),
+  },
+);
+
+const loadNewsLiveBuild = () => import("@/components/dashboardComposer/newsLiveBuild");
+
+const NewsLiveBuild = dynamic(
+  () => retryImport(loadNewsLiveBuild).then((m) => m.NewsLiveBuild),
+  {
+    loading: () => (
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <SpectrumLoadingState label="Loading" />
+      </div>
+    ),
+  },
+);
+
+/** Homepage Historical tab: only these recipes in the sidebar. */
+const HISTORICAL_RECIPE_IDS = ["kalshiTradeHistory", "polymarketTradeHistory"];
+
+/** Homepage Present tab: Holder Terminal + Polymarket Holder Analysis only. */
+const PRESENT_RECIPE_IDS = ["polymarketHolderAnalysis"];
+const PRESENT_TERMINAL_IDS = ["holder"];
+
+/** Synthetic picker row — Historical surface only (not on Present or the real dashboard). */
+const HISTORICAL_NEWS_ROW = {
+  id: "historicalNews",
+  name: "Historical News",
+  description:
+    "News headlines since 2019 — add keywords, pick a date range, and land matching articles in a sheet.",
+  listCaption: "Headlines from 2019 to now",
+  listCaptionKey: null,
+  logoPath: null,
+  available: true,
+  badge: null,
+  selected: false,
+};
+
+/** Synthetic picker row — Present surface only. */
+const NEWS_LIVE_ROW = {
+  id: "newsLive",
+  name: "News Live",
+  description:
+    "Real-time news headlines — add keyword filters, preview the live feed, and land matching articles in a sheet.",
+  listCaption: "Live headlines with keyword filters",
+  listCaptionKey: null,
+  logoPath: null,
+  available: true,
+  badge: null,
+  selected: false,
+};
+
+const HISTORICAL_PICKER_IDS = ["kalshiHistorical", "kalshiHistoricalV2", "polymarketHistorical", "historicalNews"];
+const PRESENT_PICKER_IDS = ["kalshiLive", "polymarket", "chainlink", "binance", "newsLive"];
+
 function whenIdle(work) {
   if (typeof window.requestIdleCallback === "function") {
     const handle = window.requestIdleCallback(work, { timeout: 2000 });
@@ -141,6 +207,8 @@ const LOGO_BG = {
   kalshiLive: "bg-[#28CC95]",
   polymarket: "bg-[#2E5CFF]",
   polymarketHistorical: "bg-[#2E5CFF]",
+  historicalNews: "bg-[#0f172a]",
+  newsLive: "bg-[#0f172a]",
   chainlink: "bg-[#375BD2]",
   binance: "bg-black",
 };
@@ -151,6 +219,8 @@ const LOGO_MARK = {
   kalshiLive: "K",
   polymarket: "P",
   polymarketHistorical: "PH",
+  historicalNews: "N",
+  newsLive: "N",
   chainlink: "CL",
   binance: "B",
   coinGecko: "CG",
@@ -192,6 +262,19 @@ function Logo({ row }) {
   const markClass = brandBg
     ? "text-[11px] font-semibold tracking-tight text-white"
     : "text-[13px] font-semibold text-foreground";
+
+  if (row.id === "historicalNews" || row.id === "newsLive") {
+    return (
+      <span
+        className={cn(
+          "relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg",
+          brandBg || "border border-border/70 bg-background",
+        )}
+      >
+        <Newspaper className="size-4 text-white" aria-hidden />
+      </span>
+    );
+  }
 
   if (!row.logoPath) {
     return (
@@ -284,7 +367,11 @@ function PreviewBody({ row, description }) {
       {description ? (
         <p className="mt-3 text-[13px] leading-relaxed text-foreground/90">{description}</p>
       ) : null}
-      {isLivePreviewId(row?.id) ? (
+      {row?.id === "historicalNews" ? (
+        <HistoricalNewsPreview />
+      ) : row?.id === "newsLive" ? (
+        <NewsLivePreview />
+      ) : isLivePreviewId(row?.id) ? (
         <IntegrationSamplePreview integrationId={row.id} />
       ) : (
         <div className="mt-5 space-y-3">
@@ -343,7 +430,7 @@ function PreviewPane({ row, description }) {
   );
 }
 
-const REALTIME_IDS = new Set(["kalshiLive", "polymarket", "chainlink", "binance"]);
+const REALTIME_IDS = new Set(["kalshiLive", "polymarket", "chainlink", "binance", "newsLive"]);
 
 function RealTimeTag() {
   return (
@@ -353,6 +440,14 @@ function RealTimeTag() {
         <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
       </span>
       Real-Time
+    </span>
+  );
+}
+
+function ProTag() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+      Pro
     </span>
   );
 }
@@ -381,7 +476,17 @@ function pillCaption(row, cutoffLabel) {
   return succinctDescription(row.description);
 }
 
-function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabel, cutoffLoading }) {
+function IntegrationOption({
+  row,
+  active,
+  hovered,
+  onSelect,
+  onHover,
+  cutoffLabel,
+  cutoffLoading,
+  nested = false,
+  locked = false,
+}) {
   const liveCaption = cutoffCaption(row, cutoffLabel);
   const caption = pillCaption(row, cutoffLabel);
   return (
@@ -389,10 +494,13 @@ function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabe
       type="button"
       role="option"
       aria-selected={active}
+      aria-disabled={locked || undefined}
       onClick={() => onSelect(row.id)}
       onMouseEnter={() => onHover?.(row.id)}
       className={cn(
         "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors duration-200",
+        nested && "ml-4 w-[calc(100%-1rem)]",
+        locked && "opacity-80",
         active
           ? "border-[#2f6fed] bg-[#e7f0ff] dark:border-blue-400 dark:bg-blue-500/15"
           : hovered
@@ -405,6 +513,7 @@ function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabe
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-semibold text-foreground">{row.name}</span>
           {REALTIME_IDS.has(row.id) ? <RealTimeTag /> : null}
+          {locked ? <ProTag /> : null}
         </span>
         {liveCaption && cutoffLoading ? (
           <Skeleton className="mt-1.5 h-3.5 w-56 bg-muted-foreground/20" />
@@ -414,10 +523,91 @@ function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabe
           </span>
         )}
       </span>
-      {active ? (
+      {active && !locked ? (
         <Check className="ml-1 size-4 shrink-0 self-center text-[#2f6fed] dark:text-blue-400" aria-hidden />
       ) : null}
     </button>
+  );
+}
+
+/** Historical tab: parent “Kalshi Historical” expands into v1 + v2. */
+function KalshiHistoricalBranch({
+  v1,
+  v2,
+  expanded,
+  selectedId,
+  hoveredId,
+  onToggle,
+  onSelect,
+  onHover,
+  cutoffLabel,
+  cutoffLoading,
+  lockedIds,
+}) {
+  const childActive = selectedId === v1?.id || selectedId === v2?.id;
+  const parentHovered = hoveredId === "kalshiHistoricalGroup" && !childActive;
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={onToggle}
+        onMouseEnter={() => onHover?.("kalshiHistoricalGroup")}
+        className={cn(
+          "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors duration-200",
+          childActive || expanded
+            ? "border-[#2f6fed]/70 bg-[#e7f0ff]/70 dark:border-blue-400/70 dark:bg-blue-500/10"
+            : parentHovered
+              ? "border-foreground/20 bg-muted"
+              : "border-border/70 bg-background",
+        )}
+      >
+        <Logo row={v1 || { id: "kalshiHistorical", name: "Kalshi Historical" }} />
+        <span className="min-w-0 flex-1">
+          <span className="text-[13px] font-semibold text-foreground">Kalshi Historical</span>
+          <span className="mt-0.5 line-clamp-2 block text-[12px] leading-relaxed text-muted-foreground">
+            Choose Kalshi Historical or Kalshi Historical v2
+          </span>
+        </span>
+        <ChevronDown
+          className={cn(
+            "ml-1 size-4 shrink-0 self-center text-muted-foreground transition-transform duration-200",
+            expanded && "rotate-180",
+          )}
+          aria-hidden
+        />
+      </button>
+      {expanded ? (
+        <div className="space-y-2" role="listbox" aria-label="Kalshi Historical versions">
+          {v1 ? (
+            <IntegrationOption
+              row={{ ...v1, name: "Kalshi Historical" }}
+              active={selectedId === v1.id}
+              hovered={hoveredId === v1.id && selectedId !== v1.id}
+              onSelect={onSelect}
+              onHover={onHover}
+              cutoffLabel={cutoffLabel}
+              cutoffLoading={cutoffLoading}
+              locked={lockedIds?.includes(v1.id)}
+              nested
+            />
+          ) : null}
+          {v2 ? (
+            <IntegrationOption
+              row={v2}
+              active={selectedId === v2.id}
+              hovered={hoveredId === v2.id && selectedId !== v2.id}
+              onSelect={onSelect}
+              onHover={onHover}
+              cutoffLabel={cutoffLabel}
+              cutoffLoading={cutoffLoading}
+              locked={lockedIds?.includes(v2.id)}
+              nested
+            />
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -438,30 +628,76 @@ function IntegrationConnectFlow({
   startIntegrationId = null,
   takeRecipeRequests = false,
 }) {
-  const rows = useMemo(() => buildIntegrationPickerRows(), []);
-  const primary = rowsInOrder(rows, PRIMARY_ORDER);
-  const beta = rowsInOrder(rows, BETA_ORDER);
+  const ctx = useMyStateV2();
+  const historicalSurface = ctx?.landingDemoSurface === "historical";
+  const presentSurface = ctx?.landingDemoSurface === "present";
+  const curatedSurface = historicalSurface || presentSurface;
+  const catalogRows = useMemo(() => buildIntegrationPickerRows(), []);
+  const rows = useMemo(() => {
+    if (!curatedSurface) return catalogRows;
+    const byId = new Map(catalogRows.map((row) => [row.id, row]));
+    const ids = historicalSurface ? HISTORICAL_PICKER_IDS : PRESENT_PICKER_IDS;
+    return ids
+      .map((id) => {
+        if (id === "historicalNews") return HISTORICAL_NEWS_ROW;
+        if (id === "newsLive") return NEWS_LIVE_ROW;
+        return byId.get(id);
+      })
+      .filter(Boolean);
+  }, [catalogRows, curatedSurface, historicalSurface]);
+  const primary = historicalSurface
+    ? rows.filter((row) => row.id === "polymarketHistorical" || row.id === "historicalNews")
+    : presentSurface
+      ? rows
+      : rowsInOrder(rows, PRIMARY_ORDER);
+  const beta = curatedSurface ? [] : rowsInOrder(rows, BETA_ORDER);
   const listed = new Set([...PRIMARY_ORDER, ...BETA_ORDER]);
-  const comingSoon = rows.filter((row) => !listed.has(row.id));
-  const selectable = [...primary, ...beta];
-  const startable = !!startIntegrationId && selectable.some((row) => row.id === startIntegrationId);
+  const comingSoon = curatedSurface ? [] : rows.filter((row) => !listed.has(row.id));
+  const kalshiV1 = historicalSurface ? rows.find((row) => row.id === "kalshiHistorical") : null;
+  const kalshiV2 = historicalSurface ? rows.find((row) => row.id === "kalshiHistoricalV2") : null;
+  const selectable = historicalSurface
+    ? rows.filter((row) => HISTORICAL_PICKER_IDS.includes(row.id))
+    : presentSurface
+      ? rows
+      : [...primary, ...beta];
+  // Landing demo passes lockedIds (e.g. Kalshi Historical v2 → Pro gate). Real dashboard omits them.
+  const effectiveLockedIds = lockedIds;
+  const startable =
+    !!startIntegrationId &&
+    selectable.some((row) => row.id === startIntegrationId) &&
+    !effectiveLockedIds?.includes(startIntegrationId);
   const [selectedId, setSelectedId] = useState(startable ? startIntegrationId : null);
   const [hoveredId, setHoveredId] = useState(null);
   const [phase, setPhase] = useState(startable ? "build" : "pick");
   const [recipeId, setRecipeId] = useState(null);
   const [previewRecipeId, setPreviewRecipeId] = useState(null);
+  const [kalshiExpanded, setKalshiExpanded] = useState(
+    () => startIntegrationId === "kalshiHistorical" || startIntegrationId === "kalshiHistoricalV2",
+  );
   const previewTimer = useRef(0);
   const connect = useIntegrationConnect();
   const canvas = useWorkspaceCanvas();
-  const ctx = useMyStateV2();
   const user = useUser();
   const selected = selectable.find((row) => row.id === selectedId) || null;
-  const hovered = rows.find((row) => row.id === hoveredId) || null;
-  const shown = hovered || selected || primary[0] || null;
+  const hovered =
+    hoveredId === "kalshiHistoricalGroup"
+      ? kalshiV1 || null
+      : rows.find((row) => row.id === hoveredId) || null;
+  const shown =
+    hovered ||
+    selected ||
+    (historicalSurface ? kalshiV1 || primary[0] : primary[0]) ||
+    null;
   const { cutoffLabel, loading: cutoffLoading } = useKalshiHistoricalCutoffDisplay();
   // Radix titles throw outside a Dialog, so the inline flow uses plain headings.
   const Title = inline ? "h2" : DialogTitle;
   const Description = inline ? "p" : DialogDescription;
+  const sidebarRecipeIds = historicalSurface
+    ? HISTORICAL_RECIPE_IDS
+    : presentSurface
+      ? PRESENT_RECIPE_IDS
+      : null;
+  const sidebarTerminalIds = presentSurface ? PRESENT_TERMINAL_IDS : null;
 
   useEffect(() => {
     prefetchIntegrationPreviews();
@@ -470,8 +706,10 @@ function IntegrationConnectFlow({
       loadTradeHistoryRecipe().catch(() => {});
       loadPolymarketTradeHistoryRecipe().catch(() => {});
       loadPolymarketHolderAnalysisRecipe().catch(() => {});
+      if (historicalSurface) loadHistoricalNewsBuild().catch(() => {});
+      if (presentSurface) loadNewsLiveBuild().catch(() => {});
     });
-  }, []);
+  }, [historicalSurface, presentSurface]);
 
   useEffect(() => () => window.clearTimeout(previewTimer.current), []);
 
@@ -491,15 +729,19 @@ function IntegrationConnectFlow({
   };
 
   const select = (id) => {
-    if (lockedIds?.includes(id)) {
+    if (effectiveLockedIds?.includes(id)) {
       onLockedSelect?.(rows.find((row) => row.id === id) || { id });
       return;
     }
     setSelectedId(id);
     onSelectIntegration?.(id);
+    // Historical connect: pick goes straight into the build step (no "Start building").
+    if (historicalSurface) changePhase("build");
   };
 
   const openRecipe = (id) => {
+    if (historicalSurface && !HISTORICAL_RECIPE_IDS.includes(id)) return;
+    if (presentSurface && !PRESENT_RECIPE_IDS.includes(id)) return;
     window.clearTimeout(previewTimer.current);
     setPreviewRecipeId(null);
     setRecipeId(id);
@@ -510,6 +752,8 @@ function IntegrationConnectFlow({
   openRecipeRef.current = openRecipe;
 
   const openTerminal = (id) => {
+    if (historicalSurface) return;
+    if (presentSurface && !PRESENT_TERMINAL_IDS.includes(id)) return;
     window.clearTimeout(previewTimer.current);
     setPreviewRecipeId(null);
     connect?.close?.();
@@ -529,6 +773,22 @@ function IntegrationConnectFlow({
   }, [takeRecipeRequests]);
 
   if (phase === "build" && selected) {
+    if (selected.id === "historicalNews") {
+      return (
+        <>
+          <Title className="sr-only">Historical News</Title>
+          <HistoricalNewsBuild onBack={() => changePhase("pick")} Title={Title} Description={Description} />
+        </>
+      );
+    }
+    if (selected.id === "newsLive") {
+      return (
+        <>
+          <Title className="sr-only">News Live</Title>
+          <NewsLiveBuild onBack={() => changePhase("pick")} Title={Title} Description={Description} />
+        </>
+      );
+    }
     return (
       <>
         <Title className="sr-only">{selected.name} preview</Title>
@@ -545,6 +805,9 @@ function IntegrationConnectFlow({
           activeId={recipeId}
           onOpen={openRecipe}
           onOpenTerminal={openTerminal}
+          recipeIds={sidebarRecipeIds}
+          terminalIds={sidebarTerminalIds}
+          hideTerminals={historicalSurface}
           className="hidden w-1/4 shrink-0 md:flex"
         />
         <Recipe onBack={() => changePhase("pick")} Title={Title} Description={Description} />
@@ -559,6 +822,9 @@ function IntegrationConnectFlow({
           onOpenTerminal={openTerminal}
           onHover={previewRecipe}
           expanded={Boolean(previewRecipeId)}
+          recipeIds={sidebarRecipeIds}
+          terminalIds={sidebarTerminalIds}
+          hideTerminals={historicalSurface}
           className="hidden w-1/4 shrink-0 md:flex"
         />
         <RecipePreviewPanel recipeId={previewRecipeId} onOpen={openRecipe} onOpenTerminal={openTerminal} onHover={previewRecipe} />
@@ -572,18 +838,50 @@ function IntegrationConnectFlow({
             </div>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-6 pb-4">
               <div role="listbox" aria-label="Integrations" className="space-y-2">
-                {primary.map((row) => (
-                  <IntegrationOption
-                    key={row.id}
-                    row={row}
-                    active={row.id === selected?.id}
-                    hovered={row.id === hoveredId && row.id !== selected?.id}
-                    onSelect={select}
-                    onHover={setHoveredId}
-                    cutoffLabel={cutoffLabel}
-                    cutoffLoading={cutoffLoading}
-                  />
-                ))}
+                {historicalSurface ? (
+                  <>
+                    <KalshiHistoricalBranch
+                      v1={kalshiV1}
+                      v2={kalshiV2}
+                      expanded={kalshiExpanded}
+                      selectedId={selectedId}
+                      hoveredId={hoveredId}
+                      onToggle={() => setKalshiExpanded((open) => !open)}
+                      onSelect={select}
+                      onHover={setHoveredId}
+                      cutoffLabel={cutoffLabel}
+                      cutoffLoading={cutoffLoading}
+                      lockedIds={effectiveLockedIds}
+                    />
+                    {primary.map((row) => (
+                      <IntegrationOption
+                        key={row.id}
+                        row={row}
+                        active={row.id === selected?.id}
+                        hovered={row.id === hoveredId && row.id !== selected?.id}
+                        onSelect={select}
+                        onHover={setHoveredId}
+                        cutoffLabel={cutoffLabel}
+                        cutoffLoading={cutoffLoading}
+                        locked={effectiveLockedIds?.includes(row.id)}
+                      />
+                    ))}
+                  </>
+                ) : (
+                  primary.map((row) => (
+                    <IntegrationOption
+                      key={row.id}
+                      row={row}
+                      active={row.id === selected?.id}
+                      hovered={row.id === hoveredId && row.id !== selected?.id}
+                      onSelect={select}
+                      onHover={setHoveredId}
+                      cutoffLabel={cutoffLabel}
+                      cutoffLoading={cutoffLoading}
+                      locked={effectiveLockedIds?.includes(row.id)}
+                    />
+                  ))
+                )}
               </div>
               {beta.length ? (
                 <div className="pt-4">
@@ -601,6 +899,7 @@ function IntegrationConnectFlow({
                         onHover={setHoveredId}
                         cutoffLabel={cutoffLabel}
                         cutoffLoading={cutoffLoading}
+                        locked={effectiveLockedIds?.includes(row.id)}
                       />
                     ))}
                   </div>
@@ -641,7 +940,7 @@ function IntegrationConnectFlow({
                 </div>
               ) : null}
             </div>
-            {selected ? (
+            {selected && !historicalSurface ? (
               <div className="flex shrink-0 items-center justify-end gap-2 px-6 py-4">
                 {onCancel ? (
                   <Button type="button" variant="outline" onClick={onCancel}>
@@ -660,7 +959,10 @@ function IntegrationConnectFlow({
             ) : null}
           </div>
           {shown ? (
-            <PreviewPane row={shown} description={hovered?.description || ""} />
+            <PreviewPane
+              row={shown}
+              description={hovered?.description || (curatedSurface ? shown.description : "") || ""}
+            />
           ) : null}
         </div>
       </div>
@@ -806,9 +1108,14 @@ export function IntegrationConnectProvider({ children, inlineStart = false, inli
     const url = new URL(window.location.href);
     const recipeId = url.searchParams.get("recipe");
     const integrationId = url.searchParams.get("integration");
-    if (!recipeId && !integrationId) return;
+    const surface = url.searchParams.get("surface");
+    const openConnect = url.searchParams.get("connect") === "1";
+    const openCurated = surface === "historical" || surface === "present";
+    if (!recipeId && !integrationId && !openCurated && !openConnect) return;
     url.searchParams.delete("recipe");
     url.searchParams.delete("integration");
+    url.searchParams.delete("connect");
+    if (openCurated) url.searchParams.delete("surface");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     if (recipeId && RECIPE_VIEWS[recipeId]) {
       requestLandingDemoRecipe(recipeId);
@@ -816,6 +1123,8 @@ export function IntegrationConnectProvider({ children, inlineStart = false, inli
       setOpen(true);
     } else if (integrationId) {
       setArrival({ integrationId });
+      setOpen(true);
+    } else if (openCurated || openConnect) {
       setOpen(true);
     }
   }, [inlineOnly]);

@@ -16,6 +16,7 @@ import { loadWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
 import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { WorkspaceTabsLayer } from "@/components/dashboardComposer/blankDashboardEmpty";
+import { hideLandingExploreTabChrome } from "@/components/dashboardComposer/workspaceStartTabBar";
 import { IntegrationConnectLandingDemo } from "@/components/dashboardComposer/integrationConnectDialog";
 import FigmaNavChrome from "./components/figmaNavChrome";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ import {
 } from "@/lib/runYourself/hasPaidAccess";
 import { consumeRunYourselfInteractiveSession } from "@/lib/runYourself/consumeInteractiveSession";
 import { OPEN_BILLING_EVENT } from "@/lib/scrollToPricing";
+import { isLandingExploreSurface } from "@/lib/landingDemoExplore";
 
 // The homepage demo renders DashBody but none of these views up front. They carry AG Grid, xlsx,
 // BlockNote, moment-timezone and the candlestick charts, so they must stay out of DashBody's chunk.
@@ -153,10 +155,25 @@ const DashBody = ({ user }) => {
     useEffect(() => {
       if (isDemo || typeof window === "undefined") return;
       const url = new URL(window.location.href);
-      if (url.searchParams.get("view") !== "billing") return;
-      setViewing?.("manageAccount");
-      url.searchParams.delete("view");
-      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+      const view = url.searchParams.get("view");
+      const surface = url.searchParams.get("surface");
+      if (view === "billing") {
+        setViewing?.("manageAccount");
+        url.searchParams.delete("view");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+        return;
+      }
+      if (view === "integrations" || surface === "integrations") {
+        setViewing?.("integrations");
+        url.searchParams.delete("view");
+        url.searchParams.delete("surface");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+        return;
+      }
+      if (surface === "markets" || surface === "holders") {
+        url.searchParams.delete("surface");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+      }
     }, [isDemo, setViewing]);
 
     useEffect(() => {
@@ -438,7 +455,9 @@ const DashBody = ({ user }) => {
             )}
           </>
         )}
-        {contextStateV2?.landingDemoActive && (
+        {/* Homepage explore surfaces stay in `#demo` — no dashboard Sign Up/Save/Share chrome. */}
+        {contextStateV2?.landingDemoActive &&
+          !isLandingExploreSurface(contextStateV2?.landingDemoSurface) && (
           <>
             <FigmaNavChrome dashboardName="Demo Dashboard" />
             <div className="h-14 shrink-0" aria-hidden />
@@ -447,7 +466,12 @@ const DashBody = ({ user }) => {
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div
           {...{ [PROJECT_THUMBNAIL_ROOT]: "" }}
-          className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1 [--dashboard-tab-clearance:2.75rem]"
+          className={cn(
+            "relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1",
+            hideLandingExploreTabChrome(contextStateV2)
+              ? "[--dashboard-tab-clearance:0px]"
+              : "[--dashboard-tab-clearance:2.75rem]",
+          )}
         >
                 <WorkspaceCanvas />
                 {(viewing === "welcome" || viewing === "connectDataHome") && (
@@ -553,10 +577,20 @@ const DashBody = ({ user }) => {
         </div>
         {contextStateV2?.landingDemo && (
           <IntegrationConnectLandingDemo
-            active={!!contextStateV2?.landingDemoActive}
+            active={
+              !!contextStateV2?.landingDemoActive &&
+              !isLandingExploreSurface(contextStateV2?.landingDemoSurface)
+            }
             initialIntegrationId={contextStateV2?.landingDemoIntegration}
-            onSelectIntegration={(integrationId) => contextStateV2?.activateLandingDemo?.({ integrationId })}
-            onOpenRecipe={(recipeId) => contextStateV2?.activateLandingDemo?.({ recipeId })}
+            onSelectIntegration={(integrationId) => {
+              // Explore tabs stay inline in `#demo`; framed guide demos still expand.
+              if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
+              contextStateV2?.activateLandingDemo?.({ integrationId });
+            }}
+            onOpenRecipe={(recipeId) => {
+              if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
+              contextStateV2?.activateLandingDemo?.({ recipeId });
+            }}
           />
         )}
       </WorkspaceComposerDockProvider>

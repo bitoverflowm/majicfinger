@@ -21,6 +21,7 @@ import { WORKSPACE_PROJECT_PARAM, WorkspaceProjectProvider } from "@/components/
 import { userSwrFetcher } from "@/lib/hooks"
 import { rememberTerminalRequest } from "@/lib/terminalRequest"
 import { AuthenticatedJourneyInit } from "@/components/analytics/AuthenticatedJourneyInit"
+import { readShellSurfaceParam, SHELL_SURFACES } from "@/lib/projectsShellLaunch"
 
 if (typeof window !== "undefined") preloadDashboardViews()
 
@@ -32,10 +33,24 @@ function DashboardLoading() {
     )
 }
 
+function shellInitialSettings(surface) {
+    if (surface === SHELL_SURFACES.integrations) {
+        return { viewing: "integrations" }
+    }
+    if (surface === SHELL_SURFACES.historical || surface === SHELL_SURFACES.present) {
+        return { viewing: "welcome", landingDemoSurface: surface }
+    }
+    if (surface === SHELL_SURFACES.markets || surface === SHELL_SURFACES.holders) {
+        return { viewing: "welcome", landingDemoSurface: surface }
+    }
+    return { viewing: "welcome" }
+}
+
 function DashboardInner() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher)
+    const shellSurface = readShellSurfaceParam(searchParams)
 
     useEffect(() => {
         if (isLoading) return
@@ -58,7 +73,7 @@ function DashboardInner() {
                 loading={<DashboardLoading />}
             >
                 <StateProvider>
-                    <StateProviderV2 initialSettings={{ viewing: "welcome" }}>
+                    <StateProviderV2 initialSettings={shellInitialSettings(shellSurface)}>
                         <AuthenticatedJourneyInit user={user} />
                         <LiveStreamManager />
                         <RestLiveFeedManager />

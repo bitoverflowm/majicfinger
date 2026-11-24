@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, CalendarDays, LayoutGrid, List, Loader2, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { cn } from "@/lib/utils";
 import {
   CATEGORIES,
+  EXPLORE_TOP_FEEDS,
   FEEDS,
   cachedFeed,
   cachedStats,
@@ -53,8 +55,6 @@ const FEED_SORTS = {
   trending: ["movers", "volume", "closing"],
   competitive: ["competitive", "volume", "closing"],
 };
-
-const TOP_FEEDS = new Set(["closed", "volume", "liquidity", "competitive"]);
 
 function sortsFor(feed) {
   return FEED_SORTS[feed] || FEED_SORTS.tradable;
@@ -267,6 +267,7 @@ function NewMarketToast({ markets, onPause, onView }) {
  * @param {{ onPick: (subjects: object[]) => void, heading?: import("react").ReactNode, onReveal?: () => void, className?: string }} props
  */
 export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
+  const landingDemo = !!useMyStateV2()?.landingDemo;
   const [feed, setFeed] = useState("tradable");
   const [view, setView] = useState("list");
   const [sort, setSort] = useState("closing");
@@ -602,7 +603,7 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
   );
   const feedGroups = [];
   for (const item of FEEDS) {
-    const label = TOP_FEEDS.has(item.id) ? "Top markets by" : "";
+    const label = EXPLORE_TOP_FEEDS.has(item.id) ? "Top markets by" : "";
     const last = feedGroups[feedGroups.length - 1];
     if (last && last.label === label) last.feeds.push(item);
     else feedGroups.push({ label, feeds: [item] });
@@ -625,19 +626,31 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
           {heading || <h3 className="text-[15px] font-semibold text-foreground">Browse markets</h3>}
           <p className="mt-0.5 text-[13px] text-muted-foreground">Every market you can trade on Polymarket right now, streaming live. Pick one to open it.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => changePaused(!paused)}
-          aria-pressed={paused}
-          title={paused ? "Show an alert again when a market is created." : "Stop the new market alerts. New markets still collect under Just listed."}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] hover:bg-muted hover:text-foreground",
-            paused ? "font-medium text-foreground" : "text-muted-foreground",
-          )}
-        >
-          {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}
-          {paused ? "Resume alerts" : "Pause alerts"}
-        </button>
+        {landingDemo ? (
+          <span
+            title="New market alerts are a Pro feature"
+            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium text-muted-foreground"
+          >
+            Start Alerts
+            <span className="rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] text-cyan-700 ring-1 ring-cyan-500/35 dark:text-cyan-300/90 dark:ring-cyan-400/30">
+              Pro only
+            </span>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => changePaused(!paused)}
+            aria-pressed={paused}
+            title={paused ? "Show an alert again when a market is created." : "Stop the new market alerts. New markets still collect under Just listed."}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] hover:bg-muted hover:text-foreground",
+              paused ? "font-medium text-foreground" : "text-muted-foreground",
+            )}
+          >
+            {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}
+            {paused ? "Resume alerts" : "Pause alerts"}
+          </button>
+        )}
       </div>
 
       <div role="tablist" aria-label="Markets to show" className="-mx-1 mt-3 flex items-end gap-1.5 overflow-x-auto px-1 pb-1">

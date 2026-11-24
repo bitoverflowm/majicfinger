@@ -351,7 +351,7 @@ async function getFeaturedPool() {
 export async function fetchPolymarketLiveFeaturedMarkets(opts = {}) {
   const limit = Math.max(
     1,
-    Math.min(12, Math.floor(Number(opts.limit) || FEATURED_LIMIT_DEFAULT)),
+    Math.min(24, Math.floor(Number(opts.limit) || FEATURED_LIMIT_DEFAULT)),
   );
   const exclude = new Set(
     (Array.isArray(opts.excludeIds) ? opts.excludeIds : [])
@@ -367,4 +367,140 @@ export async function fetchPolymarketLiveFeaturedMarkets(opts = {}) {
     : pool;
   const source = preferred.length >= Math.min(limit, pool.length) ? preferred : pool;
   return source.slice(0, limit);
+}
+
+/**
+ * Volume-ranked open markets for a Polymarket tag (War Room category chips).
+ *
+ * Gamma's `/markets?tag_slug=` ignores the tag (returns global volume).
+ * `/events?tag_slug=` filters correctly — flatten nested markets from those events.
+ *
+ * @param {string} tagSlug
+ * @param {{ limit?: number }} [opts]
+ * @returns {Promise<FeaturedPolymarketMarket[]>}
+ */
+export async function fetchPolymarketMarketsByTagSlug(tagSlug, opts = {}) {
+  const slug = String(tagSlug || "").trim().toLowerCase();
+  if (!slug) return [];
+  const want = Math.max(1, Math.min(300, Math.floor(Number(opts.limit) || 64)));
+  // Events can nest many markets (daily temp buckets); pull enough events then cap markets.
+  const eventLimit = Math.min(100, Math.max(24, Math.ceil(want / 2)));
+  const payload = await gammaGet("/events", {
+    closed: false,
+    tag_slug: slug,
+    order: "volume24hr",
+    ascending: false,
+    limit: eventLimit,
+  });
+  const seen = new Set();
+  return marketsFromEventsPayload(payload)
+    .filter((market) => {
+      if (market.outcomes.length < 2) return false;
+      const key = marketKey(market);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
+    .slice(0, want);
+}
+
+/** Gamma list queries mirroring Holder Explore feeds. */
+const EXPLORE_FEED_QUERIES = {
+  tradable: { closed: false, order: "volume24hr", ascending: false },
+  new: { closed: false, order: "createdAt", ascending: false },
+  closed: { closed: true, order: "closedTime", ascending: false },
+  volume: { closed: false, order: "volume24hr", ascending: false },
+  liquidity: { closed: false, order: "liquidityNum", ascending: false },
+  competitive: { closed: false, order: "volume24hr", ascending: false },
+  trending: { closed: false, order: "volume24hr", ascending: false },
+};
+
+/**
+ * Markets for a Holder Explore feed chip (War Room globe tags).
+ *
+ * @param {string} feedId
+ * @param {{ limit?: number }} [opts]
+ * @returns {Promise<FeaturedPolymarketMarket[]>}
+ */
+export async function fetchPolymarketMarketsByExploreFeed(feedId, opts = {}) {
+  const id = String(feedId || "").trim().toLowerCase();
+  const query = EXPLORE_FEED_QUERIES[id];
+  if (!query) return [];
+  const want = Math.max(1, Math.min(300, Math.floor(Number(opts.limit) || 64)));
+  const pageSize = 100;
+  const pages = Math.max(1, Math.ceil(want / pageSize));
+  const payloads = await Promise.all(
+    Array.from({ length: pages }, (_, index) =>
+      gammaGet("/markets", {
+        ...query,
+        limit: pageSize,
+        offset: index * pageSize,
+      }).catch(() => []),
+    ),
+  );
+  const seen = new Set();
+  let markets = payloads
+    .flatMap((payload) => marketsFromPayload(payload))
+    .filter((market) => {
+      if (market.outcomes.length < 2) return false;
+      const key = String(market.conditionId || market.id || "").trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, want);
+  if (id === "competitive") {
+    markets = markets
+      .map((market) => {
+        const yes =
+          market.outcomes.find((o) => String(o.outcome).toLowerCase() === "yes") || market.outcomes[0];
+        const price = featuredOutcomePriceDollars(yes?.lastPrice);
+        if (price == null || price < 0.2 || price > 0.8) return null;
+        return { market, distance: Math.abs(price - 0.5) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.distance - b.distance || (b.market.volume24h || 0) - (a.market.volume24h || 0))
+      .map((entry) => entry.market);
+  }
+  if (id === "trending") {
+    markets = markets
+      .filter((market) => (market.volume24h || 0) >= 5_000)
+      .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0));
+  }
+  return markets;
+}
+
+/**
+ * Single-market Gamma lookup by condition id (War Room globe / deep links).
+ * The featured pool is capped and does not contain every tradable marker.
+ *
+ * @param {string} conditionId
+ * @returns {Promise<FeaturedPolymarketMarket | null>}
+ */
+export async function fetchPolymarketMarketByConditionId(conditionId) {
+  const id = String(conditionId || "").trim();
+  if (!id) return null;
+  const needle = id.toLowerCase();
+  const pick = (payload) => {
+    const markets = marketsFromPayload(payload);
+    return (
+      markets.find((market) => String(market.conditionId || "").toLowerCase() === needle) ||
+      markets[0] ||
+      null
+    );
+  };
+  try {
+    const open = await gammaGet("/markets", { condition_ids: id, limit: 5, closed: false });
+    const hit = pick(open);
+    if (hit) return hit;
+  } catch {
+    /* try closed */
+  }
+  try {
+    const closed = await gammaGet("/markets", { condition_ids: id, limit: 5, closed: true });
+    return pick(closed);
+  } catch {
+    return null;
+  }
 }

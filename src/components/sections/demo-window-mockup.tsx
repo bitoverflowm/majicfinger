@@ -13,6 +13,8 @@ type DemoWindowMockupProps = {
   style?: CSSProperties;
   /** Shows a window title bar with this title. */
   title?: string;
+  /** Square full-bleed frame — no radius, border, shadow, or title chrome. */
+  flush?: boolean;
   "data-demo-mockup"?: boolean;
 };
 
@@ -27,19 +29,26 @@ export function DemoWindowMockup({
   id,
   style,
   title,
+  flush = false,
   "data-demo-mockup": dataDemoMockup,
 }: DemoWindowMockupProps) {
+  const showTitle = Boolean(title) && !flush;
   return (
     <div
       id={id}
       style={style}
       data-demo-mockup={dataDemoMockup}
       className={cn(
-        "relative isolate w-full overflow-hidden overscroll-none rounded-2xl border border-border bg-background shadow-xl ring-1 ring-border/60",
+        "relative isolate w-full overflow-hidden",
+        // Flush homepage stages must chain wheel scroll to the page at inner edges.
+        flush ? "overscroll-y-auto bg-transparent" : "overscroll-none bg-background",
+        flush
+          ? "rounded-none border-0 shadow-none ring-0"
+          : "rounded-2xl border border-border shadow-xl ring-1 ring-border/60",
         className,
       )}
     >
-      {title ? (
+      {showTitle ? (
         <div className="relative flex h-10 shrink-0 items-center border-b border-border bg-muted/50 px-4">
           <div className="flex gap-1.5" aria-hidden>
             <span className="size-2.5 rounded-full bg-neutral-300 dark:bg-neutral-600" />

@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { DemoScrollLink } from "@/components/sections/demo-scroll-link";
 import { siteConfig } from "@/lib/config";
 
 /** End-of-article CTA; same wording and actions as the landing page's closing section. */
@@ -18,26 +17,14 @@ export function GuideTakeawayCta() {
       >
         {ctaSection.title}
       </h2>
-      <div className="mt-4 flex flex-col items-center gap-2.5">
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <DemoScrollLink
-            href={`/${hero.cta.primary.href}`}
-            activateLandingDemo
-            className="flex h-9 w-fit items-center justify-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-95"
-          >
-            {hero.cta.primary.text}
-          </DemoScrollLink>
-          <Link
-            href={hero.cta.secondary.href}
-            className="flex h-9 w-fit items-center justify-center gap-1.5 rounded-full border border-border bg-background px-5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-          >
-            {hero.cta.secondary.text}
-            <span aria-hidden>→</span>
-          </Link>
-        </div>
-        <p className="max-w-md text-xs text-muted-foreground sm:text-sm">
-          {ctaSection.subtext}
-        </p>
+      <div className="mt-4 flex flex-col items-center">
+        <Link
+          href={hero.cta.secondary.href}
+          className="flex h-9 w-fit items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-95"
+        >
+          {hero.cta.secondary.text}
+          <span aria-hidden>→</span>
+        </Link>
       </div>
     </section>
   );

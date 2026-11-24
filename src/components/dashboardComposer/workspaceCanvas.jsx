@@ -2394,7 +2394,15 @@ const RESIZE_EDGES = [
 
 function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, booting = false, locked = false, exportTour = false, onExportTourDone }) {
   const canvas = useWorkspaceCanvas();
+  const ctxDemo = useMyStateV2();
+  const landingDemo = !!ctxDemo?.landingDemo;
+  const exploreHolderDemo =
+    landingDemo && (ctxDemo?.landingDemoSurface === "markets" || ctxDemo?.landingDemoSurface === "holders");
+  /** Markets / Holders demo: search is just the bar — no card chrome. */
+  const framelessSearch = exploreHolderDemo && block.panel === "search";
   const readOnly = !!canvas?.readOnly || locked;
+  /** Landing demos keep a quiet border — no editor selection/hover chrome. */
+  const calmBorder = readOnly || landingDemo;
   const dragRef = useRef(null);
   const rootRef = useRef(null);
   const blockRef = useRef(block);
@@ -2469,7 +2477,6 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     }
   };
 
-  const landingDemo = !!useMyStateV2()?.landingDemo;
   const [exportLocked, setExportLocked] = useState(false);
   const touring = exportTour && !!exportFormats && !readOnly;
   const [exportItem, setExportItem] = useState(null);
@@ -2699,15 +2706,20 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       inert={locked ? "" : undefined}
       onPointerDown={readOnly ? undefined : onPointerDown}
       className={cn(
-        "absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
+        "absolute flex flex-col",
+        framelessSearch
+          ? "overflow-visible border-0 bg-transparent shadow-none"
+          : "overflow-hidden rounded-xl border bg-background shadow-sm",
         locked ? "pointer-events-none select-none blur-[6px] saturate-[0.85]" : "pointer-events-auto",
         block.arrive && (block.branch ? "lychee-sheet-branch" : "lychee-sheet-arrive"),
-        readOnly ? "border-border/70" : "group/block",
-        !readOnly && spotlight
-          ? "border-emerald-500 ring-2 ring-emerald-400/80"
-            : !readOnly && selected
+        !framelessSearch && (calmBorder ? "border-border/70" : "group/block"),
+        !framelessSearch &&
+          !calmBorder &&
+          (spotlight
+            ? "border-emerald-500 ring-2 ring-emerald-400/80"
+            : selected
               ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
-              : !readOnly && "border-border/70 hover:border-[#0d99ff]",
+              : "border-border/70 hover:border-[#0d99ff]"),
         panelClassName(block),
       )}
       style={{
@@ -2715,12 +2727,12 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
         top: block.y,
         width: block.w,
         height: block.h,
-        cursor: canvas?.tool === "hand" && !readOnly ? "grab" : undefined,
+        cursor: canvas?.tool === "hand" && !readOnly && !framelessSearch ? "grab" : undefined,
         transition: resizing ? "none" : "left 480ms cubic-bezier(0.22, 1, 0.36, 1), top 480ms cubic-bezier(0.22, 1, 0.36, 1), width 480ms cubic-bezier(0.22, 1, 0.36, 1), height 480ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
-      {readOnly ? null : <RealtimeToggle block={block} />}
-      {readOnly ? null : (
+      {readOnly || framelessSearch ? null : <RealtimeToggle block={block} />}
+      {readOnly || framelessSearch ? null : (
       <DropdownMenu
         open={menuOpen}
         modal={!touring}
@@ -3038,6 +3050,9 @@ export function WorkspaceCanvas() {
   const pageTab = ((canvas?.readOnly ? canvas?.previewTabs : ctx?.workspaceStartTabs) || []).find((tab) => tab?.id === pageTabId) || null;
   // The demo shows everything a terminal tab opens; saving it is what takes a membership.
   const demoPaywalled = !!ctx?.landingDemo && !canvas?.runFeed && !pageTab?.terminal;
+  const exploreHolderCanvas =
+    !!ctx?.landingDemo &&
+    (ctx?.landingDemoSurface === "markets" || ctx?.landingDemoSurface === "holders");
   const lockedIds = useMemo(() => (demoPaywalled ? demoLockedIds(blocks) : new Set()), [blocks, demoPaywalled]);
   const lockedBlocks = blocks.filter((block) => lockedIds.has(block.id));
   // A preview keeps the layouts it works out here, since it saves nothing.
@@ -3372,6 +3387,8 @@ export function WorkspaceCanvas() {
     if (el instanceof HTMLElement) el.scrollIntoView({ block: "nearest" });
   }, [canvas?.selectedId]);
 
+  const landingDemo = !!ctx?.landingDemo;
+
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return undefined;
@@ -3419,14 +3436,22 @@ export function WorkspaceCanvas() {
         }
       }
       if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
-      if (scroller.scrollHeight <= scroller.clientHeight + 1) return;
+      // Homepage explore: native overflow + `[data-landing-explore]` overscroll chaining.
+      // Do not preventDefault / window.scrollBy — that felt sticky and trapped the page.
+      if (landingDemo) return;
+      const maxTop = scroller.scrollHeight - scroller.clientHeight;
+      if (maxTop <= 1) return;
+      const scrollingDown = event.deltaY > 0;
+      const atTop = scroller.scrollTop <= 0;
+      const atBottom = scroller.scrollTop >= maxTop - 1;
+      if ((scrollingDown && atBottom) || (!scrollingDown && atTop)) return;
       event.preventDefault();
       event.stopPropagation();
       scroller.scrollTop += event.deltaY;
     };
     scroller.addEventListener("wheel", onWheel, { passive: false, capture: true });
     return () => scroller.removeEventListener("wheel", onWheel, { capture: true });
-  }, [blocks.length]);
+  }, [blocks.length, landingDemo]);
 
   if (!canvas?.ready) {
     return (
@@ -3476,7 +3501,13 @@ export function WorkspaceCanvas() {
     <>
     <div
       ref={scrollerRef}
-      className="pointer-events-auto absolute inset-0 z-20 overflow-auto"
+      className={cn(
+        "pointer-events-auto absolute inset-0 z-20 overflow-auto",
+        // Landing explore demos chain to the page at edges; real dashboard keeps contain.
+        landingDemo ? "overscroll-y-auto" : "overscroll-contain",
+        // Markets / Holders demos: slight canvas tint vs the stage background.
+        exploreHolderCanvas && "bg-zinc-100 dark:bg-zinc-900",
+      )}
       style={canvas?.tool === "hand" ? { cursor: canvas.handDown ? "grabbing" : "grab" } : undefined}
     >
       <div

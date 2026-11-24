@@ -5,7 +5,7 @@ import { forwardRef } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export const FREE_NOTE = "Free plan · no credit card needed";
+export const FREE_NOTE = "No credit card needed";
 
 export const PRIMARY_CTA =
   "flex items-center justify-center gap-1.5 rounded-full border border-white/[0.12] bg-secondary text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] transition-all ease-out hover:bg-secondary/80 active:scale-95 dark:text-secondary-foreground";

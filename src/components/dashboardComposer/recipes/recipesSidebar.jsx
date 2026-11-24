@@ -102,8 +102,28 @@ function SidebarRow({ item, icon: Icon, active = false, onClick, hoverProps }) {
 /**
  * Terminals and quick actions beside the integration picker. A terminal opens as a new tab;
  * a recipe opens a full-window tool.
+ *
+ * `recipeIds` / `terminalIds` limit which items appear (curated Explore surfaces).
+ * `hideTerminals` drops the Terminals section entirely.
  */
-export function RecipesSidebar({ onOpen, onOpenTerminal, onHover, activeId = null, expanded = false, className }) {
+export function RecipesSidebar({
+  onOpen,
+  onOpenTerminal,
+  onHover,
+  activeId = null,
+  expanded = false,
+  className,
+  recipeIds = null,
+  terminalIds = null,
+  hideTerminals = false,
+}) {
+  const recipes = Array.isArray(recipeIds)
+    ? RECIPES.filter((recipe) => recipeIds.includes(recipe.id))
+    : RECIPES;
+  const terminals = Array.isArray(terminalIds)
+    ? TERMINALS.filter((terminal) => terminalIds.includes(terminal.id))
+    : TERMINALS;
+  const showTerminals = !hideTerminals && terminals.length > 0;
   const hoverProps = (id) => ({
     onMouseEnter: () => onHover?.(id),
     onMouseLeave: () => onHover?.(null),
@@ -122,25 +142,29 @@ export function RecipesSidebar({ onOpen, onOpenTerminal, onHover, activeId = nul
       )}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-black/[0.015] pb-4 dark:bg-white/[0.02]">
-        <SectionHeader title="Terminals" count={TERMINALS.length} className="pt-6">
-          Out-of-the-box terminals to supercharge your research.
-        </SectionHeader>
-        <ul>
-          {TERMINALS.map((terminal) => (
-            <SidebarRow
-              key={terminal.id}
-              item={terminal}
-              icon={SquareTerminal}
-              onClick={() => onOpenTerminal?.(terminal.id)}
-              hoverProps={TERMINAL_PREVIEWS[terminal.id] ? hoverProps(terminal.id) : undefined}
-            />
-          ))}
-        </ul>
-        <SectionHeader title="Recipes" count={RECIPES.length} className="pt-5">
+        {showTerminals ? (
+          <>
+            <SectionHeader title="Terminals" count={terminals.length} className="pt-6">
+              Out-of-the-box terminals to supercharge your research.
+            </SectionHeader>
+            <ul>
+              {terminals.map((terminal) => (
+                <SidebarRow
+                  key={terminal.id}
+                  item={terminal}
+                  icon={SquareTerminal}
+                  onClick={() => onOpenTerminal?.(terminal.id)}
+                  hoverProps={TERMINAL_PREVIEWS[terminal.id] ? hoverProps(terminal.id) : undefined}
+                />
+              ))}
+            </ul>
+          </>
+        ) : null}
+        <SectionHeader title="Recipes" count={recipes.length} className={showTerminals ? "pt-5" : "pt-6"}>
           A list of quick actions requested by our quants. Click one to get started right away.
         </SectionHeader>
         <ul>
-          {RECIPES.map((recipe) => (
+          {recipes.map((recipe) => (
             <SidebarRow
               key={recipe.id}
               item={recipe}

@@ -61,6 +61,7 @@ import {
 } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 import { KALSHI_VS_POLYMARKET_PATH } from "@/lib/kalshiVsPolymarketLanding";
 import { startKalshiPolymarketCompareDashboard } from "@/lib/kalshiPolymarketCompareDashboard";
+import { isLandingExploreSurface } from "@/lib/landingDemoExplore";
 
 /** Wireframe order + News API (platform integration roadmap). */
 const CONNECT_INTEGRATION_ORDER = [
@@ -778,6 +779,8 @@ export default function ConnectDataStep1({
 
   const noteLandingDemoSelection = useCallback(() => {
     if (!context?.landingDemo) return;
+    // Homepage explore surfaces stay inside `#demo` — never promote to dashboard chrome.
+    if (isLandingExploreSurface(context?.landingDemoSurface)) return;
     context.activateLandingDemo?.();
   }, [context]);
 

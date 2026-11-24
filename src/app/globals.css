@@ -493,3 +493,14 @@ body {
   background-color: transparent !important;
   transition: background-color 1s ease-out;
 }
+
+/*
+ * Homepage `#demo` explore stages: nested `overscroll-contain` trapped the page.
+ * Restore native chaining so wheels exit the demo at top/bottom without hijacking.
+ */
+[data-landing-explore] {
+  overscroll-behavior-y: auto;
+}
+[data-landing-explore] * {
+  overscroll-behavior-y: auto;
+}

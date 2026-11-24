@@ -195,8 +195,8 @@ function DesktopProductsPanel({
         }
       }}
     >
-      <div className="w-[min(42rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-xl sm:p-5">
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:gap-6">
+      <div className="w-[min(56rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-xl sm:p-5">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
           <div>
             <p className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
               Integrations
@@ -236,11 +236,13 @@ function DesktopProductsPanel({
                 </li>
               ))}
             </ul>
+          </div>
 
-            <p className="mb-3 mt-5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          <div>
+            <p className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
               Products
             </p>
-            <ul className="space-y-0.5">
+            <ul className="max-h-[min(70vh,24rem)] space-y-0.5 overflow-y-auto pr-1">
               {data.products.map((product) => (
                 <li key={product.id}>
                   <Link
@@ -340,6 +342,7 @@ function DesktopProductsDropdown({ data }: { data: ProductsNavData }) {
     >
       <button
         type="button"
+        data-nav="products"
         className={cn(
           "flex h-full shrink-0 cursor-default items-center justify-center whitespace-nowrap px-4 py-2 text-sm font-medium tracking-tight text-primary/60 transition-colors duration-200 hover:text-primary",
           open && "text-primary",

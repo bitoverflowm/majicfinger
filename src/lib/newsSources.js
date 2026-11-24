@@ -383,6 +383,23 @@ function dayOnly(ms) {
   return (d.getUTCHours() === 7 || d.getUTCHours() === 8) && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
 }
 
+/** Strip RSS/HTML description down to a short plain-text lede. */
+export function plainNewsSnippet(raw, max = 320) {
+  const text = String(raw || "")
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max - 1).trim()}…` : text;
+}
+
 export function parseGoogleNewsRss(xml) {
   const out = [];
   for (const [, block] of String(xml || "").matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
@@ -396,6 +413,7 @@ export function parseGoogleNewsRss(xml) {
     const title = suffix && rawTitle.endsWith(suffix) ? rawTitle.slice(0, -suffix.length).trim() : rawTitle;
     if (!title || !link || !Number.isFinite(t)) continue;
     const decoded = decodeGoogleNewsUrl(link);
+    const snippet = plainNewsSnippet(tag(block, "description")?.text || "");
     // Never put news.google.com in `url` / `publisher_url`. Opaque ids stay null until
     // resolveGoogleNewsUrl / resolveArticlePublisherUrls runs.
     out.push({
@@ -406,6 +424,7 @@ export function parseGoogleNewsRss(xml) {
       publisher_home: sourceUrl || null,
       source,
       domain: hostOf(decoded.publisher_url || sourceUrl),
+      snippet: snippet && snippet !== title ? snippet : "",
       t,
       timezone: "UTC",
       timestamp_type: "google_rss_pubDate",

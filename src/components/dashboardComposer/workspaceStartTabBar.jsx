@@ -235,12 +235,22 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
   );
 }
 
+/** Homepage explore demos: no workspace tab strip (Historical/Present always; Markets/Holders until a 2nd tab). */
+export function hideLandingExploreTabChrome(context, tabs = context?.workspaceStartTabs) {
+  if (!context?.landingDemo) return false;
+  const surface = context?.landingDemoSurface;
+  if (surface === "historical" || surface === "present") return true;
+  if (surface !== "markets" && surface !== "holders") return false;
+  return !Array.isArray(tabs) || tabs.length <= 1;
+}
+
 export function WorkspaceStartTabs({ tabsActive, onOpenTabs }) {
   const context = useMyStateV2();
   const canvas = useWorkspaceCanvas();
   const sessionUser = useUser();
   const tabs = Array.isArray(context?.workspaceStartTabs) ? context.workspaceStartTabs : [];
   const activeId = context?.activeWorkspaceStartTabId;
+  const exploreDemo = context?.landingDemo && (context?.landingDemoSurface === "markets" || context?.landingDemoSurface === "holders");
 
   const selectTab = (id) => {
     if (canvas?.requestTab) {
@@ -274,6 +284,8 @@ export function WorkspaceStartTabs({ tabsActive, onOpenTabs }) {
     onOpenTabs?.();
   };
 
+  if (hideLandingExploreTabChrome(context, tabs)) return null;
+
   return (
     <div
       role="tablist"
@@ -289,23 +301,25 @@ export function WorkspaceStartTabs({ tabsActive, onOpenTabs }) {
           onSelect={selectTab}
         />
       ))}
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label="New tab"
-              onClick={addBlankTab}
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-sm leading-none text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
-            >
-              +
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={6} className="text-xs">
-            New tab
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      {exploreDemo ? null : (
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="New tab"
+                onClick={addBlankTab}
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-sm leading-none text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+              >
+                +
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6} className="text-xs">
+              New tab
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
     </div>
   );
 }

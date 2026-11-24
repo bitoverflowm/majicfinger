@@ -13,6 +13,7 @@ import { DemoBackdrop } from "@/components/sections/demo-backdrop";
 import { DemoLoadingCard } from "@/components/sections/demo-loading-card";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
 import { isCompactScreen, useCompactScreen } from "@/lib/desktopOnly";
+import { isLandingDemoEnabled, isWarRoomHeroEnabled } from "@/lib/warRoom/flags";
 import { retryImport } from "@/lib/retryImport";
 import { cn } from "@/lib/utils";
 import type { DashboardDemoSectionProps } from "./dashboard-demo-section";
@@ -22,7 +23,13 @@ import type { DashboardDemoSectionProps } from "./dashboard-demo-section";
  * The download starts when this module evaluates rather than when hydration first renders the
  * placeholder, which is seconds earlier on a cold load. Small screens never download it.
  */
-if (typeof window !== "undefined" && !isCompactScreen()) import("./dashboard-demo-section").catch(() => {});
+if (
+  typeof window !== "undefined" &&
+  !isCompactScreen() &&
+  (isLandingDemoEnabled() || isWarRoomHeroEnabled())
+) {
+  import("./dashboard-demo-section").catch(() => {});
+}
 
 const DashboardDemoSection = dynamic<DashboardDemoSectionProps>(
   () =>
@@ -34,6 +41,17 @@ const FramedDashboardDemoSection = dynamic<DashboardDemoSectionProps>(
   () =>
     retryImport(() => import("./dashboard-demo-section")).then((m) => ({ default: m.DashboardDemoSection })),
   { ssr: false, loading: () => <DashboardDemoSkeleton framed /> },
+);
+
+const BareDashboardDemoSection = dynamic<DashboardDemoSectionProps>(
+  () =>
+    retryImport(() => import("./dashboard-demo-section")).then((m) => ({ default: m.DashboardDemoSection })),
+  {
+    ssr: false,
+    loading: () => (
+      <DashboardDemoSkeleton bare sectionId="explore-demo" className="relative z-30 m-0 h-full w-full p-0" />
+    ),
+  },
 );
 
 function SkeletonMockup({ framed }: { framed: boolean }) {
@@ -51,7 +69,17 @@ export function DashboardDemoSkeleton({
   sectionId = "demo",
   className = HOMEPAGE_DEMO_SECTION_CLASS,
   framed = false,
-}: Pick<DashboardDemoSectionProps, "sectionId" | "className" | "framed">) {
+  bare = false,
+}: Pick<DashboardDemoSectionProps, "sectionId" | "className" | "framed" | "bare">) {
+  if (bare) {
+    return (
+      <section id={sectionId} className={cn(className, "z-30 h-full min-h-0")}>
+        <div className="flex h-full min-h-[32rem] w-full items-center justify-center overflow-hidden bg-background">
+          <DemoLoadingCard />
+        </div>
+      </section>
+    );
+  }
   return (
     <section id={sectionId} className={cn(className, "z-30")}>
       {framed ? (
@@ -84,8 +112,10 @@ function HomepageDemo(props: DashboardDemoSectionProps) {
   const compact = useCompactScreen();
   useScrollbarWidth();
   if (compact === false) return <FramedDashboardDemoSection {...props} />;
+  // Prefer the caller's sectionId (e.g. explore-demo) — never steal the homepage `#demo` anchor.
+  const sectionId = props.sectionId || "demo";
   return (
-    <section id="demo" className={cn(HOMEPAGE_DEMO_SECTION_CLASS, "z-30")}>
+    <section id={sectionId} className={cn(HOMEPAGE_DEMO_SECTION_CLASS, "z-30")}>
       <div className={compact ? undefined : "lg:hidden"}>
         <CompactDemoFrame />
       </div>
@@ -100,6 +130,15 @@ function HomepageDemo(props: DashboardDemoSectionProps) {
   );
 }
 
-export function DashboardDemoSectionLazy(props: DashboardDemoSectionProps) {
-  return props.framed ? <HomepageDemo {...props} /> : <DashboardDemoSection {...props} />;
+export function DashboardDemoSectionLazy(
+  props: DashboardDemoSectionProps & {
+    /** Load even when the standalone landing demo flag is off (e.g. War Room hero tabs). */
+    force?: boolean;
+  },
+) {
+  const { force, ...demoProps } = props;
+  if (!force && !isLandingDemoEnabled()) return null;
+  // Bare / full-bleed explore tabs skip the painted framed homepage path.
+  if (demoProps.bare) return <BareDashboardDemoSection {...demoProps} />;
+  return demoProps.framed ? <HomepageDemo {...demoProps} /> : <DashboardDemoSection {...demoProps} />;
 }

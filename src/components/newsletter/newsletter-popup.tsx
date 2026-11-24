@@ -16,7 +16,7 @@ const TICK_MS = 1000;
 const PREVIEW_DELAY_MS = 1200;
 
 /** App and transactional routes where an interruption would get in the way. */
-const BLOCKED_PREFIXES = ["/dashboard", "/login", "/checkout", "/try", "/easy", "/search", "/embeds", "/privacy", "/terms", "/dataUse"];
+const BLOCKED_PREFIXES = ["/dashboard", "/war-room", "/login", "/checkout", "/try", "/easy", "/search", "/embeds", "/privacy", "/terms", "/dataUse"];
 
 function isBlockedPath(pathname: string | null) {
   if (!pathname) return true;

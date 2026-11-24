@@ -2,10 +2,11 @@
 import { useState } from 'react';
 import { useUser  } from '@/lib/hooks';
 import { WORKSPACE_ENTRY_PATH } from '@/lib/workspaceEntry';
+import { fastLogout } from '@/lib/fastLogout';
 import Link from 'next/link'
 import Image from 'next/image';
 
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { Menu, Citrus } from "lucide-react"
 
 
@@ -29,27 +30,11 @@ const Nav = () => {
     const isLandingPage = pathname === '/';
     const [logoError, setLogoError] = useState(false);
 
-    const router = useRouter();
-
-    const handleLogout = async () => {
-      //e.preventDefault(); // Prevent the default link behavior
-
-      try {
-        const response = await fetch('/api/logout', {
-          method: 'POST', // Make sure to use POST if your logout API expects it
-        });
-
-        // If the logout was successful, redirect to the homepage
-        if (response.ok) {
-          router.push('/');
-        } else {
-          // Handle errors or unsuccessful logout attempts here
-          console.error('Logout failed');
-        }
-      } catch (error) {
-        console.error('An error occurred during logout', error);
-      }
-    };
+    const handleLogout = () =>
+      fastLogout({
+        email: user?.email,
+        userId: user?._id || user?.userId,
+      });
 
     return (
       <header className="absolute w-full z-30 top-0 flex h-16 items-center gap-4 px-4 md:px-6">

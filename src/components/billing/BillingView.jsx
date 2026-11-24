@@ -371,7 +371,6 @@ export default function BillingView({ user, locked = false, onBack, className })
         key={defaultCycle}
         id="billing-plans"
         showHeader={false}
-        includeFree={false}
         defaultCycle={defaultCycle}
         currentPlan={currentPlan}
         getAction={getAction}

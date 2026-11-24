@@ -16,7 +16,6 @@ import { FAQSection } from "@/components/sections/faq-section";
 import { TestimonialSection } from "@/components/sections/testimonial-section";
 import { ChangelogHighlights } from "@/components/sections/changelog-highlights";
 import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
-import { getPublishedDashboardsForLanding } from "@/lib/landing/publishedDashboards";
 import { LandingJsonLd } from "@/components/seo/landing-json-ld";
 import { getAllContent } from "@/lib/content";
 
@@ -71,7 +70,10 @@ const stripeReferralSnippet = `(function(){
   }
 })();`;
 
-export default async function Home() {
+export default async function Home({ searchParams }) {
+  const heroParam = String(searchParams?.hero || "").trim().toLowerCase();
+  const forceLanding = heroParam === "landing";
+  const fixture = ["1", "true", "yes"].includes(String(searchParams?.fixture || "").trim().toLowerCase());
   let articles = [];
   try {
     const guides = getAllContent("guides") || [];
@@ -84,7 +86,16 @@ export default async function Home() {
     console.warn("Content could not be loaded:", e);
   }
 
-  const { dashboards, profilePic } = await getPublishedDashboardsForLanding("misterrpink", 12);
+  let dashboards = [];
+  let profilePic = null;
+  try {
+    const { getPublishedDashboardsForLanding } = await import("@/lib/landing/publishedDashboards");
+    const result = await getPublishedDashboardsForLanding("misterrpink", 12);
+    dashboards = result.dashboards;
+    profilePic = result.profilePic;
+  } catch (e) {
+    console.warn("Landing dashboards could not be loaded:", e);
+  }
 
   return (
     <>
@@ -96,7 +107,7 @@ export default async function Home() {
             `divide-y` border-top selector doesn't draw a line under the navbar. */}
         <LandingJsonLd />
         <main className="flex flex-col items-center justify-center divide-y divide-border min-h-screen w-full theme-landing min-h-screen bg-background antialiased w-full mx-auto scroll-smooth font-sans">
-          <HeroSection />
+          <HeroSection forceLanding={forceLanding} fixture={fixture} />
           <FeatureShowcaseSection afterConnect={<DataSourcesSection />} end={<ComingSoonSourcesSection />} />
           <QuoteSection />
           <FeatureSection />

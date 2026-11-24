@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { CLIP, canvasGridMetrics, widthForSpan, xForCol } from "@/components/dashboardComposer/clipLayout";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { cn } from "@/lib/utils";
 import { terminalViewOf } from "@/lib/workspaceTerminals";
 import { PanelSizing } from "./terminalPanelFrame";
@@ -84,13 +85,16 @@ function placeEntries(terminal, kit, entries, originY) {
  * blueprint the first time it shows that view (or when it's empty); later blueprint versions only
  * add the panels introduced since, so whatever the user removed stays removed. Their own blocks stay.
  * Returns `{ blocks, layout }`, `layout` being the tab's next `terminalLayout`.
+ *
+ * `omitPanels` drops blueprint panels when seeding (e.g. homepage Markets/Holders demos hide `intro`).
  */
-export function terminalLayoutPatch(tab, blocks, { checkScreen = false } = {}) {
+export function terminalLayoutPatch(tab, blocks, { checkScreen = false, omitPanels = [] } = {}) {
   const terminal = tab?.terminal;
   const kit = KITS[terminal];
   if (!kit) return null;
   const view = terminalViewOf(tab.terminalSubject);
-  const entries = kit.blueprint[view] || [];
+  const omit = new Set(Array.isArray(omitPanels) ? omitPanels : []);
+  const entries = (kit.blueprint[view] || []).filter((entry) => !omit.has(entry.panel));
   const list = Array.isArray(blocks) ? blocks : [];
   const panels = list.filter(isTerminalBlock);
   const own = list.filter((block) => !isTerminalBlock(block));
@@ -298,6 +302,7 @@ export function scrollsInsideTerminalPanel(target, deltaX, deltaY) {
 
 /** Keeps a terminal tab's panels in step with its subject. Seeds and upgrades are written through the callbacks. */
 export function useTerminalTabLayout({ tab, blocks, enabled, onBlocks, onLayout }) {
+  const landingDemo = !!useMyStateV2()?.landingDemo;
   const onBlocksRef = useRef(onBlocks);
   onBlocksRef.current = onBlocks;
   const onLayoutRef = useRef(onLayout);
@@ -308,11 +313,15 @@ export function useTerminalTabLayout({ tab, blocks, enabled, onBlocks, onLayout 
     if (!enabled || !tab?.terminal) return;
     const checkScreen = !screenCheckedRef.current.has(tab.id);
     screenCheckedRef.current.add(tab.id);
-    const patch = terminalLayoutPatch(tab, blocks, { checkScreen });
+    const patch = terminalLayoutPatch(tab, blocks, {
+      checkScreen,
+      // Homepage Explore Markets / Holders (and other landing demos) skip the welcome blurb.
+      omitPanels: landingDemo ? ["intro"] : [],
+    });
     if (!patch) return;
     if (patch.blocks !== blocks) onBlocksRef.current?.(patch.blocks);
     onLayoutRef.current?.(patch.layout);
-  }, [blocks, enabled, tab]);
+  }, [blocks, enabled, landingDemo, tab]);
 }
 
 export function panelClassName(block) {

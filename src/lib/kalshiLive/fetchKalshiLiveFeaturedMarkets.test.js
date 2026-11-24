@@ -96,3 +96,12 @@ test("diversifyKalshiDiscoveryFeatured keeps one market per event", () => {
     ["A1", "B1", "C1"],
   );
 });
+
+test("series volume prefers volume_fp (Kalshi live field)", () => {
+  // Mirrors fetchKalshiLiveTradableMarkets / bySeriesCategories ranking.
+  const vol = (row) =>
+    Number(row.volume_fp ?? row.volume_24h ?? row.volume ?? row.total_volume ?? 0) || 0;
+  assert.equal(vol({ volume_fp: "12.5", volume_24h: 1 }), 12.5);
+  assert.equal(vol({ volume_24h: 9 }), 9);
+  assert.equal(vol({}), 0);
+});

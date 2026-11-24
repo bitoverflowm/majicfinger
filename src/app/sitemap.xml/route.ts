@@ -288,6 +288,7 @@ export async function GET() {
       changefreq: "weekly",
       lastmod: "2026-09-17",
     },
+    { path: "/war-room", priority: "0.9", changefreq: "hourly", lastmod: "2026-11-21" },
     { path: "/polymarket-holder-terminal", priority: "0.9", changefreq: "weekly", lastmod: "2026-11-10" },
     { path: "/polymarket-market-holders", priority: "0.85", changefreq: "weekly", lastmod: "2026-11-10" },
     { path: "/polymarket-wallet-tracker", priority: "0.85", changefreq: "weekly", lastmod: "2026-11-10" },

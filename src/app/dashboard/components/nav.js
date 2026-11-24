@@ -71,7 +71,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient"
+import { fastLogout } from "@/lib/fastLogout"
 import FigmaNavChrome from "./figmaNavChrome"
 
 function attachPublicAssetsToProjectRow(row) {
@@ -437,25 +437,12 @@ const Nav = () => {
     }
   }, [saveProjectDialogNonce])
 
-  const handleLogout = async () => {
-    try {
-      liveStreamActions?.stop?.();
-      endAuthenticatedSession({
-        email: user?.email,
-        userId: user?._id || user?.userId,
-      });
-      const response = await fetch('/api/logout', {
-        method: 'POST',
-      });
-      if (response.ok) {
-        router.push('/');
-      } else {
-        console.error('Logout failed');
-      }
-    } catch (error) {
-      console.error('An error occurred during logout', error);
-    }
-  };
+  const handleLogout = () =>
+    fastLogout({
+      email: user?.email,
+      userId: user?._id || user?.userId,
+      liveStreamStop: () => liveStreamActions?.stop?.(),
+    });
 
   const [overwrite, setOverwrite] = useState()
   const activeChartSheet = activeChartSheetId ? chartSheets?.[activeChartSheetId] : null;
