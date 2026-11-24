@@ -62,3 +62,29 @@ test("resolveMarketLocation places weather cities on the real city", () => {
   assert.equal(hk.region, "Hong Kong");
   assert.ok(hk.lon > 110);
 });
+
+test("resolveMarketLocation places bare city sports titles in the real city (not ocean fallback)", () => {
+  // Kalshi-style moneyline short titles — previously missed jaguars/CITY catalogs and
+  // fell through to warRoom fallbackWorldPoint (~Azores / mid-Atlantic).
+  const jax = resolveMarketLocation({ title: "Jacksonville wins" });
+  assert.equal(jax.region, "Jacksonville");
+  assert.ok(jax.lat > 30 && jax.lat < 31, `lat ${jax.lat}`);
+  assert.ok(jax.lon < -81 && jax.lon > -82, `lon ${jax.lon}`);
+  assert.equal(jax.method, "sports_home");
+
+  const kc = resolveMarketLocation({ title: "Kansas City wins" });
+  assert.equal(kc.region, "Kansas City");
+  assert.ok(kc.lat > 38 && kc.lat < 40);
+  assert.ok(kc.lon < -94 && kc.lon > -95);
+
+  const madrid = resolveMarketLocation({ title: "Real Madrid wins" });
+  assert.equal(madrid.region, "Madrid");
+  assert.equal(madrid.venue, "Santiago Bernabéu");
+});
+
+test("resolveMarketLocation places US weather city names without series ticker", () => {
+  const orlando = resolveMarketLocation({ title: "Highest temperature in Orlando today?" });
+  assert.equal(orlando.region, "Orlando");
+  assert.ok(orlando.lat > 28 && orlando.lat < 29);
+  assert.ok(orlando.lon < -81 && orlando.lon > -82);
+});

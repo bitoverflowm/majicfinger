@@ -40,6 +40,15 @@ test("locateMarket maps sports homes to stadiums via shared catalog", () => {
   assert.ok(Math.abs(bournemouth.lat - 50.7352) < 0.01);
 });
 
+test("locateMarket places Jacksonville wins in Florida (not mid-Atlantic fallback)", () => {
+  const jax = locateMarket({ title: "Jacksonville wins" });
+  assert.ok(jax, "expected geocode hit");
+  assert.ok(String(jax.region).includes("Jacksonville"));
+  assert.ok(jax.lat > 30 && jax.lat < 31, `lat ${jax.lat}`);
+  assert.ok(jax.lon < -81 && jax.lon > -82, `lon ${jax.lon}`);
+  assert.notEqual(jax.precision, "global");
+});
+
 test("locateMarket maps crypto to NYC and entity HQs to city", () => {
   const btc = locateMarket({ title: "Will Bitcoin hit $100k this year?", tags: ["Crypto"] });
   assert.equal(btc.region, "New York City");

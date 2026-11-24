@@ -130,6 +130,8 @@ const TITLE_GEO = [
   { re: /\btampa\b/i, point: SERIES_GEO.KXHIGHTPA },
   { re: /\bnashville\b/i, point: SERIES_GEO.KXHIGHBNA },
   { re: /\bcharlotte\b/i, point: SERIES_GEO.KXHIGHCLT },
+  { re: /\borlando\b/i, point: SERIES_GEO.KXHIGHORL },
+  { re: /\bjacksonville\b/i, point: SERIES_GEO.KXHIGHJAX },
   { re: /\bsan francisco|\bsf\b/i, point: SERIES_GEO.KXHIGHSFO },
   { re: /\bsan diego\b/i, point: SERIES_GEO.KXHIGHSAN },
   { re: /\bukraine|kyiv|kiev|donbas|crimea\b/i, point: SERIES_GEO.KXUKRAINE },
