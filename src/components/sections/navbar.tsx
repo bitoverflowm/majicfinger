@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -13,7 +13,7 @@ import { JarvisNavSearch } from "@/components/nav/jarvis-nav-search";
 import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { useUser } from "@/lib/hooks";
 import { WORKSPACE_ENTRY_PATH } from "@/lib/workspaceEntry";
-import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient";
+import { fastLogout } from "@/lib/fastLogout";
 
 const overlayVariants = {
   hidden: { opacity: 0 },
@@ -30,22 +30,14 @@ const drawerVariants = {
 export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const user = useUser();
-  const router = useRouter();
   const pathname = usePathname();
   const pricingHref = pathname === "/" ? "/#pricing" : "/#pricing";
 
-  const handleLogout = async () => {
-    try {
-      endAuthenticatedSession({
-        email: user?.email,
-        userId: user?._id || user?.userId,
-      });
-      const response = await fetch("/api/logout", { method: "POST" });
-      if (response.ok) router.push("/");
-    } catch (error) {
-      console.error("An error occurred during logout", error);
-    }
-  };
+  const handleLogout = () =>
+    fastLogout({
+      email: user?.email,
+      userId: user?._id || user?.userId,
+    });
 
   const closeDrawer = () => setIsDrawerOpen(false);
 

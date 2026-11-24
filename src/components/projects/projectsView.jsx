@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { toast } from "sonner";
@@ -19,6 +18,13 @@ import {
   SquareTerminal,
   Trash2,
 } from "lucide-react";
+import {
+  ProjectsAccountMenu,
+  ProjectsAlertsBell,
+  ProjectsPlanFooter,
+  ProjectsProductTabs,
+  ProjectsSidebarLinks,
+} from "@/components/projects/projectsShellChrome";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +45,6 @@ import {
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   createWorkspaceProject,
   deleteWorkspaceProject,
@@ -332,11 +337,7 @@ export default function ProjectsView({ user }) {
     }
     const entry = typeof window !== "undefined" && new URLSearchParams(window.location.search).has(ENTRY_PARAM);
     if (entry) {
-      // Arriving from sign-in or a Dashboard link: someone with nothing saved yet starts on the dashboard and its walkthrough.
-      if (result.ok && !result.hasWork) {
-        router.replace("/dashboard");
-        return;
-      }
+      // First-time and returning visitors stay on Projects / Recents (not the blank dashboard).
       router.replace(PROJECTS_PATH);
     }
     if (!result.ok) {
@@ -449,12 +450,11 @@ export default function ProjectsView({ user }) {
   return (
     <div className="flex min-h-svh bg-background text-foreground">
       <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r border-border/70 px-3 py-3 md:flex">
-        <div className="flex items-center gap-2 px-1 pb-4">
-          <span className="flex size-6 shrink-0 overflow-hidden rounded-full">
-            <Image src="/logo.png" width={24} height={24} alt="Lychee" className="size-full object-cover" />
-          </span>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{user?.name || user?.email || "Your files"}</span>
-          <UserAvatar src={profile?.profile_pic} handle={profile?.user_name} name={user?.name} email={user?.email} size={24} />
+        <div className="flex items-center gap-1 px-1 pb-4">
+          <ProjectsAccountMenu user={user} profile={profile} />
+          <div className="ml-auto">
+            <ProjectsAlertsBell user={user} />
+          </div>
         </div>
         <nav className="flex flex-col gap-0.5">
           <SidebarItem active={section === "recents"} icon={Clock} label="Recents" onClick={() => setSection("recents")} />
@@ -466,15 +466,26 @@ export default function ProjectsView({ user }) {
             onClick={() => setSection("starred")}
           />
         </nav>
+        <ProjectsSidebarLinks />
+        <div className="mt-auto">
+          <ProjectsPlanFooter user={user} />
+        </div>
       </aside>
 
       <main className="min-w-0 flex-1">
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border/70 bg-background/95 px-6 backdrop-blur">
-          <h1 className="text-[15px] font-semibold tracking-[-0.01em]">{title}</h1>
-          <div className="flex-1" />
-          <Button size="sm" onClick={createDashboard} disabled={creating} className="h-8 gap-1.5 bg-[#0d99ff] text-[13px] text-white hover:bg-[#0b87e0]">
+        <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-border/70 bg-background/95 px-4 backdrop-blur sm:gap-3 sm:px-6">
+          <div className="min-w-0 md:hidden">
+            <ProjectsAccountMenu user={user} profile={profile} />
+          </div>
+          <h1 className="hidden shrink-0 text-[15px] font-semibold tracking-[-0.01em] md:block">{title}</h1>
+          <div className="min-w-0 flex-1" />
+          <ProjectsProductTabs userId={userId} onMembershipRequired={membershipToast} />
+          <div className="md:hidden">
+            <ProjectsAlertsBell user={user} />
+          </div>
+          <Button size="sm" onClick={createDashboard} disabled={creating} className="h-8 gap-1.5 bg-[#0d99ff] text-[13px] text-white hover:bg-[#0b87e0] xl:hidden">
             {creating ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Plus className="size-3.5" aria-hidden />}
-            New dashboard
+            New
           </Button>
         </header>
 

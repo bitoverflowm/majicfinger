@@ -2,7 +2,7 @@
 export const ENTRY_PARAM = "start";
 
 /**
- * Where sign-in and Dashboard links go. Someone with saved work lands on their projects;
- * someone with nothing saved yet is sent on to the dashboard and its walkthrough.
+ * Where sign-in and Dashboard links go. First-time and returning users land on
+ * Projects / Recents — not the blank dashboard canvas.
  */
 export const WORKSPACE_ENTRY_PATH = `/dashboard/projects?${ENTRY_PARAM}=1`;

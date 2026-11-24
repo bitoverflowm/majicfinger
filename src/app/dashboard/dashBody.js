@@ -155,10 +155,25 @@ const DashBody = ({ user }) => {
     useEffect(() => {
       if (isDemo || typeof window === "undefined") return;
       const url = new URL(window.location.href);
-      if (url.searchParams.get("view") !== "billing") return;
-      setViewing?.("manageAccount");
-      url.searchParams.delete("view");
-      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+      const view = url.searchParams.get("view");
+      const surface = url.searchParams.get("surface");
+      if (view === "billing") {
+        setViewing?.("manageAccount");
+        url.searchParams.delete("view");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+        return;
+      }
+      if (view === "integrations" || surface === "integrations") {
+        setViewing?.("integrations");
+        url.searchParams.delete("view");
+        url.searchParams.delete("surface");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+        return;
+      }
+      if (surface === "markets" || surface === "holders") {
+        url.searchParams.delete("surface");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+      }
     }, [isDemo, setViewing]);
 
     useEffect(() => {

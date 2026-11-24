@@ -1074,9 +1074,14 @@ export function IntegrationConnectProvider({ children, inlineStart = false, inli
     const url = new URL(window.location.href);
     const recipeId = url.searchParams.get("recipe");
     const integrationId = url.searchParams.get("integration");
-    if (!recipeId && !integrationId) return;
+    const surface = url.searchParams.get("surface");
+    const openConnect = url.searchParams.get("connect") === "1";
+    const openCurated = surface === "historical" || surface === "present";
+    if (!recipeId && !integrationId && !openCurated && !openConnect) return;
     url.searchParams.delete("recipe");
     url.searchParams.delete("integration");
+    url.searchParams.delete("connect");
+    if (openCurated) url.searchParams.delete("surface");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     if (recipeId && RECIPE_VIEWS[recipeId]) {
       requestLandingDemoRecipe(recipeId);
@@ -1084,6 +1089,8 @@ export function IntegrationConnectProvider({ children, inlineStart = false, inli
       setOpen(true);
     } else if (integrationId) {
       setArrival({ integrationId });
+      setOpen(true);
+    } else if (openCurated || openConnect) {
       setOpen(true);
     }
   }, [inlineOnly]);
