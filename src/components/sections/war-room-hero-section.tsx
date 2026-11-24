@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { LandingDemoScrollManager } from "./landing-demo-scroll";
 import { DemoScrollLink } from "./demo-scroll-link";
 import { HomepageExploreTabs } from "./homepage-explore-tabs";
+import { scrollToPricingSection } from "@/lib/scrollToPricing";
 
 export function WarRoomHeroSection({ fixture = false }: { fixture?: boolean }) {
   return (
@@ -16,13 +18,24 @@ export function WarRoomHeroSection({ fixture = false }: { fixture?: boolean }) {
           Research Kalshi and Polymarket. Monitor real-world signals. Explore markets, trades,
           investigate wallets, build custom charts and live sharable dashboards. No code. No setup.
         </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <DemoScrollLink
             href="#demo"
             className="inline-flex h-11 items-center justify-center rounded-full bg-foreground px-6 text-sm font-medium text-background transition hover:opacity-90"
           >
             Learn More
           </DemoScrollLink>
+          <Link
+            href="/#pricing"
+            onClick={(e) => {
+              e.preventDefault();
+              scrollToPricingSection();
+            }}
+            className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-border bg-muted px-5 text-sm font-medium text-foreground transition hover:bg-muted/70"
+          >
+            See plans
+            <span aria-hidden>→</span>
+          </Link>
           <p className="text-sm font-medium text-muted-foreground">10K+ users</p>
         </div>
       </div>

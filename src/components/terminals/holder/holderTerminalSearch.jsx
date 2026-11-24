@@ -203,18 +203,28 @@ function EventMarketsDialog({ event, onClose, onConfirm }) {
 /**
  * The integrations' Polymarket search with a market / trader toggle. A market opens straight
  * away. An event or series asks which of its markets to open. A trader is a username or wallet.
- * `onExplore`, when given, adds an Explore button that goes back to browsing markets.
+ * `onExplore`, when given, adds an Explore button left of the search that goes back to browsing.
+ * `exploreLabel` rewords that button (Holders demo → "Explore holders", Markets → "Explore Markets").
  * `scopes` limits the toggle (one scope hides it); `labels` and `placeholders` reword it by scope id.
  * @param {{
  *   onPick: (subjects: object[]) => void,
  *   onExplore?: () => void,
+ *   exploreLabel?: string,
  *   className?: string,
  *   scopes?: string[],
  *   labels?: Record<string, string>,
  *   placeholders?: Record<string, string>,
  * }} props
  */
-export function HolderTerminalSearch({ onPick, onExplore, className, scopes, labels, placeholders }) {
+export function HolderTerminalSearch({
+  onPick,
+  onExplore,
+  exploreLabel = "Explore",
+  className,
+  scopes,
+  labels,
+  placeholders,
+}) {
   const options = scopes?.length ? SCOPES.filter((option) => scopes.includes(option.id)) : SCOPES;
   const [scope, setScope] = useState(options[0]?.id || "markets");
   const [event, setEvent] = useState(null);
@@ -253,8 +263,8 @@ export function HolderTerminalSearch({ onPick, onExplore, className, scopes, lab
   const traders = scope === "traders";
   return (
     <div className={className}>
-      <div className={cn("mb-2 flex items-center gap-2", options.length < 2 && !onExplore && "hidden")}>
-        <div role="tablist" aria-label="Search for" className={cn("inline-flex rounded-lg bg-muted p-0.5 text-[12px]", options.length < 2 && "hidden")}>
+      {options.length >= 2 ? (
+        <div role="tablist" aria-label="Search for" className="mb-2 inline-flex rounded-lg bg-muted p-0.5 text-[12px]">
           {options.map((option) => (
             <button
               key={option.id}
@@ -271,31 +281,35 @@ export function HolderTerminalSearch({ onPick, onExplore, className, scopes, lab
             </button>
           ))}
         </div>
+      ) : null}
+      <div className="flex items-center gap-2">
         {onExplore ? (
           <button
             type="button"
             onClick={onExplore}
-            className="inline-flex h-[30px] items-center gap-1.5 rounded-lg bg-muted px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-muted px-2.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
           >
             <Compass className="size-3.5" aria-hidden />
-            Explore
+            {exploreLabel}
           </button>
         ) : null}
+        <div className="min-w-0 flex-1">
+          <PolymarketLiveSearch
+            key={scope}
+            collectMode
+            dismissAfterSelect
+            onSelect={select}
+            entities={traders ? ["profile"] : ["market", "event"]}
+            searchProfiles={traders}
+            searchTags={false}
+            acceptAddress={traders}
+            placeholder={
+              placeholders?.[scope] ||
+              (traders ? "Search a username or paste a wallet address" : "Search markets, events or series in plain English, or paste a link")
+            }
+          />
+        </div>
       </div>
-      <PolymarketLiveSearch
-        key={scope}
-        collectMode
-        dismissAfterSelect
-        onSelect={select}
-        entities={traders ? ["profile"] : ["market", "event"]}
-        searchProfiles={traders}
-        searchTags={false}
-        acceptAddress={traders}
-        placeholder={
-          placeholders?.[scope] ||
-          (traders ? "Search a username or paste a wallet address" : "Search markets, events or series in plain English, or paste a link")
-        }
-      />
       {event ? (
         <EventMarketsDialog
           key={event.id || event.slug}

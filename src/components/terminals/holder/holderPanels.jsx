@@ -59,10 +59,13 @@ function HolderSearchPanel() {
   // Homepage Markets / Holders demos lock search to one side; dashboard keeps both.
   const scopes =
     surface === "markets" ? ["markets"] : surface === "holders" ? ["traders"] : undefined;
+  const exploreLabel =
+    surface === "holders" ? "Explore holders" : surface === "markets" ? "Explore Markets" : "Explore";
   return (
     <HolderTerminalSearch
       onPick={actions.pick}
       onExplore={subject ? actions.explore : undefined}
+      exploreLabel={exploreLabel}
       scopes={scopes}
       className={
         exploreDemo
