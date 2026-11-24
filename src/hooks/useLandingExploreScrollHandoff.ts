@@ -30,47 +30,91 @@ function nestedCanScroll(root: HTMLElement, target: EventTarget | null, deltaX: 
   return false;
 }
 
-/** Stage covers the visual center enough to own wheel events (optional demo lock). */
-function stageOwnsWheel(rect: DOMRect) {
-  const viewH = window.innerHeight || 1;
-  const mid = viewH * 0.45;
-  // Still approaching / leaving the demo — page keeps the wheel.
-  if (rect.top > mid || rect.bottom < mid) return false;
-  const visible = Math.min(rect.bottom, viewH) - Math.max(rect.top, 0);
-  return visible / viewH >= 0.4;
+function isGlobeWheelTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      "[data-war-room-globe], .maplibregl-canvas, .maplibregl-canvas-container, .maplibregl-map",
+    ),
+  );
 }
 
 /**
- * Homepage `#demo` explore stages:
- * - Mid-page: page keeps the wheel (don’t dive into Markets/Holders virtual lists).
- * - Stage dominant: scroll nested demo content; at edges, continue the landing page.
+ * Homepage `#demo` explore stages — explicit scroll lock:
+ * - Click / focus inside the stage: lock. Wheel on the globe zooms MapLibre;
+ *   wheel on a pane with room scrolls that pane.
+ * - Pane edge or non-scrollable demo chrome: release lock and scroll the page.
+ * - Unlocked (incl. mid-page over the stage): landing page keeps the wheel —
+ *   no sticky hijack into Markets/Holders lists.
  */
 export function useLandingExploreScrollHandoff(rootRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return undefined;
 
+    let locked = false;
+
+    const setLocked = (next: boolean) => {
+      if (locked === next) return;
+      locked = next;
+      root.dataset.landingDemoLocked = next ? "1" : "0";
+      root.dispatchEvent(
+        new CustomEvent("landing-demo-scroll-lock", {
+          detail: { locked: next },
+          bubbles: true,
+        }),
+      );
+    };
+
+    root.dataset.landingDemoLocked = "0";
+
+    const onPointerDownInside = () => {
+      setLocked(true);
+    };
+
+    const onFocusIn = () => {
+      setLocked(true);
+    };
+
+    const onDocPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && !root.contains(target)) setLocked(false);
+    };
+
     const onWheel = (event: WheelEvent) => {
       if (event.defaultPrevented) return;
       if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
 
-      const stage =
-        (root.querySelector("[data-landing-explore]") as HTMLElement | null) || root;
-      const rect = stage.getBoundingClientRect();
-
-      if (!stageOwnsWheel(rect)) {
+      // Unlocked: page owns the wheel (capture so nested lists cannot steal it).
+      if (!locked) {
         event.preventDefault();
         window.scrollBy({ top: event.deltaY, left: 0, behavior: "instant" });
         return;
       }
 
+      // Locked on the globe: leave the event for MapLibre scrollZoom.
+      if (isGlobeWheelTarget(event.target)) return;
+
+      // Locked on a scrollable pane with room: stay locked; let native scroll run.
       if (nestedCanScroll(root, event.target, event.deltaX, event.deltaY)) return;
 
+      // Pane edge or non-scrollable chrome: edge-release to the landing page.
+      setLocked(false);
       event.preventDefault();
       window.scrollBy({ top: event.deltaY, left: 0, behavior: "instant" });
     };
 
-    root.addEventListener("wheel", onWheel, { passive: false });
-    return () => root.removeEventListener("wheel", onWheel);
+    root.addEventListener("pointerdown", onPointerDownInside);
+    root.addEventListener("focusin", onFocusIn);
+    document.addEventListener("pointerdown", onDocPointerDown, true);
+    root.addEventListener("wheel", onWheel, { passive: false, capture: true });
+
+    return () => {
+      root.removeEventListener("pointerdown", onPointerDownInside);
+      root.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("pointerdown", onDocPointerDown, true);
+      root.removeEventListener("wheel", onWheel, { capture: true });
+      delete root.dataset.landingDemoLocked;
+    };
   }, [rootRef]);
 }

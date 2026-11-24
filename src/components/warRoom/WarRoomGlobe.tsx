@@ -228,10 +228,14 @@ export function WarRoomGlobe({
           fadeDuration: reduceMotion ? 0 : 300,
           canvasContextAttributes: { antialias: true },
         });
-        // Homepage embedded globe: leave wheel to the landing page (drag still pans).
+        // Homepage embedded globe: scrollZoom only while the explore stage is
+        // scroll-locked (click/focus). Unlocked → page keeps the wheel; drag still pans.
         if (keepGlobe && interactive) {
           try {
-            instance.scrollZoom?.disable?.();
+            const locked =
+              containerRef.current?.closest?.("[data-landing-demo-locked='1']") != null;
+            if (locked) instance.scrollZoom?.enable?.();
+            else instance.scrollZoom?.disable?.();
           } catch {
             /* older MapLibre */
           }
@@ -464,6 +468,47 @@ export function WarRoomGlobe({
       if (hiddenHandler) document.removeEventListener("visibilitychange", hiddenHandler);
       mapRef.current?.remove();
       mapRef.current = null;
+    };
+  }, [interactive, keepGlobe]);
+
+  // Sync MapLibre scrollZoom with homepage explore scroll-lock (`data-landing-demo-locked`).
+  useEffect(() => {
+    if (!keepGlobe || !interactive) return undefined;
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    const syncScrollZoom = () => {
+      const map = mapRef.current;
+      if (!map) return;
+      const locked = container.closest("[data-landing-demo-locked='1']") != null;
+      try {
+        if (locked) map.scrollZoom?.enable?.();
+        else map.scrollZoom?.disable?.();
+      } catch {
+        /* older MapLibre */
+      }
+    };
+
+    syncScrollZoom();
+
+    const onLockEvent = () => syncScrollZoom();
+    document.addEventListener("landing-demo-scroll-lock", onLockEvent);
+
+    const host =
+      container.closest("[data-landing-demo-locked]") ||
+      container.closest("#demo") ||
+      container.parentElement;
+    const observer =
+      host && typeof MutationObserver !== "undefined"
+        ? new MutationObserver(syncScrollZoom)
+        : null;
+    if (host && observer) {
+      observer.observe(host, { attributes: true, attributeFilter: ["data-landing-demo-locked"] });
+    }
+
+    return () => {
+      document.removeEventListener("landing-demo-scroll-lock", onLockEvent);
+      observer?.disconnect();
     };
   }, [interactive, keepGlobe]);
 
