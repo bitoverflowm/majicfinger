@@ -40,16 +40,6 @@ export async function launchShellProduct({ id, userId }) {
     return { ok: true, href: "/war-room" };
   }
 
-  if (id === "new-dashboard") {
-    const created = await createWorkspaceProject({ name: "Untitled", kind: "dashboard" });
-    if (!created.ok) return { ok: false, status: created.status, message: created.message };
-    rememberWorkspaceProject(userId, { id: created.data.id, scope: created.data.localScope });
-    const href = dashboardUrlForProject(created.data.id);
-    const next = new URL(href, typeof window !== "undefined" ? window.location.origin : "http://localhost");
-    next.searchParams.set("connect", "1");
-    return { ok: true, href: `${next.pathname}${next.search}` };
-  }
-
   if (id === "integrations") {
     const created = await createWorkspaceProject({ name: "Integrations", kind: "dashboard" });
     if (!created.ok) return { ok: false, status: created.status, message: created.message };

@@ -483,9 +483,9 @@ export default function ProjectsView({ user }) {
           <div className="md:hidden">
             <ProjectsAlertsBell user={user} />
           </div>
-          <Button size="sm" onClick={createDashboard} disabled={creating} className="h-8 gap-1.5 bg-[#0d99ff] text-[13px] text-white hover:bg-[#0b87e0] xl:hidden">
+          <Button size="sm" onClick={createDashboard} disabled={creating} className="h-8 gap-1.5 bg-[#0d99ff] text-[13px] text-white hover:bg-[#0b87e0]">
             {creating ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Plus className="size-3.5" aria-hidden />}
-            New
+            New dashboard
           </Button>
         </header>
 

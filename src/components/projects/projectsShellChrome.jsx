@@ -14,7 +14,6 @@ import {
   LogOut,
   Moon,
   Newspaper,
-  Plus,
   Sun,
   Users,
   Plug,
@@ -48,7 +47,6 @@ const PRODUCT_TABS = [
   { id: "present", label: "The Present", icon: LayoutDashboard, tint: "text-[#f24e1e]", chip: "bg-[#f24e1e]/15" },
   { id: "markets", label: "Markets", icon: LineChart, tint: "text-[#14ae5c]", chip: "bg-[#14ae5c]/15" },
   { id: "holders", label: "Holders", icon: Users, tint: "text-[#e6a919]", chip: "bg-[#e6a919]/15" },
-  { id: "new-dashboard", label: "New Dashboard", icon: Plus, tint: "text-neutral-700 dark:text-neutral-100", chip: "bg-neutral-500/15", prefix: "+" },
   { id: "integrations", label: "Integrations", icon: Plug, tint: "text-[#0d99ff]", chip: "bg-[#0d99ff]/12" },
 ];
 
@@ -253,7 +251,6 @@ export function ProjectsProductTabs({ userId, onMembershipRequired }) {
       <div role="toolbar" aria-label="Lychee products" className="hidden items-center gap-1.5 xl:flex">
         {PRODUCT_TABS.map((tab) => {
           const Icon = tab.icon;
-          const label = tab.prefix ? `${tab.prefix} ${tab.label}` : tab.label;
           return (
             <button
               key={tab.id}
@@ -265,7 +262,7 @@ export function ProjectsProductTabs({ userId, onMembershipRequired }) {
               <span className={cn("inline-flex size-5 items-center justify-center rounded-md", tab.chip, tab.tint)}>
                 <Icon className="size-3" aria-hidden />
               </span>
-              <span className="whitespace-nowrap">{busyId === tab.id ? "Opening…" : label}</span>
+              <span className="whitespace-nowrap">{busyId === tab.id ? "Opening…" : tab.label}</span>
             </button>
           );
         })}
@@ -284,7 +281,6 @@ export function ProjectsProductTabs({ userId, onMembershipRequired }) {
         <DropdownMenuContent align="end" className="w-56">
           {PRODUCT_TABS.map((tab) => {
             const Icon = tab.icon;
-            const label = tab.prefix ? `${tab.prefix} ${tab.label}` : tab.label;
             return (
               <DropdownMenuItem
                 key={tab.id}
@@ -298,7 +294,7 @@ export function ProjectsProductTabs({ userId, onMembershipRequired }) {
                 <span className={cn("inline-flex size-5 items-center justify-center rounded-md", tab.chip, tab.tint)}>
                   <Icon className="size-3" aria-hidden />
                 </span>
-                {busyId === tab.id ? "Opening…" : label}
+                {busyId === tab.id ? "Opening…" : tab.label}
               </DropdownMenuItem>
             );
           })}
