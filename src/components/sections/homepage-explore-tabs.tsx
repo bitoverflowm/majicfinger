@@ -149,6 +149,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
         <div role="tablist" aria-label="Explore Lychee" className="flex flex-wrap gap-2">
           {TABS.map((item) => {
             const selected = tab === item.id;
+            const showAlpha = selected && item.id === "war-room";
             return (
               <button
                 key={item.id}
@@ -157,13 +158,21 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
                 aria-selected={selected}
                 onClick={() => onSelectExploreTab(item.id)}
                 className={cn(
-                  "rounded-full px-4 py-1.5 text-sm font-medium transition",
+                  "inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition",
                   selected
                     ? "bg-foreground text-background"
                     : "bg-muted text-muted-foreground hover:text-foreground",
                 )}
               >
                 {item.label}
+                {showAlpha ? (
+                  <span
+                    className="inline-flex h-[18px] items-center rounded-full border border-background/30 px-1.5 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-background/85"
+                    aria-label="Alpha"
+                  >
+                    Alpha
+                  </span>
+                ) : null}
               </button>
             );
           })}
