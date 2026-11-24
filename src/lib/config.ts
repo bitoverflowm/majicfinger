@@ -141,7 +141,6 @@ export const siteConfig = {
   },
   ctaSection: {
     title: "Get started with Lychee.",
-    subtext: "Free to explore here · Jarvis included in every paid plan at launch",
   },
   footerLinks: [
     {
