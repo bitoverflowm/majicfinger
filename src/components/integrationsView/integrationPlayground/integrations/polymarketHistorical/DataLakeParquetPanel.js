@@ -3508,7 +3508,7 @@ export default function DataLakeParquetPanel({
         if (composeAthenaRowLimit != null) {
           composeAthenaRowLimit = Math.min(composeAthenaRowLimit, ATHENA_DEMO_ROW_LIMIT);
         } else if (!randomSampleEnabled) {
-          // Always send the demo cap so guided Historical hubs cannot fall through to the 100-row sample default.
+          // Demo budget matches subscriber ceiling (no teaser sample default).
           composeAthenaRowLimit = ATHENA_DEMO_ROW_LIMIT;
         }
       }
