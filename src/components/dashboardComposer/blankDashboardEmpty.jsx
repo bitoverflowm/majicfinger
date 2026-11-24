@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { connectHomeAnySheetHasData } from "@/lib/connectHomePullDestination";
+import { isLandingExploreSurface } from "@/lib/landingDemoExplore";
 import { cn } from "@/lib/utils";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
@@ -57,6 +58,8 @@ export function BlankDashboardEmpty() {
   const ctx = useMyStateV2();
   const canChart = connectHomeAnySheetHasData(ctx?.dataSheets, ctx?.connectedData);
 
+  // Homepage `#demo` explore is a closed loop — never offer freeform Add sheet / Chart / Integration.
+  if (ctx?.landingDemo && isLandingExploreSurface(ctx?.landingDemoSurface)) return null;
   if (!canvas?.ready || canvas?.runFeed || (canvas?.blocks || []).length > 0) return null;
 
   return (
@@ -111,17 +114,32 @@ export function WorkspaceTabsLayer({ viewing, navChromeExpanded, connectHome }) 
   const connect = useIntegrationConnect();
   const ctx = useMyStateV2();
   const landingDemo = !!ctx?.landingDemo;
-  const active = (ctx?.workspaceStartTabs || []).find((tab) => tab.id === ctx?.activeWorkspaceStartTabId);
+  const surface = ctx?.landingDemoSurface;
+  const exploreDemo = landingDemo && isLandingExploreSurface(surface);
+  const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
+  const active = tabs.find((tab) => tab.id === ctx?.activeWorkspaceStartTabId);
   // Landing demo: the canvas is always the home view; the picker floats over it from dashBody.
   const landingCanvas = landingDemo && viewing === "connectDataHome";
   const landingConnect = landingCanvas && !!connect?.inlineOpen;
   const canvasTab = viewing === "welcome" || landingCanvas;
   // A terminal tab is empty only until its panels are laid out, unless the user cleared it.
   const terminalLayingOut = !!active?.terminal && !active.terminalLayout?.edited;
+  // Explore guests never see the blank-dashboard create card (Add sheet / Chart / Integration).
   const showEmpty =
-    canvasTab && !landingConnect && !terminalLayingOut && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
+    !exploreDemo &&
+    canvasTab &&
+    !landingConnect &&
+    !terminalLayingOut &&
+    !!canvas?.ready &&
+    !(canvas?.blocks || []).length &&
+    !canvas?.runFeed;
   const cover = !canvasTab;
   const openTabs = () => ctx?.setViewing?.("welcome");
+
+  // Markets / Holders: self-contained terminal on the canvas — no WorkspaceTabsLayer chrome.
+  if (exploreDemo && (surface === "markets" || surface === "holders")) return null;
+  // Historical / Present: layer only when a recipe spawned multiple content tabs; never empty chrome.
+  if (exploreDemo && (surface === "historical" || surface === "present") && tabs.length <= 1) return null;
 
   return (
     <div

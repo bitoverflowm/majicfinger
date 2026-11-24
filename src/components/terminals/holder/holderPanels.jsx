@@ -229,6 +229,11 @@ export function HolderHost({ tab, customized = false, onTop, selectTab, children
         if (!host?.id || !shown || !state) return;
         const result = exploreFromTerminal({ ctx: state, tabId: host.id, accountId, keepHost });
         if (!result) return;
+        // Demo Markets/Holders clear the subject in place — no moved-tab tip / second tab.
+        if (result.cleared) {
+          toTop?.();
+          return;
+        }
         const moved = result.exploreId === host.id;
         setViewTip({ hostId: result.exploreId, tabId: result.viewId, kind: shown.kind, moved });
         if (moved) toTop?.();

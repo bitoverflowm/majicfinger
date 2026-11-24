@@ -138,9 +138,8 @@ const NewsLiveBuild = dynamic(
 /** Homepage Historical tab: only these recipes in the sidebar. */
 const HISTORICAL_RECIPE_IDS = ["kalshiTradeHistory", "polymarketTradeHistory"];
 
-/** Homepage Present tab: Holder Terminal + Polymarket Holder Analysis only. */
+/** Homepage Present tab: Polymarket Holder Analysis recipe only (no Holder Terminal shell). */
 const PRESENT_RECIPE_IDS = ["polymarketHolderAnalysis"];
-const PRESENT_TERMINAL_IDS = ["holder"];
 
 /** Synthetic picker row — Historical surface only (not on Present or the real dashboard). */
 const HISTORICAL_NEWS_ROW = {
@@ -697,7 +696,7 @@ function IntegrationConnectFlow({
     : presentSurface
       ? PRESENT_RECIPE_IDS
       : null;
-  const sidebarTerminalIds = presentSurface ? PRESENT_TERMINAL_IDS : null;
+  const sidebarTerminalIds = null;
 
   useEffect(() => {
     prefetchIntegrationPreviews();
@@ -753,7 +752,8 @@ function IntegrationConnectFlow({
 
   const openTerminal = (id) => {
     if (historicalSurface) return;
-    if (presentSurface && !PRESENT_TERMINAL_IDS.includes(id)) return;
+    // Present explore ends on recipe content only — never open Holder Terminal dashboard shell.
+    if (presentSurface) return;
     window.clearTimeout(previewTimer.current);
     setPreviewRecipeId(null);
     connect?.close?.();
@@ -807,7 +807,7 @@ function IntegrationConnectFlow({
           onOpenTerminal={openTerminal}
           recipeIds={sidebarRecipeIds}
           terminalIds={sidebarTerminalIds}
-          hideTerminals={historicalSurface}
+          hideTerminals={historicalSurface || presentSurface}
           className="hidden w-1/4 shrink-0 md:flex"
         />
         <Recipe onBack={() => changePhase("pick")} Title={Title} Description={Description} />
@@ -824,7 +824,7 @@ function IntegrationConnectFlow({
           expanded={Boolean(previewRecipeId)}
           recipeIds={sidebarRecipeIds}
           terminalIds={sidebarTerminalIds}
-          hideTerminals={historicalSurface}
+          hideTerminals={historicalSurface || presentSurface}
           className="hidden w-1/4 shrink-0 md:flex"
         />
         <RecipePreviewPanel recipeId={previewRecipeId} onOpen={openRecipe} onOpenTerminal={openTerminal} onHover={previewRecipe} />
@@ -1102,6 +1102,23 @@ export function IntegrationConnectProvider({ children, inlineStart = false, inli
   const [inlineOpen, setInlineOpen] = useState(inlineStart);
   /** Set from `/dashboard?recipe=` or `?integration=` (members arriving from a site demo); first open only. */
   const [arrival, setArrival] = useState(null);
+
+  // Homepage explore demos: allow a closed-loop reset / Playwright close without a modal X.
+  useEffect(() => {
+    if (!inlineOnly) return undefined;
+    const close = () => {
+      setOpen(false);
+      setInlineOpen(false);
+      setArrival(null);
+    };
+    const openInline = () => setInlineOpen(true);
+    window.addEventListener("lychee:landing-demo-connect-close", close);
+    window.addEventListener("lychee:landing-demo-connect-open", openInline);
+    return () => {
+      window.removeEventListener("lychee:landing-demo-connect-close", close);
+      window.removeEventListener("lychee:landing-demo-connect-open", openInline);
+    };
+  }, [inlineOnly]);
 
   useEffect(() => {
     if (inlineOnly) return;

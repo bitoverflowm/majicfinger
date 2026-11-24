@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { cn } from "@/lib/utils";
+import { isLandingExploreSurface } from "@/lib/landingDemoExplore";
 import {
   WELCOME_START_TAB_ID,
   duplicateTabName,
@@ -235,13 +236,19 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
   );
 }
 
-/** Homepage explore demos: no workspace tab strip (Historical/Present always; Markets/Holders until a 2nd tab). */
+/**
+ * Homepage explore demos: hide the workspace tab strip unless a recipe naturally
+ * spawned multiple content tabs (Historical / Present). Markets / Holders stay
+ * terminal-only — never show dashboard tab chrome.
+ */
 export function hideLandingExploreTabChrome(context, tabs = context?.workspaceStartTabs) {
   if (!context?.landingDemo) return false;
   const surface = context?.landingDemoSurface;
-  if (surface === "historical" || surface === "present") return true;
-  if (surface !== "markets" && surface !== "holders") return false;
-  return !Array.isArray(tabs) || tabs.length <= 1;
+  if (surface === "markets" || surface === "holders") return true;
+  if (surface === "historical" || surface === "present") {
+    return !Array.isArray(tabs) || tabs.length <= 1;
+  }
+  return false;
 }
 
 export function WorkspaceStartTabs({ tabsActive, onOpenTabs }) {
@@ -250,7 +257,8 @@ export function WorkspaceStartTabs({ tabsActive, onOpenTabs }) {
   const sessionUser = useUser();
   const tabs = Array.isArray(context?.workspaceStartTabs) ? context.workspaceStartTabs : [];
   const activeId = context?.activeWorkspaceStartTabId;
-  const exploreDemo = context?.landingDemo && (context?.landingDemoSurface === "markets" || context?.landingDemoSurface === "holders");
+  // Rigid explore loop: never a freeform "+" tab on Historical / Present / Markets / Holders.
+  const exploreDemo = !!context?.landingDemo && isLandingExploreSurface(context?.landingDemoSurface);
 
   const selectTab = (id) => {
     if (canvas?.requestTab) {

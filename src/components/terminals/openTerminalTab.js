@@ -1,3 +1,4 @@
+import { isLandingTerminalExploreSurface } from "@/lib/landingDemoExplore";
 import { findTerminal, sanitizeTerminalSubject, terminalSubjectTabName, terminalTabName } from "@/lib/workspaceTerminals";
 import { newStartTabId, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 
@@ -58,6 +59,8 @@ export function terminalProjectDraft(terminalId, subject = null) {
  * already has one, that's where to go and `tabId` stays as it is. Otherwise `tabId` becomes
  * the explore tab and the subject it was showing moves to a new tab right after it.
  * Returns `{ exploreId, viewId }`: the explore tab, and the tab now showing the subject.
+ *
+ * Homepage Markets / Holders demos stay single-tab: clear the subject in place (no 2nd tab).
  */
 export function exploreFromTerminal({ ctx, tabId, accountId, keepHost = false }) {
   const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
@@ -66,6 +69,17 @@ export function exploreFromTerminal({ ctx, tabId, accountId, keepHost = false })
   const terminal = findTerminal(host?.terminal);
   const subject = sanitizeTerminalSubject(host?.terminalSubject);
   if (!host || !terminal || !subject) return null;
+  // Closed demo loop: Markets / Holders never spawn a dashboard-style second tab.
+  if (ctx?.landingDemo && isLandingTerminalExploreSurface(ctx?.landingDemoSurface)) {
+    const explore = {
+      ...host,
+      name: terminalTabName(terminal.title, tabs.filter((tab) => tab.id !== tabId).map((tab) => tab.name)),
+    };
+    delete explore.terminalSubject;
+    delete explore.terminalLayout;
+    commitTabs(ctx, tabs.map((tab) => (tab.id === tabId ? explore : tab)), accountId, tabId);
+    return { exploreId: tabId, viewId: tabId, cleared: true };
+  }
   const existing = tabs.find((tab) => tab.id !== tabId && tab.terminal === terminal.id && !sanitizeTerminalSubject(tab.terminalSubject));
   if (existing) return { exploreId: existing.id, viewId: tabId };
   if (keepHost) {
@@ -95,21 +109,34 @@ export function placeTerminalSubjects({ ctx, tabId, subjects, accountId, keepHos
   const terminal = findTerminal(host?.terminal);
   const clean = (subjects || []).map(sanitizeTerminalSubject).filter(Boolean);
   if (!host || !terminal || !clean.length) return [];
-  if (keepHost) {
-    const opened = clean.map((subject) => terminalTab(terminal, subject, []));
-    commitTabs(ctx, [...tabs.slice(0, index + 1), ...opened, ...tabs.slice(index + 1)], accountId, opened[0].id);
-    return opened.map((tab) => tab.id);
+  // Homepage Markets / Holders: one terminal tab only — take the first subject in place.
+  const demoTerminal = ctx?.landingDemo && isLandingTerminalExploreSurface(ctx?.landingDemoSurface);
+  if (demoTerminal || !keepHost) {
+    const [first, ...rest] = clean;
+    if (demoTerminal) {
+      commitTabs(
+        ctx,
+        tabs.map((tab) =>
+          tab.id === tabId ? { ...tab, terminalSubject: first, name: terminalSubjectTabName(first, terminal.title) } : tab,
+        ),
+        accountId,
+        tabId,
+      );
+      return [tabId];
+    }
+    const added = rest.map((subject) => terminalTab(terminal, subject, []));
+    const nextTabs = [
+      ...tabs.map((tab) =>
+        tab.id === tabId ? { ...tab, terminalSubject: first, name: terminalSubjectTabName(first, terminal.title) } : tab,
+      ),
+      ...added,
+    ];
+    commitTabs(ctx, nextTabs, accountId, tabId);
+    return [tabId, ...added.map((tab) => tab.id)];
   }
-  const [first, ...rest] = clean;
-  const added = rest.map((subject) => terminalTab(terminal, subject, []));
-  const nextTabs = [
-    ...tabs.map((tab) =>
-      tab.id === tabId ? { ...tab, terminalSubject: first, name: terminalSubjectTabName(first, terminal.title) } : tab,
-    ),
-    ...added,
-  ];
-  commitTabs(ctx, nextTabs, accountId, tabId);
-  return [tabId, ...added.map((tab) => tab.id)];
+  const opened = clean.map((subject) => terminalTab(terminal, subject, []));
+  commitTabs(ctx, [...tabs.slice(0, index + 1), ...opened, ...tabs.slice(index + 1)], accountId, opened[0].id);
+  return opened.map((tab) => tab.id);
 }
 
 /** Merges `patch(tab)` into one terminal tab, leaving the rest and the active tab alone. */

@@ -33,6 +33,7 @@ import { useFeatureTipDismissal } from "@/components/ui/feature-tip";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { isLandingExploreSurface, isLandingTerminalExploreSurface } from "@/lib/landingDemoExplore";
 import {
   WELCOME_START_TAB_ID,
   defaultStartTab,
@@ -1167,6 +1168,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
 
   const addBlock = useCallback(
     (type) => {
+      // Homepage explore: no freeform Add sheet / Chart / Text on the guest canvas.
+      if (ctx?.landingDemo && isLandingExploreSurface(ctx?.landingDemoSurface)) return;
       const size = BLOCK_SIZE[type] || BLOCK_SIZE.text;
       const copy = BLOCK_COPY[type] || BLOCK_COPY.text;
       const id = newId();
@@ -1195,7 +1198,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
         setRevealNonce((nonce) => nonce + 1);
       }
     },
-    [pageId],
+    [ctx?.landingDemo, ctx?.landingDemoSurface, pageId],
   );
 
   /** A fitted terminal panel's content changed height: resize it and move what's below with it. */
@@ -1283,6 +1286,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
 
   const createChartFromBlock = useCallback(
     (id, forcedView) => {
+      // Homepage explore: recipe-placed charts only — no freeform Create chart.
+      if (ctx?.landingDemo && isLandingExploreSurface(ctx?.landingDemoSurface)) return;
       const sheet = blocks.find((block) => block.id === id && block.type === "sheet");
       if (!sheet) return;
       const base = String(sheet.title || "Sheet").replace(/\s+chart$/, "").trim() || "Sheet";
@@ -1310,7 +1315,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
       setSelectedId(chartId);
       setTool("select");
     },
-    [blocks, pageId],
+    [blocks, ctx?.landingDemo, ctx?.landingDemoSurface, pageId],
   );
 
   const chartRunLock = useRef(false);
@@ -2407,8 +2412,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const canvas = useWorkspaceCanvas();
   const ctxDemo = useMyStateV2();
   const landingDemo = !!ctxDemo?.landingDemo;
-  const exploreHolderDemo =
-    landingDemo && (ctxDemo?.landingDemoSurface === "markets" || ctxDemo?.landingDemoSurface === "holders");
+  const exploreDemo = landingDemo && isLandingExploreSurface(ctxDemo?.landingDemoSurface);
+  const exploreHolderDemo = landingDemo && isLandingTerminalExploreSurface(ctxDemo?.landingDemoSurface);
   /** Markets / Holders demo: search is just the bar — no card chrome. */
   const framelessSearch = exploreHolderDemo && block.panel === "search";
   const readOnly = !!canvas?.readOnly || locked;
@@ -2790,13 +2795,15 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
           ) : null}
           {block.type === "sheet" ? (
             <>
-              <DropdownMenuItem
-                className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
-                onSelect={() => canvas?.createChartFromBlock?.(block.id)}
-              >
-                <BarChart3 className="size-4 text-muted-foreground" />
-                {createLabel}
-              </DropdownMenuItem>
+              {exploreDemo ? null : (
+                <DropdownMenuItem
+                  className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
+                  onSelect={() => canvas?.createChartFromBlock?.(block.id)}
+                >
+                  <BarChart3 className="size-4 text-muted-foreground" />
+                  {createLabel}
+                </DropdownMenuItem>
+              )}
               {hasVisualTable(sheetDataset) ? (
                 block.visualReady ? (
                   <div
@@ -2996,8 +3003,7 @@ export function WorkspaceCanvas() {
   const pageTabId = tabIdFromPage(canvas?.pageId);
   const pageTab = ((canvas?.readOnly ? canvas?.previewTabs : ctx?.workspaceStartTabs) || []).find((tab) => tab?.id === pageTabId) || null;
   const exploreHolderCanvas =
-    !!ctx?.landingDemo &&
-    (ctx?.landingDemoSurface === "markets" || ctx?.landingDemoSurface === "holders");
+    !!ctx?.landingDemo && isLandingTerminalExploreSurface(ctx?.landingDemoSurface);
   // A preview keeps the layouts it works out here, since it saves nothing.
   const [previewLayouts, setPreviewLayouts] = useState({});
   const previewLayout = canvas?.readOnly && pageTab ? previewLayouts[pageTab.id] : null;

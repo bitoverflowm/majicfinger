@@ -20,6 +20,7 @@ import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas"
 import { WorkspaceTabsLayer } from "@/components/dashboardComposer/blankDashboardEmpty";
 import { hideLandingExploreTabChrome } from "@/components/dashboardComposer/workspaceStartTabBar";
 import { IntegrationConnectLandingDemo } from "@/components/dashboardComposer/integrationConnectDialog";
+import { LandingExploreConnectBack } from "@/components/dashboardComposer/landingExploreConnectBack";
 import FigmaNavChrome from "./components/figmaNavChrome";
 import { cn } from "@/lib/utils";
 import { PROJECT_THUMBNAIL_ROOT } from "@/lib/projectThumbnail";
@@ -586,22 +587,25 @@ const DashBody = ({ user }) => {
                 </div>}
         </div>
         {contextStateV2?.landingDemo && (
-          <IntegrationConnectLandingDemo
-            active={
-              !!contextStateV2?.landingDemoActive &&
-              !isLandingExploreSurface(contextStateV2?.landingDemoSurface)
-            }
-            initialIntegrationId={contextStateV2?.landingDemoIntegration}
-            onSelectIntegration={(integrationId) => {
-              // Explore tabs stay inline in `#demo`; framed guide demos still expand.
-              if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
-              contextStateV2?.activateLandingDemo?.({ integrationId });
-            }}
-            onOpenRecipe={(recipeId) => {
-              if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
-              contextStateV2?.activateLandingDemo?.({ recipeId });
-            }}
-          />
+          <>
+            <LandingExploreConnectBack />
+            <IntegrationConnectLandingDemo
+              active={
+                !!contextStateV2?.landingDemoActive &&
+                !isLandingExploreSurface(contextStateV2?.landingDemoSurface)
+              }
+              initialIntegrationId={contextStateV2?.landingDemoIntegration}
+              onSelectIntegration={(integrationId) => {
+                // Explore tabs stay inline in `#demo`; framed guide demos still expand.
+                if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
+                contextStateV2?.activateLandingDemo?.({ integrationId });
+              }}
+              onOpenRecipe={(recipeId) => {
+                if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
+                contextStateV2?.activateLandingDemo?.({ recipeId });
+              }}
+            />
+          </>
         )}
       </WorkspaceComposerDockProvider>
     );
