@@ -2728,14 +2728,17 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
           : "overflow-hidden rounded-xl border bg-background shadow-sm",
         locked ? "pointer-events-none select-none blur-[6px] saturate-[0.85]" : "pointer-events-auto",
         block.arrive && (block.branch ? "lychee-sheet-branch" : "lychee-sheet-arrive"),
-        !framelessSearch && (calmBorder ? "border-border/70" : "group/block"),
+        // Homepage `#demo` keeps a quiet border but still needs `group/block` so the ⋮ menu
+        // reveals on hover like the full dashboard (conversion CTAs come later).
+        !framelessSearch && (readOnly ? "border-border/70" : "group/block"),
         !framelessSearch &&
-          !calmBorder &&
-          (spotlight
-            ? "border-emerald-500 ring-2 ring-emerald-400/80"
-            : selected
-              ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
-              : "border-border/70 hover:border-[#0d99ff]"),
+          (calmBorder
+            ? "border-border/70"
+            : spotlight
+              ? "border-emerald-500 ring-2 ring-emerald-400/80"
+              : selected
+                ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
+                : "border-border/70 hover:border-[#0d99ff]"),
         panelClassName(block),
       )}
       style={{
