@@ -293,7 +293,7 @@ export async function startAthenaBoundedQuery({
     const sampleSizeParsed = parseRandomSampleSize(compose?.randomSample?.size, {
       maxSize: demo ? ATHENA_DEMO_ROW_LIMIT : undefined,
     });
-    // Demo embeds use a smaller cap so marketing visitors see a tiny sample only.
+    // Demo uses the subscriber row budget (full trade history for charts), not a teaser sample.
     const capRows = demo
       ? ATHENA_DEMO_ROW_LIMIT
       : typeof composeSqlCap === "number" && Number.isFinite(composeSqlCap)
@@ -309,10 +309,10 @@ export async function startAthenaBoundedQuery({
     if (sampleSizeParsed != null) {
       // Eligible population must not be pre-limited; sample LIMIT is applied by the wrapper.
       sqlLimit = null;
-    } else if (demo) {
-      sqlLimit = ATHENA_DEMO_ROW_LIMIT;
     } else if (explicitLimit != null) {
       sqlLimit = Math.min(capRows, explicitLimit);
+    } else if (demo) {
+      sqlLimit = ATHENA_DEMO_ROW_LIMIT;
     } else if (unlimitedComposeRows) {
       sqlLimit = null;
     } else {

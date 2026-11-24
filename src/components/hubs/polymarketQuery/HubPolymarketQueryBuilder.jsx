@@ -704,7 +704,7 @@ export function HubPolymarketQueryBuilder({
                 prediction market research.
               </p>
               <p className="text-[11px] leading-snug text-muted-foreground">
-                Public demo preview · up to 100 rows per query in the full workspace.
+                Public demo preview in the full workspace.
               </p>
             </div>
 

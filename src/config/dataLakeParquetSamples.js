@@ -77,11 +77,11 @@ export const CHART_RENDER_ROW_CAP = 20000;
 export const SHEET_GRID_PAGE_SIZE = 100;
 
 /**
- * Row cap for embedded demo (`body.demo` / `isDemo`) — Polymarket & Kalshi historical pulls
- * (landing `#demo` + guided hubs). Matches the free sample cap so trade history / joins are
- * usable in the demo; the old 10-row teaser was too small for charts.
+ * Row budget for embedded demo (`body.demo` / `isDemo`) — Polymarket & Kalshi historical pulls
+ * (landing `#demo` + guided hubs). Same ceiling as paid subscriber pulls so trade-history
+ * charts are full; there is no teaser 10/100-row demo cap.
  */
-export const ATHENA_DEMO_ROW_LIMIT = ATHENA_SAMPLE_ROW_LIMIT;
+export const ATHENA_DEMO_ROW_LIMIT = ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT;
 
 /**
  * @typedef {"polymarket" | "kalshi"} DataLakeDataset
