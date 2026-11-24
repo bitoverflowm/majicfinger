@@ -478,7 +478,11 @@ const DashBody = ({ user }) => {
         <div
           {...{ [PROJECT_THUMBNAIL_ROOT]: "" }}
           className={cn(
-            "relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1",
+            "relative z-0 flex min-w-0 flex-col py-1",
+            // Homepage `#demo` explore: grow with WorkspaceCanvas sheets instead of a clipped flex child.
+            contextStateV2?.landingDemo && isLandingExploreSurface(contextStateV2?.landingDemoSurface)
+              ? "min-h-[max(32rem,min(88svh,58rem))] h-auto w-full"
+              : "min-h-0 flex-1",
             hideLandingExploreTabChrome(contextStateV2)
               ? "[--dashboard-tab-clearance:0px]"
               : "[--dashboard-tab-clearance:2.75rem]",
@@ -615,7 +619,16 @@ const DashBody = ({ user }) => {
     }
 
     return isDemo ? (
-      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col",
+          contextStateV2?.landingDemo && isLandingExploreSurface(contextStateV2?.landingDemoSurface)
+            ? "min-h-[max(32rem,min(88svh,58rem))] h-auto"
+            : "h-full min-h-0",
+        )}
+      >
+        {content}
+      </div>
     ) : (
       <div className="relative flex min-h-svh min-w-0 flex-col bg-[#f5f5f5] dark:bg-[#1e1e1e]">
         <div

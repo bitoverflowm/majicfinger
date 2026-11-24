@@ -7,7 +7,7 @@ export const POLYMARKET_HISTORICAL_EXPLORE_SECTION = {
   anchorId: "explore-data",
   title: "Explore Polymarket Historical Data Without Writing Code",
   description:
-    "Choose a historical table, apply filters, select the fields you need, and preview real rows. Start with one market or build a multi-market query, then continue in the full workspace when you are ready to join, transform, chart, backtest, or export. Public demo preview · up to 10 rows per query.",
+    "Choose a historical table, apply filters, select the fields you need, and preview real rows. Start with one market or build a multi-market query, then continue in the full workspace when you are ready to join, transform, chart, backtest, or export. Public demo preview · up to 100 rows per query.",
 } as const;
 
 const EXPLORE_HISTORICAL = {

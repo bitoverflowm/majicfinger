@@ -18,18 +18,24 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-/** Full-bleed stage shared by War Room + Historical / Present / Markets / Holders. */
-const DEMO_STAGE_CLASS =
-  "relative left-1/2 h-[min(88svh,58rem)] min-h-[32rem] w-screen max-w-[100vw] -translate-x-1/2 overflow-hidden";
+/** Floor for every explore stage (War Room stays fixed at this size). */
+const DEMO_STAGE_FLOOR =
+  "min-h-[max(32rem,min(88svh,58rem))] w-screen max-w-[100vw] relative left-1/2 -translate-x-1/2";
+
+/** War Room globe needs a fixed viewport + clipped overflow. */
+const WAR_ROOM_STAGE_CLASS = cn(DEMO_STAGE_FLOOR, "h-[min(88svh,58rem)] overflow-hidden bg-black");
 
 /**
- * Terminal demo surface — slightly off the page background in both themes so the stage
- * reads as its own panel (light: soft gray; dark: deeper than page `bg-background`).
+ * Historical / Present / Markets / Holders — floor matches the old mockup height, then the
+ * outer stage grows with WorkspaceCanvas content so sheets/charts are not clipped in a short frame.
  */
-const TERMINAL_DEMO_STAGE_CLASS = cn(DEMO_STAGE_CLASS, "bg-[#f5f5f5] dark:bg-[#161616]");
+const TERMINAL_DEMO_STAGE_CLASS = cn(
+  DEMO_STAGE_FLOOR,
+  "h-auto overflow-visible bg-[#f5f5f5] dark:bg-[#161616]",
+);
 
-/** Section fills the stage — no painted backdrop, no device chrome. */
-const BARE_DEMO_SECTION_CLASS = "relative z-30 m-0 h-full w-full p-0";
+/** Section fills the stage floor, then grows with canvas content. */
+const BARE_DEMO_SECTION_CLASS = "relative z-30 m-0 min-h-[max(32rem,min(88svh,58rem))] h-auto w-full p-0";
 
 /** Anchor for Learn More / #demo — keeps explore tabs in view (not a lower-page mockup). */
 const WAR_ROOM_STAGE_ATTR = { "data-war-room-demo": true } as const;
@@ -128,11 +134,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
 
       <div className="mt-4" ref={stageRef}>
         {tab === "war-room" ? (
-          <div
-            className={cn(DEMO_STAGE_CLASS, "bg-black")}
-            data-landing-explore=""
-            {...WAR_ROOM_STAGE_ATTR}
-          >
+          <div className={WAR_ROOM_STAGE_CLASS} data-landing-explore="" {...WAR_ROOM_STAGE_ATTR}>
             <WarRoomView
               fixture={fixture}
               embedded

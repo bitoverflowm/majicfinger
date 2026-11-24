@@ -593,8 +593,8 @@ export default function DataLakeParquetPanel({
   const setGuidedWorkflowPullRequested = ctx?.setGuidedWorkflowPullRequested;
   /**
    * All demo embeds (landing dashboard + Polymarket/Kalshi Historical guided hubs)
-   * must pass `demo: true` so Athena caps at ATHENA_DEMO_ROW_LIMIT (10).
-   * Do not gate this on guidedWorkflowPull — that was letting guided demos pull 100 rows.
+   * must pass `demo: true` so Athena caps at ATHENA_DEMO_ROW_LIMIT (sample size).
+   * Do not gate this on guidedWorkflowPull — guided demos share the same demo row cap.
    */
   const demoPullMode = isDemo;
   /** Free-play demo only: clear WHERE so visitors aren't stuck on empty filters. Guided demos keep draft WHERE. */

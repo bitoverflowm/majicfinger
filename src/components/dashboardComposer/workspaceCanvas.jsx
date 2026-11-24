@@ -3446,27 +3446,41 @@ export function WorkspaceCanvas() {
     />
   ));
 
+  const contentHeight = blocks.reduce(
+    (max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + gridMetrics.bottom),
+    0,
+  );
+  const contentWidth = Math.max(
+    gridMetrics.width,
+    blocks.reduce((max, block) => Math.max(max, (block.x || 0) + (block.w || 0) + 32), 0),
+  );
+  // Homepage `#demo` explore: size to content so the outer stage can grow; do not clip in a short absolute frame.
+  const exploreGrow = landingDemo && isLandingExploreSurface(ctx?.landingDemoSurface);
+
   return (
     <>
     <div
       ref={scrollerRef}
       className={cn(
-        "pointer-events-auto absolute inset-0 z-20 overflow-auto",
+        "pointer-events-auto z-20",
+        exploreGrow
+          ? "relative w-full overflow-visible overscroll-y-auto"
+          : "absolute inset-0 overflow-auto",
         // Landing explore demos chain to the page at edges; real dashboard keeps contain.
-        landingDemo ? "overscroll-y-auto" : "overscroll-contain",
+        !exploreGrow && (landingDemo ? "overscroll-y-auto" : "overscroll-contain"),
         // Markets / Holders demos: slight canvas tint vs the stage background.
         exploreHolderCanvas && "bg-zinc-100 dark:bg-zinc-900",
       )}
-      style={canvas?.tool === "hand" ? { cursor: canvas.handDown ? "grabbing" : "grab" } : undefined}
+      style={{
+        ...(canvas?.tool === "hand" ? { cursor: canvas.handDown ? "grabbing" : "grab" } : null),
+        ...(exploreGrow ? { minHeight: "100%", height: Math.max(contentHeight, 1) } : null),
+      }}
     >
       <div
-        className="relative min-h-full min-w-full"
+        className={cn("relative min-w-full", exploreGrow ? "" : "min-h-full")}
         style={{
-          height: blocks.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + gridMetrics.bottom), 0),
-          width: Math.max(
-            gridMetrics.width,
-            blocks.reduce((max, block) => Math.max(max, (block.x || 0) + (block.w || 0) + 32), 0),
-          ),
+          height: contentHeight,
+          width: contentWidth,
         }}
       >
       <div

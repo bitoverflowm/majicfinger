@@ -49,7 +49,11 @@ const BareDashboardDemoSection = dynamic<DashboardDemoSectionProps>(
   {
     ssr: false,
     loading: () => (
-      <DashboardDemoSkeleton bare sectionId="explore-demo" className="relative z-30 m-0 h-full w-full p-0" />
+      <DashboardDemoSkeleton
+        bare
+        sectionId="explore-demo"
+        className="relative z-30 m-0 min-h-[max(32rem,min(88svh,58rem))] h-auto w-full p-0"
+      />
     ),
   },
 );
@@ -73,8 +77,8 @@ export function DashboardDemoSkeleton({
 }: Pick<DashboardDemoSectionProps, "sectionId" | "className" | "framed" | "bare">) {
   if (bare) {
     return (
-      <section id={sectionId} className={cn(className, "z-30 h-full min-h-0")}>
-        <div className="flex h-full min-h-[32rem] w-full items-center justify-center overflow-hidden bg-background">
+      <section id={sectionId} className={cn(className, "z-30 min-h-[max(32rem,min(88svh,58rem))] h-auto")}>
+        <div className="flex min-h-[max(32rem,min(88svh,58rem))] w-full items-center justify-center overflow-hidden bg-background">
           <DemoLoadingCard />
         </div>
       </section>
