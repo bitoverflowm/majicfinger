@@ -235,10 +235,11 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
   );
 }
 
-/** Homepage Markets / Holders: no tab chrome until the flow opens a second tab. */
+/** Homepage explore demos: no workspace tab strip (Historical/Present always; Markets/Holders until a 2nd tab). */
 export function hideLandingExploreTabChrome(context, tabs = context?.workspaceStartTabs) {
   if (!context?.landingDemo) return false;
   const surface = context?.landingDemoSurface;
+  if (surface === "historical" || surface === "present") return true;
   if (surface !== "markets" && surface !== "holders") return false;
   return !Array.isArray(tabs) || tabs.length <= 1;
 }

@@ -77,8 +77,18 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       ) {
         return
       }
+      // Homepage explore tabs (Historical / Present / Markets / Holders) stay inside `#demo`.
+      const surface = landingDemoSurface
+      if (
+        surface === "historical" ||
+        surface === "present" ||
+        surface === "markets" ||
+        surface === "holders"
+      ) {
+        return
+      }
       setLandingDemoActive(true)
-    }, [landingDemo, landingDemoIntegration])
+    }, [landingDemo, landingDemoIntegration, landingDemoSurface])
     const deactivateLandingDemo = useCallback(() => {
       setLandingDemoActive(false)
     }, [])

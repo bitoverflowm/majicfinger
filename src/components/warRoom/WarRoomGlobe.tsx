@@ -228,6 +228,14 @@ export function WarRoomGlobe({
           fadeDuration: reduceMotion ? 0 : 300,
           canvasContextAttributes: { antialias: true },
         });
+        // Homepage embedded globe: leave wheel to the landing page (drag still pans).
+        if (keepGlobe && interactive) {
+          try {
+            instance.scrollZoom?.disable?.();
+          } catch {
+            /* older MapLibre */
+          }
+        }
         stripAttribution(instance);
         instance.on("style.load", () => {
           stripAttribution(instance);

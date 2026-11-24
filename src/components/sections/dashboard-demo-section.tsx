@@ -16,6 +16,7 @@ import {
   subscribeLandingDemoExit,
   takeLandingDemoReturnPosition,
 } from "@/lib/landingDemoSession";
+import { isLandingExploreSurface } from "@/lib/landingDemoExplore";
 import { useUser } from "@/lib/hooks";
 import { userHasDashboardAccess } from "@/lib/membershipAccess";
 import { cn } from "@/lib/utils";
@@ -169,7 +170,9 @@ function LandingDemoStage({
   bare?: boolean;
 }) {
   const ctx = useMyStateV2();
-  const active = !!ctx?.landingDemoActive;
+  /** Explore tabs never expand into the full-viewport dashboard shell. */
+  const exploreSurface = isLandingExploreSurface(ctx?.landingDemoSurface);
+  const active = !!ctx?.landingDemoActive && !exploreSurface;
   const deactivate = ctx?.deactivateLandingDemo;
   const activate = ctx?.activateLandingDemo;
 
@@ -321,6 +324,7 @@ function LandingDemoStage({
       className={cn("relative", flush && "h-full min-h-0")}
       style={slotHeight != null ? { height: slotHeight } : undefined}
       onClickCapture={framed || flush ? undefined : activateOnClick}
+      {...(exploreSurface ? { "data-landing-explore": "" } : {})}
     >
       <DemoWindowMockup
         id="demo-mockup"
@@ -340,7 +344,7 @@ function LandingDemoStage({
         )}
       >
         {children}
-        {escHint}
+        {exploreSurface ? null : escHint}
       </DemoWindowMockup>
     </div>
   );

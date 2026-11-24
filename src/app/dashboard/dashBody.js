@@ -32,6 +32,7 @@ import {
 } from "@/lib/runYourself/hasPaidAccess";
 import { consumeRunYourselfInteractiveSession } from "@/lib/runYourself/consumeInteractiveSession";
 import { OPEN_BILLING_EVENT } from "@/lib/scrollToPricing";
+import { isLandingExploreSurface } from "@/lib/landingDemoExplore";
 
 // The homepage demo renders DashBody but none of these views up front. They carry AG Grid, xlsx,
 // BlockNote, moment-timezone and the candlestick charts, so they must stay out of DashBody's chunk.
@@ -439,7 +440,9 @@ const DashBody = ({ user }) => {
             )}
           </>
         )}
-        {contextStateV2?.landingDemoActive && (
+        {/* Homepage explore surfaces stay in `#demo` — no dashboard Sign Up/Save/Share chrome. */}
+        {contextStateV2?.landingDemoActive &&
+          !isLandingExploreSurface(contextStateV2?.landingDemoSurface) && (
           <>
             <FigmaNavChrome dashboardName="Demo Dashboard" />
             <div className="h-14 shrink-0" aria-hidden />
@@ -559,10 +562,20 @@ const DashBody = ({ user }) => {
         </div>
         {contextStateV2?.landingDemo && (
           <IntegrationConnectLandingDemo
-            active={!!contextStateV2?.landingDemoActive}
+            active={
+              !!contextStateV2?.landingDemoActive &&
+              !isLandingExploreSurface(contextStateV2?.landingDemoSurface)
+            }
             initialIntegrationId={contextStateV2?.landingDemoIntegration}
-            onSelectIntegration={(integrationId) => contextStateV2?.activateLandingDemo?.({ integrationId })}
-            onOpenRecipe={(recipeId) => contextStateV2?.activateLandingDemo?.({ recipeId })}
+            onSelectIntegration={(integrationId) => {
+              // Explore tabs stay inline in `#demo`; framed guide demos still expand.
+              if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
+              contextStateV2?.activateLandingDemo?.({ integrationId });
+            }}
+            onOpenRecipe={(recipeId) => {
+              if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
+              contextStateV2?.activateLandingDemo?.({ recipeId });
+            }}
           />
         )}
       </WorkspaceComposerDockProvider>

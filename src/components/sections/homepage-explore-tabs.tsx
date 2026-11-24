@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { WarRoomView, type WarRoomNavigateRequest } from "@/components/warRoom/WarRoomView";
 import { useWarRoomResearchDemo } from "@/components/warRoom/useWarRoomResearchDemo";
 import { DashboardDemoSectionLazy } from "@/components/sections/dashboard-demo-section-lazy";
+import { useLandingExploreScrollHandoff } from "@/hooks/useLandingExploreScrollHandoff";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -41,6 +42,8 @@ const WAR_ROOM_STAGE_ATTR = { "data-war-room-demo": true } as const;
  */
 export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) {
   const [tab, setTab] = useState<TabId>("war-room");
+  const stageRef = useRef<HTMLDivElement>(null);
+  useLandingExploreScrollHandoff(stageRef);
   const {
     marketSubject,
     holdersSubject,
@@ -123,9 +126,13 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4" ref={stageRef}>
         {tab === "war-room" ? (
-          <div className={cn(DEMO_STAGE_CLASS, "bg-black")} {...WAR_ROOM_STAGE_ATTR}>
+          <div
+            className={cn(DEMO_STAGE_CLASS, "bg-black")}
+            data-landing-explore=""
+            {...WAR_ROOM_STAGE_ATTR}
+          >
             <WarRoomView
               fixture={fixture}
               embedded
@@ -136,7 +143,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
         ) : null}
 
         {showPast ? (
-          <div className={TERMINAL_DEMO_STAGE_CLASS}>
+          <div className={TERMINAL_DEMO_STAGE_CLASS} data-landing-explore="">
             <DashboardDemoSectionLazy
               key="terminal-demo-past"
               force
@@ -149,7 +156,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
         ) : null}
 
         {showPresent ? (
-          <div className={TERMINAL_DEMO_STAGE_CLASS}>
+          <div className={TERMINAL_DEMO_STAGE_CLASS} data-landing-explore="">
             <DashboardDemoSectionLazy
               key="terminal-demo-present"
               force
@@ -162,7 +169,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
         ) : null}
 
         {showMarkets ? (
-          <div className={TERMINAL_DEMO_STAGE_CLASS}>
+          <div className={TERMINAL_DEMO_STAGE_CLASS} data-landing-explore="">
             <DashboardDemoSectionLazy
               key={`markets-${marketSubject?.conditionId || "explore"}`}
               force
@@ -177,7 +184,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
         ) : null}
 
         {showHolders ? (
-          <div className={TERMINAL_DEMO_STAGE_CLASS}>
+          <div className={TERMINAL_DEMO_STAGE_CLASS} data-landing-explore="">
             <DashboardDemoSectionLazy
               key={`holders-${holdersKey}`}
               force
