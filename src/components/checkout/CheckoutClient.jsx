@@ -176,7 +176,7 @@ function planDisplay(summary) {
     return {
       name: current.name,
       description: current.description,
-      includesLabel: current.includesLabel && current.includesLabel !== "All features in Free +" ? current.includesLabel : "",
+      includesLabel: current.includesLabel || "",
       features: (current.features || []).map((feature) => feature.text),
       legacy: false,
     };

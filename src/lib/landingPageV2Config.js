@@ -26,21 +26,6 @@ export const landingPageV2Config = {
    */
   plans: [
     {
-      tier: "free",
-      name: "Free",
-      description: "Explore Lychee before committing. No account or credit card required to try.",
-      price: 0,
-      note: "Free for everyone",
-      buttonText: "Try for free",
-      href: "/#demo",
-      venuesLabel: "All your venues",
-      features: [
-        { icon: "rows", text: "Pull up to **100 rows per data sheet**" },
-        { icon: "chart", text: "Try the full filtering, analysis, and charting workflow" },
-        { icon: "dashboard", text: "**1 dashboard, 1 tab, and up to 12 data sheets**" },
-      ],
-    },
-    {
       tier: "lite",
       name: "Lite",
       description: "A complete workspace for traders, analysts, journalists, and researchers.",
@@ -48,7 +33,7 @@ export const landingPageV2Config = {
       priceMonthly: 11,
       priceAnnual: 99,
       buttonText: "Get Lite",
-      includesLabel: "All features in Free +",
+      venuesLabel: "All your venues",
       features: [
         { icon: "plug", text: "All available integrations, including historical and live data" },
         { icon: "rows", text: "Pull up to **125,000 rows per data sheet**" },
@@ -129,7 +114,7 @@ export const landingPageV2Config = {
     href: "mailto:kash@lycheedata.com?subject=Lychee%20Enterprise%20trial",
   },
   /**
-   * Data sources shown on the Free plan: a logo (`src`) or a letter `mark` on a brand-colored tile.
+   * Data sources shown on paid plans with `venuesLabel`: a logo (`src`) or a letter `mark` on a brand-colored tile.
    * Hovering a tile shows `description`, the integrations it `includes`, and `links` (hub pages first).
    */
   pricingVenues: [
