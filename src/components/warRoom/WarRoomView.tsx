@@ -222,10 +222,13 @@ export function WarRoomView({
     };
   }, [allFeatures, venueFilter]);
 
-  const markets = useMemo(
-    () => (venueFilter === "both" ? allMarkets : allMarkets.filter((row) => venueMatches(venueFilter, row.venue))),
-    [allMarkets, venueFilter],
-  );
+  const markets = useMemo(() => {
+    if (venueFilter === "both") return allMarkets;
+    // Venue filter: prefer the denser map index so Kalshi/Poly-only isn't stuck
+    // on whatever survived the mixed top-N rail slice.
+    const source = allMapMarkets.length ? allMapMarkets : allMarkets;
+    return source.filter((row) => venueMatches(venueFilter, row.venue));
+  }, [allMarkets, allMapMarkets, venueFilter]);
   const mapMarkets = useMemo(
     () =>
       venueFilter === "both" ? allMapMarkets : allMapMarkets.filter((row) => venueMatches(venueFilter, row.venue)),

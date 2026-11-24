@@ -516,6 +516,7 @@ export async function fetchKalshiLiveMarketsBySeriesCategories(opts) {
           const ticker = String(row.ticker || "").trim().toUpperCase();
           if (!ticker) continue;
           const vol =
+            toNum(row.volume_fp) ??
             toNum(row.volume_24h) ??
             toNum(row.volume) ??
             toNum(row.total_volume) ??
@@ -569,6 +570,150 @@ export async function fetchKalshiLiveMarketsBySeriesCategories(opts) {
   return out
     .sort((a, b) => (Number(b.volume24h) || 0) - (Number(a.volume24h) || 0))
     .slice(0, limit);
+}
+
+/** War Room “all tradable” desk — denser than featured, capped for globe/rail. */
+const TRADABLE_LIMIT_DEFAULT = 220;
+const TRADABLE_LIMIT_MAX = 300;
+const TRADABLE_SERIES_CAP = 80;
+const TRADABLE_MARKETS_PER_SERIES = 200;
+const TRADABLE_SERIES_CONCURRENCY = 10;
+const TRADABLE_CACHE_TTL_MS = 5 * 60_000;
+const TRADABLE_CACHE_VERSION = 1;
+
+/** @type {{ at: number; v: number; markets: FeaturedKalshiMarket[] } | null} */
+let tradableCache = null;
+/** @type {Promise<FeaturedKalshiMarket[]> | null} */
+let tradableInflight = null;
+
+/**
+ * Volume-ranked open Kalshi markets for War Room “all tradable”.
+ * GET /series?include_volume=true (volume_fp) → top series → open markets,
+ * then rank by market 24h volume. Cached in-process (~5 min) with
+ * stale-while-revalidate so cold pagination does not block every snapshot.
+ *
+ * @param {{ limit?: number }} [opts]
+ * @returns {Promise<FeaturedKalshiMarket[]>}
+ */
+export async function fetchKalshiLiveTradableMarkets(opts = {}) {
+  const limit = Math.max(
+    1,
+    Math.min(TRADABLE_LIMIT_MAX, Math.floor(Number(opts.limit) || TRADABLE_LIMIT_DEFAULT)),
+  );
+  const pool = await getTradablePool();
+  return pool.slice(0, limit);
+}
+
+/**
+ * @returns {Promise<FeaturedKalshiMarket[]>}
+ */
+async function getTradablePool() {
+  const now = Date.now();
+  if (
+    tradableCache &&
+    tradableCache.v === TRADABLE_CACHE_VERSION &&
+    now - tradableCache.at < TRADABLE_CACHE_TTL_MS
+  ) {
+    return tradableCache.markets;
+  }
+  if (tradableInflight) {
+    if (tradableCache?.markets?.length) return tradableCache.markets;
+    return tradableInflight;
+  }
+  const previous = tradableCache?.markets?.length ? tradableCache.markets : null;
+  tradableInflight = loadTradablePool()
+    .then((markets) => {
+      if (markets.length) {
+        tradableCache = { at: Date.now(), v: TRADABLE_CACHE_VERSION, markets };
+      }
+      return markets.length ? markets : previous || [];
+    })
+    .catch((err) => {
+      if (previous?.length) return previous;
+      throw err;
+    })
+    .finally(() => {
+      tradableInflight = null;
+    });
+  if (previous?.length) return previous;
+  return tradableInflight;
+}
+
+/**
+ * @returns {Promise<FeaturedKalshiMarket[]>}
+ */
+async function loadTradablePool() {
+  const body = await kalshiGet("series", {
+    include_volume: "true",
+    include_product_metadata: "false",
+  });
+  const seriesRows = Array.isArray(body?.series) ? body.series : [];
+  /** @type {Array<{ ticker: string; vol: number; category: string; title: string }>} */
+  const rankedSeries = [];
+  for (const row of seriesRows) {
+    if (!row || typeof row !== "object") continue;
+    const ticker = String(row.ticker || "").trim().toUpperCase();
+    if (!ticker) continue;
+    const vol =
+      toNum(row.volume_fp) ??
+      toNum(row.volume_24h) ??
+      toNum(row.volume) ??
+      toNum(row.total_volume) ??
+      0;
+    if (!(vol > 0)) continue;
+    rankedSeries.push({
+      ticker,
+      vol,
+      category: String(row.category || "").trim(),
+      title: String(row.title || ticker).trim() || ticker,
+    });
+  }
+  rankedSeries.sort((a, b) => b.vol - a.vol);
+  const topSeries = rankedSeries.slice(0, TRADABLE_SERIES_CAP);
+  if (!topSeries.length) return [];
+
+  /** @type {FeaturedKalshiMarket[]} */
+  const out = [];
+  const seen = new Set();
+
+  for (let i = 0; i < topSeries.length; i += TRADABLE_SERIES_CONCURRENCY) {
+    const chunk = topSeries.slice(i, i + TRADABLE_SERIES_CONCURRENCY);
+    await Promise.all(
+      chunk.map(async (series) => {
+        try {
+          const marketsBody = await kalshiGet("markets", {
+            series_ticker: series.ticker,
+            status: "open",
+            mve_filter: "exclude",
+            limit: TRADABLE_MARKETS_PER_SERIES,
+          });
+          const markets = Array.isArray(marketsBody?.markets) ? marketsBody.markets : [];
+          for (const market of markets) {
+            if (!market || typeof market !== "object") continue;
+            const ticker = String(market.ticker || "").trim().toUpperCase();
+            if (!ticker || seen.has(ticker)) continue;
+            const vol = toNum(market.volume_24h_fp) ?? toNum(market.volume_fp) ?? 0;
+            if (!(vol > 0)) continue;
+            seen.add(ticker);
+            out.push(
+              toFeaturedMarket(market, {
+                seriesTicker: series.ticker,
+                seriesTitle: series.title,
+                category: series.category || undefined,
+                tags: [series.category, series.ticker].filter(Boolean),
+                title:
+                  String(market.title || market.yes_sub_title || ticker).trim() || ticker,
+              }),
+            );
+          }
+        } catch {
+          /* skip series */
+        }
+      }),
+    );
+  }
+
+  return out.sort((a, b) => (Number(b.volume24h) || 0) - (Number(a.volume24h) || 0));
 }
 
 /**

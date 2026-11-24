@@ -10,6 +10,7 @@ import {
 import {
   fetchKalshiLiveMarketByTicker,
   fetchKalshiLiveMarketsBySeriesCategories,
+  fetchKalshiLiveTradableMarkets,
 } from "@/lib/kalshiLive/fetchKalshiLiveFeaturedMarkets";
 import {
   fetchPolymarketMarketByConditionId,
@@ -382,6 +383,52 @@ async function exploreFeedPolymarketBoost(exploreFeed, observedTs, existingIds) 
   }
 }
 
+/**
+ * Kalshi counterpart to Gamma explore boosts. Without this, “all tradable” + Kalshi
+ * only shows the tiny featured/seed desk (~a few NFL rows).
+ * @param {string} exploreFeed
+ * @param {string} observedTs
+ * @param {Set<string>} existingIds
+ */
+async function exploreFeedKalshiBoost(exploreFeed, observedTs, existingIds) {
+  if (!exploreFeed) return [];
+  // Featured / new / trending stay on the desk seed pool; tradable/volume need a real pull.
+  if (
+    exploreFeed !== "tradable" &&
+    exploreFeed !== "volume" &&
+    exploreFeed !== "liquidity"
+  ) {
+    return [];
+  }
+  try {
+    const boosted = await cachedBoost(`kalshi-feed:${exploreFeed}`, async () => {
+      const limit =
+        exploreFeed === "tradable" || exploreFeed === "volume" || exploreFeed === "liquidity"
+          ? 220
+          : 100;
+      const rows = await fetchKalshiLiveTradableMarkets({ limit });
+      /** @type {Array<Record<string, unknown>>} */
+      const out = [];
+      const seen = new Set();
+      for (const row of rows) {
+        const mapped = fromKalshiFeatured(row, observedTs);
+        if (!mapped?.market) continue;
+        if (seen.has(mapped.market.id)) continue;
+        seen.add(mapped.market.id);
+        out.push(mapped.market);
+      }
+      return out;
+    });
+    return boosted.filter((market) => {
+      if (existingIds.has(market.id)) return false;
+      existingIds.add(market.id);
+      return true;
+    });
+  } catch {
+    return [];
+  }
+}
+
 /** War Room Markets rail is always volume language — sort by 24h volume. */
 function sortMarketsByVolume(markets) {
   return [...markets].sort((a, b) => {
@@ -390,6 +437,55 @@ function sortMarketsByVolume(markets) {
     if (bv !== av) return bv - av;
     return Math.abs(Number(b.quote?.move) || 0) - Math.abs(Number(a.quote?.move) || 0);
   });
+}
+
+/**
+ * For dual-venue tradable desks, reserve half the point cap per venue so a
+ * client Kalshi/Polymarket filter still has a dense volume-ranked set after
+ * the mixed top-N slice (Polymarket USD volume otherwise crowds Kalshi out).
+ * @param {Array<Record<string, unknown>>} markets
+ * @param {number} cap
+ * @param {string} exploreFeed
+ */
+function rankMarketsForDesk(markets, cap, exploreFeed) {
+  const sorted = sortMarketsByVolume(markets);
+  const take = Math.max(1, Math.floor(Number(cap) || 1));
+  if (
+    exploreFeed !== "tradable" &&
+    exploreFeed !== "volume" &&
+    exploreFeed !== "liquidity"
+  ) {
+    return sorted.slice(0, take);
+  }
+  /** @type {Array<Record<string, unknown>>} */
+  const kalshi = [];
+  /** @type {Array<Record<string, unknown>>} */
+  const polymarket = [];
+  /** @type {Array<Record<string, unknown>>} */
+  const other = [];
+  for (const market of sorted) {
+    if (market?.venue === "kalshi") kalshi.push(market);
+    else if (market?.venue === "polymarket") polymarket.push(market);
+    else other.push(market);
+  }
+  if (!kalshi.length || !polymarket.length) return sorted.slice(0, take);
+
+  const reserved = Math.max(1, Math.floor(take / 2));
+  /** @type {Array<Record<string, unknown>>} */
+  const out = [];
+  const seen = new Set();
+  for (const market of [...kalshi.slice(0, reserved), ...polymarket.slice(0, reserved)]) {
+    if (seen.has(market.id)) continue;
+    seen.add(market.id);
+    out.push(market);
+  }
+  for (const market of sorted) {
+    if (out.length >= take) break;
+    if (seen.has(market.id)) continue;
+    seen.add(market.id);
+    out.push(market);
+  }
+  return sortMarketsByVolume(out);
 }
 
 function signalsForMarket(bundle, marketId) {
@@ -606,10 +702,16 @@ export async function getWarRoomSnapshot(opts = {}) {
   const existingIds = new Set(bundle.markets.map((market) => market.id));
   const shell = Boolean(opts.shell);
 
-  // Shell skips the Gamma round-trips so the client can paint from the cached desk
-  // immediately, then replace with the boosted snapshot.
-  const feedBoosted =
-    !shell && exploreFeed ? await exploreFeedPolymarketBoost(exploreFeed, bundle.asOf, existingIds) : [];
+  // Shell skips the Gamma / Kalshi tradable round-trips so the client can paint from the
+  // cached desk immediately, then replace with the boosted snapshot.
+  const [polyFeedBoosted, kalshiFeedBoosted] =
+    !shell && exploreFeed
+      ? await Promise.all([
+          exploreFeedPolymarketBoost(exploreFeed, bundle.asOf, existingIds),
+          exploreFeedKalshiBoost(exploreFeed, bundle.asOf, existingIds),
+        ])
+      : [[], []];
+  const feedBoosted = [...polyFeedBoosted, ...kalshiFeedBoosted];
   const [categoryPolyBoosted, categoryKalshiBoosted] = !shell && category
     ? await Promise.all([
         categoryPolymarketBoost(category, bundle.asOf, existingIds),
@@ -636,11 +738,10 @@ export async function getWarRoomSnapshot(opts = {}) {
       pool.push(market);
     }
   } else if (feedBoosted.length) {
-    // Feed view: Gamma ranking + desk Kalshi for multi-venue density.
-    const kalshi = bundle.markets.filter((market) => market.venue === "kalshi");
+    // Feed view: Gamma + Kalshi tradable boosts, plus any remaining desk rows.
     pool = [...feedBoosted];
     const poolIds = new Set(pool.map((market) => market.id));
-    for (const market of kalshi) {
+    for (const market of bundle.markets) {
       if (poolIds.has(market.id)) continue;
       poolIds.add(market.id);
       pool.push(market);
@@ -655,14 +756,17 @@ export async function getWarRoomSnapshot(opts = {}) {
     (market) =>
       matchesDesk(market, desk) && (!category || matchesCategory(market, category)),
   );
-  const ranked = sortMarketsByVolume(filtered);
+  const cap = opts.mobile ? MOBILE_POINT_CAP : DESKTOP_POINT_CAP;
+  const ranked = rankMarketsForDesk(filtered, cap, exploreFeed);
   const marketById = new Map(pool.map((market) => [market.id, market]));
   const filteredIds = new Set(ranked.map((market) => market.id));
-  const cap = opts.mobile ? MOBILE_POINT_CAP : DESKTOP_POINT_CAP;
   const features = ranked.map(featureFromMarket).filter(Boolean).slice(0, cap);
   // Full map index (globe can show more points than the right-rail list).
   const mapMarkets = ranked.slice(0, cap).map((market) => feedRow(bundle, market));
-  const feed = mapMarkets.slice(0, FEED_ROW_CAP);
+  // Rail: keep volume order, but for dual-venue tradable reserve slots so a
+  // Kalshi-only filter still has a real list (not ~3 survivors of mixed top-48).
+  const feedRanked = rankMarketsForDesk(filtered, FEED_ROW_CAP, exploreFeed);
+  const feed = feedRanked.slice(0, FEED_ROW_CAP).map((market) => feedRow(bundle, market));
   const activity = activityRows(bundle).filter((row) => {
     if (category) return activityMatchesCategory(row, category, marketById);
     // All tradable: keep the full activity stream.
