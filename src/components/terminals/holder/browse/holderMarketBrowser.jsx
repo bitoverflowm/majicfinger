@@ -629,10 +629,12 @@ export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
         {landingDemo ? (
           <span
             title="New market alerts are a Pro feature"
-            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground opacity-70"
+            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium text-muted-foreground"
           >
-            <Pause className="size-3.5" aria-hidden />
-            Pro only
+            Start Alerts
+            <span className="rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] text-cyan-700 ring-1 ring-cyan-500/35 dark:text-cyan-300/90 dark:ring-cyan-400/30">
+              Pro only
+            </span>
           </span>
         ) : (
           <button
