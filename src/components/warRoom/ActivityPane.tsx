@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { formatAge, formatVolume, venueLabel } from "./format";
+import { formatAge, venueLabel } from "./format";
 
 export type ActivityRow = {
   id: string;
@@ -86,8 +86,11 @@ export function ActivityPane({
       <ul className="flex flex-col">
         {rows.map((row) => {
           const selected = row.id === selectedId;
-          const notional = row.data?.notionalUsd;
+          const isTrade = row.kind === "fill";
           const isFresh = Boolean(fresh[row.id]);
+          const tradeSummary =
+            isTrade && row.summary && row.summary !== row.title ? row.summary : null;
+          const primary = isTrade ? row.title : row.summary || row.title;
           return (
             <li key={row.id}>
               <button
@@ -104,22 +107,20 @@ export function ActivityPane({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <KindBadge kind={row.kind} />
-                    <span className="truncate text-[11px] leading-tight text-slate-200">
-                      {row.summary || row.title}
-                    </span>
+                    <span className="truncate text-[11px] leading-tight text-slate-200">{primary}</span>
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-slate-500">
+                    {tradeSummary ? (
+                      <>
+                        <span className="truncate text-slate-400">{tradeSummary}</span>
+                        <span>·</span>
+                      </>
+                    ) : null}
                     <span>{venueLabel(row.venue)}</span>
                     {row.region ? (
                       <>
                         <span>·</span>
                         <span className="truncate">{row.region}</span>
-                      </>
-                    ) : null}
-                    {row.kind === "fill" && notional != null ? (
-                      <>
-                        <span>·</span>
-                        <span>{formatVolume(notional)}</span>
                       </>
                     ) : null}
                     {row.occurredAt ? <span>{formatAge(row.occurredAt)}</span> : null}
