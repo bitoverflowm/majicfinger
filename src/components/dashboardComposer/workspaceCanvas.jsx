@@ -946,7 +946,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
 
   useEffect(() => {
     if (!ready || user === undefined) return undefined;
-    const cap = getHistoricalPullRowLimit(user);
+    const cap = getHistoricalPullRowLimit(user, { isDemo: !!(ctx?.landingDemo || ctx?.isDemo) });
     for (const block of blocks) {
       if (!repullsTradeSheet(block) || !block.columns?.length) continue;
       const ticker = tradeTickerFromBlock(block);
@@ -968,7 +968,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
       });
     }
     return undefined;
-  }, [blocks, pageId, ready, user]);
+  }, [blocks, ctx?.isDemo, ctx?.landingDemo, pageId, ready, user]);
 
   useEffect(() => {
     if (readOnly) return undefined;
@@ -1537,7 +1537,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
     const reporter = createRunReporter((feed) => {
       setRunFeed(feed);
     });
-    const planLimit = getHistoricalPullRowLimit(user);
+    const planLimit = getHistoricalPullRowLimit(user, { isDemo: !!(ctx?.landingDemo || ctx?.isDemo) });
     void replayTabSheets(blocksByPageRef.current[page] || [], {
       planLimit,
       reporter,
@@ -1595,7 +1595,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
         });
       },
     });
-  }, [readOnly, user]);
+  }, [ctx?.isDemo, ctx?.landingDemo, readOnly, user]);
 
   const revealBlock = useCallback((id, nextPageId) => {
     if (!id) return;
