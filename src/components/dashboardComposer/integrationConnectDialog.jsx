@@ -444,6 +444,14 @@ function RealTimeTag() {
   );
 }
 
+function ProTag() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+      Pro
+    </span>
+  );
+}
+
 function cutoffCaption(row, cutoffLabel) {
   if (row.listCaptionKey === "kalshiHistoricalCutoff") return kalshiHistoricalV2Caption(cutoffLabel);
   if (row.listCaptionKey === "kalshiLiveCutoff") return kalshiLiveCaption(cutoffLabel);
@@ -468,7 +476,17 @@ function pillCaption(row, cutoffLabel) {
   return succinctDescription(row.description);
 }
 
-function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabel, cutoffLoading, nested = false }) {
+function IntegrationOption({
+  row,
+  active,
+  hovered,
+  onSelect,
+  onHover,
+  cutoffLabel,
+  cutoffLoading,
+  nested = false,
+  locked = false,
+}) {
   const liveCaption = cutoffCaption(row, cutoffLabel);
   const caption = pillCaption(row, cutoffLabel);
   return (
@@ -476,11 +494,13 @@ function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabe
       type="button"
       role="option"
       aria-selected={active}
+      aria-disabled={locked || undefined}
       onClick={() => onSelect(row.id)}
       onMouseEnter={() => onHover?.(row.id)}
       className={cn(
         "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors duration-200",
         nested && "ml-4 w-[calc(100%-1rem)]",
+        locked && "opacity-80",
         active
           ? "border-[#2f6fed] bg-[#e7f0ff] dark:border-blue-400 dark:bg-blue-500/15"
           : hovered
@@ -493,6 +513,7 @@ function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabe
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-semibold text-foreground">{row.name}</span>
           {REALTIME_IDS.has(row.id) ? <RealTimeTag /> : null}
+          {locked ? <ProTag /> : null}
         </span>
         {liveCaption && cutoffLoading ? (
           <Skeleton className="mt-1.5 h-3.5 w-56 bg-muted-foreground/20" />
@@ -502,7 +523,7 @@ function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabe
           </span>
         )}
       </span>
-      {active ? (
+      {active && !locked ? (
         <Check className="ml-1 size-4 shrink-0 self-center text-[#2f6fed] dark:text-blue-400" aria-hidden />
       ) : null}
     </button>
@@ -521,6 +542,7 @@ function KalshiHistoricalBranch({
   onHover,
   cutoffLabel,
   cutoffLoading,
+  lockedIds,
 }) {
   const childActive = selectedId === v1?.id || selectedId === v2?.id;
   const parentHovered = hoveredId === "kalshiHistoricalGroup" && !childActive;
@@ -566,6 +588,7 @@ function KalshiHistoricalBranch({
               onHover={onHover}
               cutoffLabel={cutoffLabel}
               cutoffLoading={cutoffLoading}
+              locked={lockedIds?.includes(v1.id)}
               nested
             />
           ) : null}
@@ -578,6 +601,7 @@ function KalshiHistoricalBranch({
               onHover={onHover}
               cutoffLabel={cutoffLabel}
               cutoffLoading={cutoffLoading}
+              locked={lockedIds?.includes(v2.id)}
               nested
             />
           ) : null}
@@ -636,8 +660,12 @@ function IntegrationConnectFlow({
     : presentSurface
       ? rows
       : [...primary, ...beta];
-  const effectiveLockedIds = curatedSurface ? [] : lockedIds;
-  const startable = !!startIntegrationId && selectable.some((row) => row.id === startIntegrationId);
+  // Landing demo passes lockedIds (e.g. Kalshi Historical v2 → Pro gate). Real dashboard omits them.
+  const effectiveLockedIds = lockedIds;
+  const startable =
+    !!startIntegrationId &&
+    selectable.some((row) => row.id === startIntegrationId) &&
+    !effectiveLockedIds?.includes(startIntegrationId);
   const [selectedId, setSelectedId] = useState(startable ? startIntegrationId : null);
   const [hoveredId, setHoveredId] = useState(null);
   const [phase, setPhase] = useState(startable ? "build" : "pick");
@@ -823,6 +851,7 @@ function IntegrationConnectFlow({
                       onHover={setHoveredId}
                       cutoffLabel={cutoffLabel}
                       cutoffLoading={cutoffLoading}
+                      lockedIds={effectiveLockedIds}
                     />
                     {primary.map((row) => (
                       <IntegrationOption
@@ -834,6 +863,7 @@ function IntegrationConnectFlow({
                         onHover={setHoveredId}
                         cutoffLabel={cutoffLabel}
                         cutoffLoading={cutoffLoading}
+                        locked={effectiveLockedIds?.includes(row.id)}
                       />
                     ))}
                   </>
@@ -848,6 +878,7 @@ function IntegrationConnectFlow({
                       onHover={setHoveredId}
                       cutoffLabel={cutoffLabel}
                       cutoffLoading={cutoffLoading}
+                      locked={effectiveLockedIds?.includes(row.id)}
                     />
                   ))
                 )}
@@ -868,6 +899,7 @@ function IntegrationConnectFlow({
                         onHover={setHoveredId}
                         cutoffLabel={cutoffLabel}
                         cutoffLoading={cutoffLoading}
+                        locked={effectiveLockedIds?.includes(row.id)}
                       />
                     ))}
                   </div>
