@@ -1,6 +1,7 @@
 /**
  * Poll GET /api/data-lake/athena-query/status until SUCCEEDED (shared by compose pulls + replay).
- * Status-only polls while Athena runs; paginated row download when complete (stays under API size caps).
+ * Status-only polls while Athena runs; when complete, downloads rows in coalesced Athena page
+ * batches (~10 AWS GetQueryResults pages / ~10k rows per HTTP hop; AWS still caps each at 1000).
  */
 
 import { yieldToUi } from "@/lib/dataLake/largeAthenaPull";
