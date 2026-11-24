@@ -3387,9 +3387,20 @@ export function WorkspaceCanvas() {
     if (el instanceof HTMLElement) el.scrollIntoView({ block: "nearest" });
   }, [canvas?.selectedId]);
 
+  const landingDemo = !!ctx?.landingDemo;
+
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return undefined;
+    /** Nested `overscroll-contain` blocks native chaining — move the page ourselves in the demo. */
+    const chainPage = (event) => {
+      if (!landingDemo) return false;
+      if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      window.scrollBy(0, event.deltaY);
+      return true;
+    };
     const onWheel = (event) => {
       if (scrollsInsideTerminalPanel(event.target, event.deltaX, event.deltaY)) return;
       const visual = event.target instanceof Element ? event.target.closest("[data-visual-scroll]") : null;
@@ -3434,14 +3445,27 @@ export function WorkspaceCanvas() {
         }
       }
       if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
-      if (scroller.scrollHeight <= scroller.clientHeight + 1) return;
+      const maxTop = scroller.scrollHeight - scroller.clientHeight;
+      // Nothing to scroll inside — or already at the edge in this direction: continue the
+      // landing page (homepage demo). Nested overscroll-contain needs an explicit window scroll.
+      if (maxTop <= 1) {
+        chainPage(event);
+        return;
+      }
+      const scrollingDown = event.deltaY > 0;
+      const atTop = scroller.scrollTop <= 0;
+      const atBottom = scroller.scrollTop >= maxTop - 1;
+      if ((scrollingDown && atBottom) || (!scrollingDown && atTop)) {
+        chainPage(event);
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       scroller.scrollTop += event.deltaY;
     };
     scroller.addEventListener("wheel", onWheel, { passive: false, capture: true });
     return () => scroller.removeEventListener("wheel", onWheel, { capture: true });
-  }, [blocks.length]);
+  }, [blocks.length, landingDemo]);
 
   if (!canvas?.ready) {
     return (
@@ -3492,7 +3516,7 @@ export function WorkspaceCanvas() {
     <div
       ref={scrollerRef}
       className={cn(
-        "pointer-events-auto absolute inset-0 z-20 overflow-auto",
+        "pointer-events-auto absolute inset-0 z-20 overflow-auto overscroll-y-auto",
         // Markets / Holders demos: slight canvas tint vs the stage background.
         exploreHolderCanvas && "bg-zinc-100 dark:bg-zinc-900",
       )}

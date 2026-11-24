@@ -21,6 +21,12 @@ type TabId = (typeof TABS)[number]["id"];
 const DEMO_STAGE_CLASS =
   "relative left-1/2 h-[min(88svh,58rem)] min-h-[32rem] w-screen max-w-[100vw] -translate-x-1/2 overflow-hidden";
 
+/**
+ * Terminal demo surface — slightly off the page background in both themes so the stage
+ * reads as its own panel (light: soft gray; dark: deeper than page `bg-background`).
+ */
+const TERMINAL_DEMO_STAGE_CLASS = cn(DEMO_STAGE_CLASS, "bg-[#f5f5f5] dark:bg-[#161616]");
+
 /** Section fills the stage — no painted backdrop, no device chrome. */
 const BARE_DEMO_SECTION_CLASS = "relative z-30 m-0 h-full w-full p-0";
 
@@ -130,7 +136,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
         ) : null}
 
         {showPast ? (
-          <div className={cn(DEMO_STAGE_CLASS, "bg-background")}>
+          <div className={TERMINAL_DEMO_STAGE_CLASS}>
             <DashboardDemoSectionLazy
               key="terminal-demo-past"
               force
@@ -143,7 +149,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
         ) : null}
 
         {showPresent ? (
-          <div className={cn(DEMO_STAGE_CLASS, "bg-background")}>
+          <div className={TERMINAL_DEMO_STAGE_CLASS}>
             <DashboardDemoSectionLazy
               key="terminal-demo-present"
               force
@@ -156,7 +162,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
         ) : null}
 
         {showMarkets ? (
-          <div className={cn(DEMO_STAGE_CLASS, "bg-background")}>
+          <div className={TERMINAL_DEMO_STAGE_CLASS}>
             <DashboardDemoSectionLazy
               key={`markets-${marketSubject?.conditionId || "explore"}`}
               force
@@ -171,7 +177,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
         ) : null}
 
         {showHolders ? (
-          <div className={cn(DEMO_STAGE_CLASS, "bg-background")}>
+          <div className={TERMINAL_DEMO_STAGE_CLASS}>
             <DashboardDemoSectionLazy
               key={`holders-${holdersKey}`}
               force
