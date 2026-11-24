@@ -8,14 +8,12 @@ import {
   BUILD_TIP_IDS,
   ColumnsFeatureTip,
   ContinueFeatureTip,
-  DataLimitsFeatureTip,
   DataTypeFeatureTip,
   EnrichmentsFeatureTip,
   SaveRunFeatureTip,
   SortLimitFeatureTip,
 } from "@/components/dashboardComposer/buildFeatureTips";
 import { dismissFeatureTip } from "@/components/ui/feature-tip";
-import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import { claimSheetId, displayMatrix, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
@@ -2712,7 +2710,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const formulaCaretRef = useRef(0);
   const dataTypePickerRef = useRef(null);
   const columnsSectionRef = useRef(null);
-  const previewCountRef = useRef(null);
   const continueButtonRef = useRef(null);
   const [sheetTabs, setSheetTabs] = useState(null);
   const sheetTabsRef = useRef(null);
@@ -10986,11 +10983,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </p>
             ) : null}
           </div>
-          <div ref={previewCountRef} className="flex min-w-0 flex-col items-end">
+          <div className="flex min-w-0 flex-col items-end">
             <p className="text-right text-[12px] text-muted-foreground">{paneLine}</p>
-            {ctx?.landingDemo ? (
-              <DataLimitsFeatureTip anchorRef={previewCountRef} onUpgrade={() => exitLandingDemoToSection("pricing")} />
-            ) : null}
             {typeof planLimit === "number" &&
             !(showJoinSheets && joinTab !== "markets") &&
             !showSummarizeExplainer &&

@@ -35,7 +35,6 @@ export const BUILD_TIP_IDS = {
   columns: "integration-build-columns",
   attributes: "integration-build-attributes",
   sortLimit: "integration-build-sort-limit",
-  dataLimits: "integration-build-data-limits",
   continueStep: "integration-build-continue",
   enrichments: "integration-build-enrichments",
   sheetLimit: "integration-build-sheet-limit",
@@ -358,95 +357,6 @@ export function SortLimitFeatureTip({ anchorRef }) {
       title="Sort and limit your pull"
       description="Order rows by any column (volume, price, close time…), then set a row Limit so the pull stays focused. Preview updates as you change either."
       action={{ label: "Ok" }}
-      closeOnAction
-    />
-  );
-}
-
-/* ---------- Data limits ---------- */
-
-const LIMIT_FROM = 100;
-const LIMIT_TO = 500000;
-const LIMIT_RISE_MS = 2200;
-const LIMIT_HOLD_MS = 1800;
-const LIMIT_REST_MS = 900;
-
-function easeOutCubic(t) {
-  return 1 - (1 - t) ** 3;
-}
-
-function DataLimitsTipAnimation() {
-  const reduced = usePrefersReducedMotion();
-  const [progress, setProgress] = useState(reduced ? 1 : 0);
-
-  useEffect(() => {
-    if (reduced) {
-      setProgress(1);
-      return;
-    }
-    let frame = 0;
-    const start = performance.now();
-    const cycle = LIMIT_REST_MS + LIMIT_RISE_MS + LIMIT_HOLD_MS;
-    const tick = (now) => {
-      const t = (now - start) % cycle;
-      const rising = Math.min(1, Math.max(0, (t - LIMIT_REST_MS) / LIMIT_RISE_MS));
-      setProgress(easeOutCubic(rising));
-      frame = window.requestAnimationFrame(tick);
-    };
-    frame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frame);
-  }, [reduced]);
-
-  const rows = Math.round(LIMIT_FROM + (LIMIT_TO - LIMIT_FROM) * progress);
-  const done = progress >= 0.999;
-
-  return (
-    <div aria-hidden className="w-full px-5">
-      <div className="flex items-baseline justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Rows per pull</span>
-        <span
-          className={cn(
-            "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide transition-colors duration-300",
-            done ? "bg-[#0d99ff] text-white" : "bg-white text-neutral-500 dark:bg-neutral-900",
-          )}
-        >
-          {done ? "Pro" : "Demo"}
-        </span>
-      </div>
-      <p className="mt-1 text-[26px] font-semibold tabular-nums leading-none tracking-tight text-neutral-900 dark:text-white">
-        {rows.toLocaleString()}
-        {done ? "+" : ""}
-      </p>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white shadow-inner dark:bg-neutral-900">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-[#0d99ff] to-[#5cb8ff]"
-          style={{ width: `${Math.max(2, progress * 100)}%` }}
-        />
-      </div>
-      <div className="mt-1 flex justify-between text-[9px] tabular-nums text-neutral-500">
-        <span>100</span>
-        <span>500,000+</span>
-      </div>
-    </div>
-  );
-}
-
-/** Demo only: explains the 50-row preview and the demo pull limit, with an upgrade path. */
-export function DataLimitsFeatureTip({ anchorRef, onUpgrade }) {
-  return (
-    <FeatureTip
-      id={BUILD_TIP_IDS.dataLimits}
-      after={tipsBefore(BUILD_TIP_IDS.dataLimits)}
-      anchorRef={anchorRef}
-      side="bottom"
-      align="end"
-      sideOffset={10}
-      className="w-[296px]"
-      media={<DataLimitsTipAnimation />}
-      title="Data Limits"
-      description="Preview window only shows 50 rows for speed and convenience. Since you are in demo mode, you can only pull 100 rows at a time. Upgrade to pull 500,000 or more rows at once, to really supercharge your research."
-      secondaryAction={{ label: "Continue" }}
-      action={{ label: "Upgrade", onClick: onUpgrade }}
       closeOnAction
     />
   );
