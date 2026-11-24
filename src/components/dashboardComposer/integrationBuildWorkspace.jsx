@@ -12,6 +12,7 @@ import {
   DataTypeFeatureTip,
   EnrichmentsFeatureTip,
   SaveRunFeatureTip,
+  SortLimitFeatureTip,
 } from "@/components/dashboardComposer/buildFeatureTips";
 import { dismissFeatureTip } from "@/components/ui/feature-tip";
 import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
@@ -2722,6 +2723,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return {
       get current() {
         const el = columnsSectionRef.current?.parentElement?.querySelector('[data-section="attributes"]') || null;
+        if (!el) return null;
+        if (cached?.contextElement !== el) {
+          cached = { getBoundingClientRect: () => el.getBoundingClientRect(), contextElement: el };
+        }
+        return cached;
+      },
+    };
+  }, []);
+  const sortLimitSectionRef = useMemo(() => {
+    let cached = null;
+    return {
+      get current() {
+        const root = columnsSectionRef.current?.parentElement;
+        const el = root?.querySelector('[data-section="sort"]') || root?.querySelector('[data-section="limit"]') || null;
         if (!el) return null;
         if (cached?.contextElement !== el) {
           cached = { getBoundingClientRect: () => el.getBoundingClientRect(), contextElement: el };
@@ -10007,6 +10022,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }, 260);
   }
 
+  function revealSortLimit() {
+    setOpenQuerySection({ tableId, value: "sort" });
+    window.setTimeout(() => {
+      const section = sortLimitSectionRef.current?.contextElement;
+      const scroller = section?.closest(".overflow-y-auto");
+      if (!section || !scroller) return;
+      const top = scroller.scrollTop + section.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8;
+      scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }, 260);
+  }
+
   return (
     <div className="relative flex min-h-0 flex-1 bg-background">
       {functionHelp ? (
@@ -10900,7 +10926,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ) : null}
           </Accordion>
           <ColumnsFeatureTip anchorRef={columnsSectionRef} onDone={hasAttributeSection ? revealAttributes : undefined} />
-          {hasAttributeSection ? <AttributesFeatureTip anchorRef={attributesSectionRef} /> : null}
+          {hasAttributeSection ? (
+            <AttributesFeatureTip anchorRef={attributesSectionRef} onDone={revealSortLimit} />
+          ) : null}
+          {hasAttributeSection ? <SortLimitFeatureTip anchorRef={sortLimitSectionRef} /> : null}
 
           {guidedFilters || liveMarketSearch || liveDirect || polymarketLive ? null : (
             <section>

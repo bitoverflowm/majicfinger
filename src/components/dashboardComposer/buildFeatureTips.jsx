@@ -34,6 +34,7 @@ export const BUILD_TIP_IDS = {
   search: "integration-build-search",
   columns: "integration-build-columns",
   attributes: "integration-build-attributes",
+  sortLimit: "integration-build-sort-limit",
   dataLimits: "integration-build-data-limits",
   continueStep: "integration-build-continue",
   enrichments: "integration-build-enrichments",
@@ -320,7 +321,7 @@ function AttributesTipAnimation() {
   );
 }
 
-export function AttributesFeatureTip({ anchorRef }) {
+export function AttributesFeatureTip({ anchorRef, onDone }) {
   return (
     <FeatureTip
       id={BUILD_TIP_IDS.attributes}
@@ -334,6 +335,28 @@ export function AttributesFeatureTip({ anchorRef }) {
       media={<AttributesTipAnimation />}
       title="Filter your data using Attributes"
       description={'All your attributes can be filtered based on your needs. E.g. title containing "Elon" or "Rain". As you select your attribute requirements the preview will be reflected immediately.'}
+      action={{ label: "Ok", onClick: onDone }}
+      onDismiss={onDone}
+      closeOnAction
+    />
+  );
+}
+
+/* ---------- Sort / Limit ---------- */
+
+/** Next to Sort + Limit on the historical (and other guided) build criteria panel. */
+export function SortLimitFeatureTip({ anchorRef }) {
+  return (
+    <FeatureTip
+      id={BUILD_TIP_IDS.sortLimit}
+      after={tipsBefore(BUILD_TIP_IDS.sortLimit)}
+      anchorRef={anchorRef}
+      side="right"
+      align="start"
+      sideOffset={14}
+      className="w-[296px]"
+      title="Sort and limit your pull"
+      description="Order rows by any column (volume, price, close time…), then set a row Limit so the pull stays focused. Preview updates as you change either."
       action={{ label: "Ok" }}
       closeOnAction
     />
