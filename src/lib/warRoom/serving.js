@@ -848,7 +848,7 @@ function researchLinks(market) {
   const links = [];
   if (market.venue === "polymarket") {
     links.push({
-      label: "Holder Terminal",
+      label: "Research Holders",
       href: holderTerminalHref({
         kind: "market",
         conditionId: market.venueMarketId,

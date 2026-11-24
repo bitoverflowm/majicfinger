@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, ExternalLink, Newspaper, X } from "lucide-react";
+import { ExternalLink, Newspaper, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { parseWarRoomMarketId } from "@/lib/warRoom/ids";
@@ -12,6 +12,12 @@ import type { ActivityRow } from "./ActivityPane";
 import { formatAge, formatCents, formatMove, formatVolume, venueLabel } from "./format";
 import type { MarketRow } from "./MarketsPane";
 import { pulseMarketToRow } from "./relatedMarkets";
+import {
+  polymarketConditionId,
+  researchNavigateFromMarket,
+  type WarRoomNavigateRequest,
+  type WarRoomResearchOrigin,
+} from "./researchHandoff";
 import { WarRoomMarketChart } from "./WarRoomMarketChart";
 import { WarRoomRelatedMarketsChart } from "./WarRoomRelatedMarketsChart";
 
@@ -20,10 +26,7 @@ export type WarRoomDetailTarget =
   | { kind: "trade"; activity: ActivityRow; market?: MarketRow | null }
   | { kind: "news"; activity: ActivityRow; relatedMarkets?: MarketRow[] };
 
-export type WarRoomNavigateRequest =
-  | { type: "holders"; conditionId: string; title: string; slug?: string | null }
-  | { type: "markets"; venue: "kalshi" | "polymarket"; marketId: string; title?: string; slug?: string | null }
-  | { type: "war-room-market"; marketId: string };
+export type { WarRoomNavigateRequest };
 
 function VenueTag({ venue }: { venue: string }) {
   const v = String(venue || "").toLowerCase();
@@ -344,6 +347,45 @@ function relatedActivityForMarkets({
   return { news: news.slice(0, 4), trades: trades.slice(0, 6) };
 }
 
+/** Shared Research Holders / Research Market CTAs — stay in the War Room demo. */
+function ResearchHandoffButtons({
+  market,
+  origin,
+  onNavigate,
+}: {
+  market: MarketRow | null | undefined;
+  origin: WarRoomResearchOrigin;
+  onNavigate?: (request: WarRoomNavigateRequest) => void;
+}) {
+  if (!market?.id || !onNavigate) return null;
+  const canHolders = Boolean(polymarketConditionId(market));
+  return (
+    <div className="mt-auto flex shrink-0 gap-2 pt-1">
+      {canHolders ? (
+        <button
+          type="button"
+          onClick={() => onNavigate(researchNavigateFromMarket({ target: "holders", market, origin }))}
+          className="inline-flex h-9 min-w-0 flex-1 items-center justify-center rounded-md bg-white text-[12px] font-medium text-slate-950 hover:bg-white/90"
+        >
+          Research Holders
+        </button>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => onNavigate(researchNavigateFromMarket({ target: "markets", market, origin }))}
+        className={cn(
+          "inline-flex h-9 min-w-0 flex-1 items-center justify-center rounded-md text-[12px] font-medium",
+          canHolders
+            ? "border border-white/12 text-slate-100 hover:bg-white/[0.04]"
+            : "bg-white text-slate-950 hover:bg-white/90",
+        )}
+      >
+        Research Market
+      </button>
+    </div>
+  );
+}
+
 function RelatedActivityLists({
   news,
   trades,
@@ -626,6 +668,11 @@ export function WarRoomDetailCard({
               trades={relatedActivity.trades}
               onSelect={onSelectActivity}
             />
+            <ResearchHandoffButtons
+              market={related[0] || null}
+              origin="news"
+              onNavigate={onNavigate}
+            />
           </div>
         ) : !market ? (
           <p className="text-[12px] text-slate-500">Loading market…</p>
@@ -663,44 +710,11 @@ export function WarRoomDetailCard({
               onMove={setHistoryMove}
             />
 
-            <div className="mt-auto flex shrink-0 gap-2 pt-1">
-              {parsed?.venue === "polymarket" ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onNavigate?.({
-                      type: "holders",
-                      conditionId: parsed.venueMarketId,
-                      title: market.title,
-                      slug: market.slug,
-                    })
-                  }
-                  className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-md bg-white text-[12px] font-medium text-slate-950 hover:bg-white/90"
-                >
-                  Holder Terminal <ArrowUpRight className="size-3.5" />
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() =>
-                  onNavigate?.({
-                    type: "markets",
-                    venue: (parsed?.venue as "kalshi" | "polymarket") || "polymarket",
-                    marketId: market.id,
-                    title: market.title,
-                    slug: market.slug,
-                  })
-                }
-                className={cn(
-                  "inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-md text-[12px] font-medium",
-                  parsed?.venue === "polymarket"
-                    ? "border border-white/12 text-slate-100 hover:bg-white/[0.04]"
-                    : "bg-white text-slate-950 hover:bg-white/90",
-                )}
-              >
-                Market Terminal <ArrowUpRight className="size-3.5" />
-              </button>
-            </div>
+            <ResearchHandoffButtons
+              market={market}
+              origin={target.kind === "trade" ? "trade" : "market"}
+              onNavigate={onNavigate}
+            />
           </div>
         )}
       </div>
