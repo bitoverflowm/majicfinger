@@ -18,6 +18,7 @@ import {
   type WarRoomNavigateRequest,
   type WarRoomResearchOrigin,
 } from "./researchHandoff";
+import { useWarRoomTheme } from "./useWarRoomTheme";
 import { WarRoomMarketChart } from "./WarRoomMarketChart";
 import { WarRoomRelatedMarketsChart } from "./WarRoomRelatedMarketsChart";
 
@@ -28,16 +29,21 @@ export type WarRoomDetailTarget =
 
 export type { WarRoomNavigateRequest };
 
-function VenueTag({ venue }: { venue: string }) {
+function VenueTag({ venue, dark = true }: { venue: string; dark?: boolean }) {
   const v = String(venue || "").toLowerCase();
   return (
     <span
       className={cn(
         "inline-flex shrink-0 items-center rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide",
         v === "kalshi" && "bg-[#28CC95]/20 text-[#28CC95]",
-        v === "polymarket" && "bg-[#2E5CFF]/20 text-[#8da4ff]",
-        v === "news" && "bg-violet-400/20 text-violet-200",
-        v !== "kalshi" && v !== "polymarket" && v !== "news" && "bg-white/10 text-slate-300",
+        v === "polymarket" &&
+          (dark ? "bg-[#2E5CFF]/20 text-[#8da4ff]" : "bg-[#2E5CFF]/15 text-[#2E5CFF]"),
+        v === "news" &&
+          (dark ? "bg-violet-400/20 text-violet-200" : "bg-violet-500/15 text-violet-700"),
+        v !== "kalshi" &&
+          v !== "polymarket" &&
+          v !== "news" &&
+          (dark ? "bg-white/10 text-slate-300" : "bg-muted text-muted-foreground"),
       )}
     >
       {venueLabel(venue)}
@@ -234,14 +240,25 @@ function RelatedMarketsList({
   loading?: boolean;
   onSelect?: (row: MarketRow) => void;
 }) {
+  const { dark } = useWarRoomTheme();
   return (
     <div>
-      <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+      <p
+        className={cn(
+          "mb-1 text-[9px] font-semibold uppercase tracking-[0.14em]",
+          dark ? "text-slate-500" : "text-muted-foreground",
+        )}
+      >
         Related markets
         {loading ? <span className="ml-1 font-normal normal-case tracking-normal">· searching</span> : null}
       </p>
       {rows.length ? (
-        <ul className="divide-y divide-white/[0.06] overflow-hidden rounded-md border border-white/10">
+        <ul
+          className={cn(
+            "divide-y overflow-hidden rounded-md border",
+            dark ? "divide-white/[0.06] border-white/10" : "divide-border/60 border-border/70",
+          )}
+        >
           {rows.map((row) => {
             const moveLabel = formatMove(row.move);
             const up = (row.move ?? 0) > 0;
@@ -251,7 +268,10 @@ function RelatedMarketsList({
                 <button
                   type="button"
                   onClick={() => onSelect?.(row)}
-                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-white/[0.04]"
+                  className={cn(
+                    "flex w-full items-center gap-2 px-2 py-1.5 text-left",
+                    dark ? "hover:bg-white/[0.04]" : "hover:bg-muted/60",
+                  )}
                 >
                   <MarketMark
                     size="sm"
@@ -260,21 +280,33 @@ function RelatedMarketsList({
                   />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
-                      <VenueTag venue={row.venue} />
-                      <span className="truncate text-[11px] text-slate-200">{row.title}</span>
+                      <VenueTag venue={row.venue} dark={dark} />
+                      <span
+                        className={cn(
+                          "truncate text-[11px]",
+                          dark ? "text-slate-200" : "text-foreground",
+                        )}
+                      >
+                        {row.title}
+                      </span>
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
-                    <span className="block font-mono text-[11px] tabular-nums text-white">
+                    <span
+                      className={cn(
+                        "block font-mono text-[11px] tabular-nums",
+                        dark ? "text-white" : "text-foreground",
+                      )}
+                    >
                       {formatCents(row.price)}
                     </span>
                     {moveLabel ? (
                       <span
                         className={cn(
                           "block font-mono text-[9px] tabular-nums",
-                          up && "text-emerald-300",
-                          down && "text-rose-300",
-                          !up && !down && "text-slate-500",
+                          up && (dark ? "text-emerald-300" : "text-emerald-600"),
+                          down && (dark ? "text-rose-300" : "text-rose-600"),
+                          !up && !down && (dark ? "text-slate-500" : "text-muted-foreground"),
                         )}
                       >
                         {moveLabel}
@@ -395,9 +427,15 @@ function RelatedActivityLists({
   trades: ActivityRow[];
   onSelect?: (row: ActivityRow) => void;
 }) {
+  const { dark } = useWarRoomTheme();
   if (!news.length && !trades.length) {
     return (
-      <p className="rounded-md border border-dashed border-white/10 px-2 py-2 text-[11px] text-slate-500">
+      <p
+        className={cn(
+          "rounded-md border border-dashed px-2 py-2 text-[11px]",
+          dark ? "border-white/10 text-slate-500" : "border-border/70 text-muted-foreground",
+        )}
+      >
         No related news or trades on these markets yet.
       </p>
     );
@@ -406,23 +444,53 @@ function RelatedActivityLists({
     <div className="space-y-3">
       {news.length ? (
         <div>
-          <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          <p
+            className={cn(
+              "mb-1 text-[9px] font-semibold uppercase tracking-[0.14em]",
+              dark ? "text-slate-500" : "text-muted-foreground",
+            )}
+          >
             Related news
           </p>
-          <ul className="divide-y divide-white/[0.06] overflow-hidden rounded-md border border-white/10">
+          <ul
+            className={cn(
+              "divide-y overflow-hidden rounded-md border",
+              dark ? "divide-white/[0.06] border-white/10" : "divide-border/60 border-border/70",
+            )}
+          >
             {news.map((row) => (
               <li key={row.id}>
                 <button
                   type="button"
                   onClick={() => onSelect?.(row)}
-                  className="flex w-full items-start gap-2 px-2 py-1.5 text-left hover:bg-white/[0.04]"
+                  className={cn(
+                    "flex w-full items-start gap-2 px-2 py-1.5 text-left",
+                    dark ? "hover:bg-white/[0.04]" : "hover:bg-muted/60",
+                  )}
                 >
-                  <span className="mt-0.5 inline-flex shrink-0 items-center rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide bg-violet-400/20 text-violet-200">
+                  <span
+                    className={cn(
+                      "mt-0.5 inline-flex shrink-0 items-center rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide",
+                      dark ? "bg-violet-400/20 text-violet-200" : "bg-violet-500/15 text-violet-700",
+                    )}
+                  >
                     News
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 text-[11px] leading-snug text-slate-200">{row.title}</span>
-                    <span className="mt-0.5 block text-[10px] text-slate-500">
+                    <span
+                      className={cn(
+                        "line-clamp-2 text-[11px] leading-snug",
+                        dark ? "text-slate-200" : "text-foreground",
+                      )}
+                    >
+                      {row.title}
+                    </span>
+                    <span
+                      className={cn(
+                        "mt-0.5 block text-[10px]",
+                        dark ? "text-slate-500" : "text-muted-foreground",
+                      )}
+                    >
                       {row.data?.publisher ? `${row.data.publisher} · ` : ""}
                       {row.occurredAt ? formatAge(row.occurredAt) : ""}
                     </span>
@@ -435,23 +503,53 @@ function RelatedActivityLists({
       ) : null}
       {trades.length ? (
         <div>
-          <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          <p
+            className={cn(
+              "mb-1 text-[9px] font-semibold uppercase tracking-[0.14em]",
+              dark ? "text-slate-500" : "text-muted-foreground",
+            )}
+          >
             Related trades
           </p>
-          <ul className="divide-y divide-white/[0.06] overflow-hidden rounded-md border border-white/10">
+          <ul
+            className={cn(
+              "divide-y overflow-hidden rounded-md border",
+              dark ? "divide-white/[0.06] border-white/10" : "divide-border/60 border-border/70",
+            )}
+          >
             {trades.map((row) => (
               <li key={row.id}>
                 <button
                   type="button"
                   onClick={() => onSelect?.(row)}
-                  className="flex w-full items-start gap-2 px-2 py-1.5 text-left hover:bg-white/[0.04]"
+                  className={cn(
+                    "flex w-full items-start gap-2 px-2 py-1.5 text-left",
+                    dark ? "hover:bg-white/[0.04]" : "hover:bg-muted/60",
+                  )}
                 >
-                  <span className="mt-0.5 inline-flex shrink-0 items-center rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide bg-amber-400/15 text-amber-200">
+                  <span
+                    className={cn(
+                      "mt-0.5 inline-flex shrink-0 items-center rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide",
+                      dark ? "bg-amber-400/15 text-amber-200" : "bg-amber-500/15 text-amber-800",
+                    )}
+                  >
                     Trade
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 text-[11px] leading-snug text-slate-200">{row.title}</span>
-                    <span className="mt-0.5 block text-[10px] text-slate-500">
+                    <span
+                      className={cn(
+                        "line-clamp-2 text-[11px] leading-snug",
+                        dark ? "text-slate-200" : "text-foreground",
+                      )}
+                    >
+                      {row.title}
+                    </span>
+                    <span
+                      className={cn(
+                        "mt-0.5 block text-[10px]",
+                        dark ? "text-slate-500" : "text-muted-foreground",
+                      )}
+                    >
                       {row.summary && row.summary !== row.title ? `${row.summary} · ` : ""}
                       {row.occurredAt ? formatAge(row.occurredAt) : ""}
                     </span>
@@ -490,6 +588,7 @@ export function WarRoomDetailCard({
   onSelectRelatedMarket?: (market: MarketRow) => void;
   onSelectActivity?: (row: ActivityRow) => void;
 }) {
+  const { dark } = useWarRoomTheme();
   const [articleMode, setArticleMode] = useState<"preview" | "iframe">("preview");
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [historyMove, setHistoryMove] = useState<number | null>(null);
@@ -578,7 +677,12 @@ export function WarRoomDetailCard({
 
   if (!open) {
     return (
-      <div className="flex h-full min-h-0 flex-col justify-center bg-[#07090f] px-4 text-slate-500">
+      <div
+        className={cn(
+          "flex h-full min-h-0 flex-col justify-center px-4",
+          dark ? "bg-[#07090f] text-slate-500" : "bg-background text-muted-foreground",
+        )}
+      >
         <p className="text-[11px] leading-snug">
           Select a market, trade, or headline — chart, live trades, and terminals open here.
         </p>
@@ -589,10 +693,27 @@ export function WarRoomDetailCard({
   if (!target) return null;
 
   return (
-    <aside className="flex h-full min-h-0 flex-col bg-[#07090f] text-slate-100">
-      <div className="flex shrink-0 items-start gap-2.5 border-b border-white/10 px-3 py-2.5">
+    <aside
+      className={cn(
+        "flex h-full min-h-0 flex-col",
+        dark ? "bg-[#07090f] text-slate-100" : "bg-background text-foreground",
+      )}
+    >
+      <div
+        className={cn(
+          "flex shrink-0 items-start gap-2.5 border-b px-3 py-2.5",
+          dark ? "border-white/10" : "border-border/70",
+        )}
+      >
         {target.kind === "news" ? (
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-violet-400/25 bg-violet-400/10 text-violet-200">
+          <div
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-md border",
+              dark
+                ? "border-violet-400/25 bg-violet-400/10 text-violet-200"
+                : "border-violet-500/25 bg-violet-500/10 text-violet-700",
+            )}
+          >
             <Newspaper className="size-4" />
           </div>
         ) : (
@@ -600,19 +721,36 @@ export function WarRoomDetailCard({
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            {venue ? <VenueTag venue={venue} /> : null}
+            {venue ? <VenueTag venue={venue} dark={dark} /> : null}
             {target.kind === "trade" ? (
-              <span className="text-[10px] uppercase tracking-wide text-amber-200/80">Trade</span>
+              <span
+                className={cn(
+                  "text-[10px] uppercase tracking-wide",
+                  dark ? "text-amber-200/80" : "text-amber-800",
+                )}
+              >
+                Trade
+              </span>
             ) : null}
           </div>
-          <p className="mt-0.5 line-clamp-3 text-[13px] font-medium leading-snug text-slate-50">
+          <p
+            className={cn(
+              "mt-0.5 line-clamp-3 text-[13px] font-medium leading-snug",
+              dark ? "text-slate-50" : "text-foreground",
+            )}
+          >
             {title}
           </p>
         </div>
         <button
           type="button"
           onClick={() => onOpenChange(false)}
-          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-white/[0.06] hover:text-slate-200"
+          className={cn(
+            "inline-flex size-6 shrink-0 items-center justify-center rounded-md",
+            dark
+              ? "text-slate-500 hover:bg-white/[0.06] hover:text-slate-200"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
           aria-label="Close"
         >
           <X className="size-3.5" />

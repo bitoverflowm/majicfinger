@@ -788,10 +788,16 @@ export function WarRoomView({
             "min-h-0 overflow-hidden transition-[width,opacity,border-color] duration-300 ease-out",
             compact
               ? mobileView === "detail"
-                ? "flex w-full flex-col border-r border-white/10"
+                ? cn(
+                    "flex w-full flex-col border-r",
+                    dark ? "border-white/10" : "border-border/70",
+                  )
                 : "hidden w-0"
               : showLeft
-                ? "flex w-[min(100%,26rem)] shrink-0 flex-col border-r border-white/10 opacity-100"
+                ? cn(
+                    "flex w-[min(100%,26rem)] shrink-0 flex-col border-r opacity-100",
+                    dark ? "border-white/10" : "border-border/70",
+                  )
                 : "w-0 border-r-0 opacity-0",
           )}
         >

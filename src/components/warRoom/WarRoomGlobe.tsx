@@ -7,7 +7,12 @@ import "./war-room-globe.css";
 import { MAP_UPDATE_CADENCE_MS } from "@/lib/warRoom/constants";
 import { cn } from "@/lib/utils";
 
-import { WAR_ROOM_FALLBACK_STYLE, WAR_ROOM_SPACE_BLACK, WAR_ROOM_VECTOR_STYLE } from "./mapStyle";
+import {
+  warRoomFallbackStyle,
+  warRoomSpaceColor,
+  warRoomVectorStyle,
+} from "./mapStyle";
+import { useWarRoomTheme } from "./useWarRoomTheme";
 
 function stripAttribution(map: { getContainer?: () => HTMLElement }) {
   const root = map.getContainer?.();
@@ -129,6 +134,7 @@ export function WarRoomGlobe({
   keepGlobe = false,
   resetNonce = 0,
 }: WarRoomGlobeProps) {
+  const { dark } = useWarRoomTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
   const onSelectRef = useRef(onSelect);
@@ -145,6 +151,9 @@ export function WarRoomGlobe({
   const knownIdsRef = useRef<Set<string>>(new Set());
   const selectedRef = useRef(selectedMarketId);
   selectedRef.current = selectedMarketId;
+  const darkRef = useRef(dark);
+  darkRef.current = dark;
+  const styleReadyRef = useRef(false);
   const flushTimer = useRef<number | null>(null);
   const focusKeyRef = useRef<string | number | null>(null);
 
@@ -244,24 +253,41 @@ export function WarRoomGlobe({
         instance.on("style.load", () => {
           stripAttribution(instance);
           applyProjection(instance);
+          const isDark = darkRef.current;
+          const space = warRoomSpaceColor(isDark);
           try {
             const style = instance.getStyle?.();
             for (const layer of style?.layers || []) {
               if (layer?.type === "background" && layer.id) {
-                instance.setPaintProperty(layer.id, "background-color", WAR_ROOM_SPACE_BLACK);
+                // Only paint void on fallback/empty styles — leave OpenFreeMap land colors intact.
+                if (!isDark && layer.id === "background") {
+                  /* liberty already has a light background */
+                } else if (isDark) {
+                  instance.setPaintProperty(layer.id, "background-color", space);
+                }
               }
             }
           } catch {
             /* style may omit a background layer */
           }
           try {
-            instance.setFog?.({
-              color: WAR_ROOM_SPACE_BLACK,
-              "high-color": WAR_ROOM_SPACE_BLACK,
-              "space-color": WAR_ROOM_SPACE_BLACK,
-              "horizon-blend": 0.02,
-              "star-intensity": 0,
-            });
+            if (isDark) {
+              instance.setFog?.({
+                color: space,
+                "high-color": space,
+                "space-color": space,
+                "horizon-blend": 0.02,
+                "star-intensity": 0,
+              });
+            } else {
+              instance.setFog?.({
+                color: "#dbe4f0",
+                "high-color": "#c5d4e8",
+                "space-color": space,
+                "horizon-blend": 0.08,
+                "star-intensity": 0,
+              });
+            }
           } catch {
             /* older MapLibre without fog */
           }
@@ -339,7 +365,9 @@ export function WarRoomGlobe({
                   "#60a5fa",
                 ],
                 "circle-opacity": 0.92,
-                "circle-stroke-width": 0,
+                // Light basemap: thin white ring so venue colors stay readable on land.
+                "circle-stroke-width": isDark ? 0 : 1.25,
+                "circle-stroke-color": "#ffffff",
               },
             });
             instance.addLayer({
@@ -376,10 +404,10 @@ export function WarRoomGlobe({
                 "text-optional": true,
               },
               paint: {
-                "text-color": "#e2e8f0",
-                "text-halo-color": WAR_ROOM_SPACE_BLACK,
-                "text-halo-width": 1,
-                "text-opacity": 0.85,
+                "text-color": isDark ? "#e2e8f0" : "#0f172a",
+                "text-halo-color": isDark ? warRoomSpaceColor(true) : "#ffffff",
+                "text-halo-width": isDark ? 1 : 1.5,
+                "text-opacity": 0.9,
               },
             });
             instance.addSource(PING_SOURCE_ID, {
@@ -446,16 +474,18 @@ export function WarRoomGlobe({
       };
 
       try {
+        const preferDark = darkRef.current;
         try {
-          map = await start(WAR_ROOM_VECTOR_STYLE);
+          map = await start(warRoomVectorStyle(preferDark));
         } catch {
-          map = await start(WAR_ROOM_FALLBACK_STYLE);
+          map = await start(warRoomFallbackStyle(preferDark));
         }
         if (cancelled) {
           map?.remove();
           return;
         }
         mapRef.current = map;
+        styleReadyRef.current = true;
       } catch (err) {
         console.warn("War Room globe failed; keeping poster", err);
         onFailRef.current?.();
@@ -464,12 +494,28 @@ export function WarRoomGlobe({
 
     return () => {
       cancelled = true;
+      styleReadyRef.current = false;
       if (flushTimer.current) window.clearTimeout(flushTimer.current);
       if (hiddenHandler) document.removeEventListener("visibilitychange", hiddenHandler);
       mapRef.current?.remove();
       mapRef.current = null;
     };
   }, [interactive, keepGlobe]);
+
+  // Swap OpenFreeMap basemap when next-themes resolves light ↔ dark.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleReadyRef.current) return;
+    try {
+      map.setStyle(warRoomVectorStyle(dark) as never);
+    } catch {
+      try {
+        map.setStyle(warRoomFallbackStyle(dark) as never);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [dark]);
 
   // Sync MapLibre scrollZoom with homepage explore scroll-lock (`data-landing-demo-locked`).
   useEffect(() => {
@@ -615,8 +661,13 @@ export function WarRoomGlobe({
   return (
     <div
       ref={containerRef}
-      className={cn("relative h-full w-full bg-black", className)}
+      className={cn(
+        "relative h-full w-full",
+        dark ? "bg-black" : "bg-[#e8eef5]",
+        className,
+      )}
       data-war-room-globe
+      data-war-room-globe-theme={dark ? "dark" : "light"}
     />
   );
 }

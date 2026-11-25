@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 import { formatAge, venueLabel } from "./format";
+import { useWarRoomTheme } from "./useWarRoomTheme";
 
 export type ActivityRow = {
   id: string;
@@ -26,13 +27,19 @@ export type ActivityRow = {
   } | null;
 };
 
-function KindBadge({ kind }: { kind: string }) {
+function KindBadge({ kind, dark }: { kind: string; dark: boolean }) {
   const news = kind === "headline";
   return (
     <span
       className={cn(
         "inline-flex shrink-0 items-center rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide",
-        news ? "bg-violet-400/20 text-violet-200" : "bg-amber-400/15 text-amber-200",
+        news
+          ? dark
+            ? "bg-violet-400/20 text-violet-200"
+            : "bg-violet-500/15 text-violet-700"
+          : dark
+            ? "bg-amber-400/15 text-amber-200"
+            : "bg-amber-500/15 text-amber-800",
       )}
     >
       {news ? "News" : "Trade"}
@@ -49,6 +56,7 @@ export function ActivityPane({
   selectedId?: string | null;
   onSelect: (row: ActivityRow) => void;
 }) {
+  const { dark } = useWarRoomTheme();
   const seenRef = useRef<Set<string>>(new Set());
   const [fresh, setFresh] = useState<Record<string, true>>({});
 
@@ -75,7 +83,12 @@ export function ActivityPane({
 
   if (!rows.length) {
     return (
-      <div className="px-2.5 py-6 text-[11px] leading-snug text-slate-500">
+      <div
+        className={cn(
+          "px-2.5 py-6 text-[11px] leading-snug",
+          dark ? "text-slate-500" : "text-muted-foreground",
+        )}
+      >
         Waiting for live trades and headlines…
       </div>
     );
@@ -98,21 +111,42 @@ export function ActivityPane({
                 onClick={() => onSelect(row)}
                 aria-current={selected ? "true" : undefined}
                 className={cn(
-                  "flex w-full items-start gap-2 border-b border-white/[0.04] px-2.5 py-1.5 text-left transition duration-300",
-                  selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]",
+                  "flex w-full items-start gap-2 border-b px-2.5 py-1.5 text-left transition duration-300",
+                  dark ? "border-white/[0.04]" : "border-border/60",
+                  selected
+                    ? dark
+                      ? "bg-white/[0.08]"
+                      : "bg-muted"
+                    : dark
+                      ? "hover:bg-white/[0.04]"
+                      : "hover:bg-muted/60",
                   isFresh && row.kind === "headline" && "animate-in fade-in slide-in-from-right-1 bg-violet-400/15",
                   isFresh && row.kind !== "headline" && "animate-in fade-in slide-in-from-right-1 bg-amber-400/15",
                 )}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <KindBadge kind={row.kind} />
-                    <span className="truncate text-[11px] leading-tight text-slate-200">{primary}</span>
+                    <KindBadge kind={row.kind} dark={dark} />
+                    <span
+                      className={cn(
+                        "truncate text-[11px] font-medium leading-tight",
+                        dark ? "text-slate-200" : "text-foreground",
+                      )}
+                    >
+                      {primary}
+                    </span>
                   </div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-slate-500">
+                  <div
+                    className={cn(
+                      "mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px]",
+                      dark ? "text-slate-500" : "text-muted-foreground",
+                    )}
+                  >
                     {tradeSummary ? (
                       <>
-                        <span className="truncate text-slate-400">{tradeSummary}</span>
+                        <span className={cn("truncate", dark ? "text-slate-400" : "text-muted-foreground")}>
+                          {tradeSummary}
+                        </span>
                         <span>·</span>
                       </>
                     ) : null}

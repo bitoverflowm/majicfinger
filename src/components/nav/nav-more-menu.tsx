@@ -27,8 +27,46 @@ const SOCIALS = [
   },
 ] as const;
 
+function ThemeAndSocialsRows({
+  themeLayoutId,
+  className,
+}: {
+  themeLayoutId: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex w-full flex-col", className)}>
+      {/* Labeled Theme row — toggle flush right (ref: compact control rows). */}
+      <div className="flex items-center justify-between gap-3 px-2.5 py-2">
+        <span className="text-[13px] font-medium leading-none text-foreground">Theme</span>
+        <ThemeSwitcher size="sm" layoutId={themeLayoutId} />
+      </div>
+      <div className="mx-2 h-px bg-border/80" role="separator" />
+      {/* Socials row — icon pill flush right. */}
+      <div className="flex items-center justify-between gap-3 px-2.5 py-2">
+        <span className="text-[13px] font-medium leading-none text-foreground">Socials</span>
+        <div className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-black/[0.05] p-0.5 dark:bg-white/[0.06]">
+          {SOCIALS.map(({ id, label, href, Icon }) => (
+            <a
+              key={id}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={label}
+              title={label}
+              className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground dark:hover:bg-white/[0.1]"
+            >
+              <Icon className="size-3.5" />
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
- * Desktop hamburger next to Login / Dashboard: theme (same as footer) + Socials pill.
+ * Desktop hamburger next to Login / Dashboard: Theme + Socials (footer theme control).
  */
 export function NavMoreMenu({ className }: { className?: string }) {
   return (
@@ -49,31 +87,10 @@ export function NavMoreMenu({ className }: { className?: string }) {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-[min(100vw-1.5rem,17.5rem)] rounded-xl border border-border/70 bg-background p-1.5 shadow-lg"
+        className="w-[15.5rem] min-w-[15.5rem] rounded-xl border border-border/70 bg-background p-1 shadow-lg"
         onCloseAutoFocus={(event) => event.preventDefault()}
       >
-        <div className="flex items-center justify-end px-2 py-2">
-          <ThemeSwitcher layoutId="nav-theme-switcher-pill" />
-        </div>
-        <div className="mx-1 h-px bg-border/70" role="separator" />
-        <div className="flex items-center justify-between gap-3 px-2 py-2.5">
-          <span className="text-[13px] font-medium text-foreground">Socials</span>
-          <div className="inline-flex items-center gap-0.5 rounded-full bg-black/[0.05] p-1 dark:bg-white/[0.06]">
-            {SOCIALS.map(({ id, label, href, Icon }) => (
-              <a
-                key={id}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={label}
-                title={label}
-                className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground dark:hover:bg-white/[0.1]"
-              >
-                <Icon className="size-4" />
-              </a>
-            ))}
-          </div>
-        </div>
+        <ThemeAndSocialsRows themeLayoutId="nav-theme-switcher-pill" />
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -82,29 +99,8 @@ export function NavMoreMenu({ className }: { className?: string }) {
 /** Compact theme + socials block for the mobile drawer (same controls as the desktop menu). */
 export function NavMoreMenuInline({ className }: { className?: string }) {
   return (
-    <div className={cn("space-y-2 rounded-xl border border-border/70 p-3", className)}>
-      <div className="flex items-center justify-end">
-        <ThemeSwitcher layoutId="nav-drawer-theme-switcher-pill" />
-      </div>
-      <div className="h-px bg-border/70" role="separator" />
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[13px] font-medium text-foreground">Socials</span>
-        <div className="inline-flex items-center gap-0.5 rounded-full bg-black/[0.05] p-1 dark:bg-white/[0.06]">
-          {SOCIALS.map(({ id, label, href, Icon }) => (
-            <a
-              key={id}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={label}
-              title={label}
-              className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground dark:hover:bg-white/[0.1]"
-            >
-              <Icon className="size-4" />
-            </a>
-          ))}
-        </div>
-      </div>
+    <div className={cn("rounded-xl border border-border/70 bg-background p-1", className)}>
+      <ThemeAndSocialsRows themeLayoutId="nav-drawer-theme-switcher-pill" />
     </div>
   );
 }
