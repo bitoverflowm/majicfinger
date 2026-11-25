@@ -2340,7 +2340,13 @@ const feedTipsShown = new Set();
 const feedsStarted = new Set();
 const FEED_TIP_MS = 6000;
 
-function RealtimeToggle({ block }) {
+/** Bring a tip / ⋮ target into the user's viewport (page + nested scrollers). */
+function scrollTargetIntoView(el) {
+  if (!(el instanceof HTMLElement)) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+}
+
+function RealtimeToggle({ block, onMembersOnly }) {
   const canvas = useWorkspaceCanvas();
   const match = realtimeSheetForBlock(block, canvas?.blocks || []);
   const session = match ? liveSession(canvas, match.sheet.id) : null;
@@ -2381,6 +2387,11 @@ function RealtimeToggle({ block }) {
       onClick={(event) => {
         event.stopPropagation();
         setTip(false);
+        // Homepage `#demo`: Realtime is members-only — show upgrade instead of starting the feed.
+        if (onMembersOnly) {
+          onMembersOnly();
+          return;
+        }
         if (running) canvas?.stopSheetRealtime?.(match.sheet.id);
         else canvas?.startSheetRealtime?.(match.sheet.id);
       }}
@@ -2498,7 +2509,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     }
   };
 
-  const [exportLocked, setExportLocked] = useState(false);
+  /** Shared Members only gate for Export / Realtime / Duplicate on `#demo`. */
+  const [membersFeature, setMembersFeature] = useState(null);
   const touring = exportTour && !!exportFormats && !readOnly;
   const [exportItem, setExportItem] = useState(null);
   const exportItemRef = useMemo(() => ({ current: exportItem }), [exportItem]);
@@ -2515,6 +2527,18 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     const timer = window.setTimeout(() => setExportTipReady(true), 220);
     return () => window.clearTimeout(timer);
   }, [touring, menuOpen, exportItem]);
+  // Keep the Export ⋮ target (and tip) in view — landing page scroll often leaves them below the fold.
+  useEffect(() => {
+    if (!touring) return undefined;
+    const menu = rootRef.current?.querySelector("[data-block-menu]");
+    scrollTargetIntoView(menu);
+    return undefined;
+  }, [touring]);
+  useEffect(() => {
+    if (!exportTipReady || !exportItem) return undefined;
+    const frame = window.requestAnimationFrame(() => scrollTargetIntoView(exportItem));
+    return () => window.cancelAnimationFrame(frame);
+  }, [exportTipReady, exportItem]);
   const endExportTour = () => {
     setMenuOpen(false);
     onExportTourDone?.();
@@ -2755,7 +2779,12 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
         transition: resizing ? "none" : "left 480ms cubic-bezier(0.22, 1, 0.36, 1), top 480ms cubic-bezier(0.22, 1, 0.36, 1), width 480ms cubic-bezier(0.22, 1, 0.36, 1), height 480ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
-      {readOnly || framelessSearch ? null : <RealtimeToggle block={block} />}
+      {readOnly || framelessSearch ? null : (
+        <RealtimeToggle
+          block={block}
+          onMembersOnly={landingDemo ? () => setMembersFeature("Realtime") : undefined}
+        />
+      )}
       {readOnly || framelessSearch ? null : (
       <DropdownMenu
         open={menuOpen}
@@ -2872,7 +2901,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                 "gap-2.5 rounded-md px-2 py-2 text-[13px]",
                 touring && "bg-[#0d99ff]/10 text-[#0b6fc2] ring-1 ring-[#0d99ff]/40 dark:text-[#5cb8ff]",
               )}
-              onSelect={() => setExportLocked(true)}
+              onSelect={() => setMembersFeature("Exporting")}
             >
               <Download className={cn("size-4 text-muted-foreground", touring && "text-[#0d99ff]")} />
               Export
@@ -2913,7 +2942,13 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
             <>
               <DropdownMenuItem
                 className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
-                onSelect={() => canvas?.duplicateBlock?.(block.id)}
+                onSelect={() => {
+                  if (landingDemo) {
+                    setMembersFeature("Duplicate");
+                    return;
+                  }
+                  canvas?.duplicateBlock?.(block.id);
+                }}
               >
                 <Copy className="size-4 text-muted-foreground" />
                 Duplicate
@@ -2940,7 +2975,13 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       </DropdownMenu>
       )}
       {touring && exportItem ? <ExportFeatureTip anchorRef={exportItemRef} open={exportTipReady} onDone={endExportTour} /> : null}
-      {landingDemo ? <LandingDemoMembersOnlyPortal open={exportLocked} feature="Exporting" onClose={() => setExportLocked(false)} /> : null}
+      {landingDemo ? (
+        <LandingDemoMembersOnlyPortal
+          open={!!membersFeature}
+          feature={membersFeature || "This feature"}
+          onClose={() => setMembersFeature(null)}
+        />
+      ) : null}
       {fullscreen && block.type === "sheet" && !readOnly ? (
         <SheetFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} />
       ) : fullscreen && block.type === "chart" && !readOnly ? (
@@ -3068,15 +3109,14 @@ export function WorkspaceCanvas() {
     }
     if (exportTourId) return undefined;
     const timers = [];
-    // After the run card closes: let the dashboard settle, scroll up to the block, then open its menu.
+    // After the run card closes: let the dashboard settle, bring the sheet into the page
+    // viewport (landing `#demo` often scrolls the stage off-screen), then open its ⋮ menu.
     timers.push(
       window.setTimeout(() => {
-        const scroller = scrollerRef.current;
-        const el = scroller?.querySelector(`[data-block-id="${CSS.escape(tipBlockId)}"]`);
-        if (scroller && el instanceof HTMLElement) {
-          const top = scroller.scrollTop + el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24;
-          scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-        }
+        const el =
+          scrollerRef.current?.querySelector(`[data-block-id="${CSS.escape(tipBlockId)}"]`) ||
+          document.querySelector(`[data-block-id="${CSS.escape(tipBlockId)}"]`);
+        scrollTargetIntoView(el);
         timers.push(window.setTimeout(() => setExportTourId(tipBlockId), 650));
       }, 900),
     );
