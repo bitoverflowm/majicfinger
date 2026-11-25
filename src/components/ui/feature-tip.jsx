@@ -126,6 +126,23 @@ export function dismissFeatureTip(id) {
   dismissers.get(id)?.forEach((dismiss) => dismiss());
 }
 
+/**
+ * Clear a tip's dismissed state (session + storage) so it can show again.
+ * Used on `#demo` Historical / Present so each completed pull can re-run
+ * confetti → first-pull tip → export ⋮ tour (Kalshi and Polymarket).
+ */
+export function resetFeatureTip(id, userId) {
+  if (!id || typeof window === "undefined") return;
+  const key = storageKey(id, userId);
+  sessionDismissed.delete(key);
+  broadcastDismissed(key, false);
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Private mode — in-memory reset is enough for this page load.
+  }
+}
+
 /** Tips that are on screen, or about to be. Lets a tip wait for another (`after`) across components. */
 const pendingTips = new Map();
 const pendingListeners = new Set();

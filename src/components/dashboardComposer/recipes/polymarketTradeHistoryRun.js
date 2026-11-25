@@ -17,12 +17,12 @@ const PREVIEW_ROWS = 50;
  * progress card on top. The sheet and its default charts land with the first page of trades
  * and fill in as the rest arrive.
  */
-export async function runPolymarketTradeHistory({ meta, plan, canvas, close, accountId }) {
+export async function runPolymarketTradeHistory({ meta, plan, canvas, close, accountId, firstPull = false }) {
   const reporter = createRunReporter((feed) => canvas?.reportRun?.(feed));
   const route = describePlan(plan);
   const limit = RECIPE_TRADE_ROW_LIMIT;
   const handle = meta.slug || meta.conditionId;
-  canvas?.armReplay?.(() => runPolymarketTradeHistory({ meta, plan, canvas, close: null, accountId }));
+  canvas?.armReplay?.(() => runPolymarketTradeHistory({ meta, plan, canvas, close: null, accountId, firstPull }));
   reporter.plan(
     [
       { id: "find", name: "find_market", status: "pending", args: { market: handle } },
@@ -36,6 +36,8 @@ export async function runPolymarketTradeHistory({ meta, plan, canvas, close, acc
       doneLabel: "Trade history ready",
       failLabel: "Trade history failed",
       readyDetail: "The trade sheet and its charts are on the canvas behind this card.",
+      // Homepage `#demo`: confetti + first-pull tip → export ⋮ tour after Save and Go.
+      firstPull: !!firstPull,
     },
   );
   close?.();

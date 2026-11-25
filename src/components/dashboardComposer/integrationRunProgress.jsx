@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AgentSteps, formatElapsed } from "@/components/dashboardComposer/agentSteps";
-import { FIRST_PULL_TIP_ID, FirstPullFeatureTip } from "@/components/dashboardComposer/buildFeatureTips";
-import { dismissFeatureTip, isFeatureTipDismissed } from "@/components/ui/feature-tip";
+import {
+  EXPORT_TIP_ID,
+  FIRST_PULL_TIP_ID,
+  FirstPullFeatureTip,
+} from "@/components/dashboardComposer/buildFeatureTips";
+import { dismissFeatureTip, isFeatureTipDismissed, resetFeatureTip } from "@/components/ui/feature-tip";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { isLandingConnectExploreSurface } from "@/lib/landingDemoExplore";
 import { cn } from "@/lib/utils";
@@ -22,12 +26,23 @@ export function RunProgressCard({ feed, onDismiss, onReplay }) {
   const demoConnect = !!ctx?.landingDemo && isLandingConnectExploreSurface(ctx?.landingDemoSurface);
   const [now, setNow] = useState(() => Date.now());
   const viewButtonRef = useRef(null);
+  const armedCelebrateRef = useRef(null);
   const live = feed?.status === "running";
   useEffect(() => {
     if (!live) return undefined;
     const timer = window.setInterval(() => setNow(Date.now()), 200);
     return () => window.clearInterval(timer);
   }, [live]);
+  // Each successful `#demo` Historical / Present pull re-arms confetti + export ⋮ tour
+  // (Kalshi and Polymarket recipes share tip ids — without reset, a second pull skips celebration).
+  useEffect(() => {
+    if (!demoConnect || !feed?.id || feed.status !== "done") return;
+    if (!runSucceeded(feed)) return;
+    if (armedCelebrateRef.current === feed.id) return;
+    armedCelebrateRef.current = feed.id;
+    resetFeatureTip(FIRST_PULL_TIP_ID);
+    resetFeatureTip(EXPORT_TIP_ID);
+  }, [demoConnect, feed]);
   if (!feed?.steps?.length) return null;
   const elapsed = formatElapsed((feed.completedAt || now) - (feed.startedAt || now));
   const succeeded = runSucceeded(feed);

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Check, CircleAlert, TrendingUp } from "lucide-react";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { useUser } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import { MarketCardSkeleton, MarketSearchColumn, MarketStatsCard, usePolymarketMarketPicker } from "./polymarketMarketSearch";
@@ -97,6 +98,7 @@ export function PolymarketTradeHistoryRecipe({ onBack, Title = "h2", Description
   const connect = useIntegrationConnect();
   const canvas = useWorkspaceCanvas();
   const user = useUser();
+  const ctx = useMyStateV2();
   const picker = usePolymarketMarketPicker();
   const { selected, meta, metaStatus, metaError } = picker;
   const plan = useMemo(() => (meta ? planTradeSources(meta) : null), [meta]);
@@ -110,6 +112,7 @@ export function PolymarketTradeHistoryRecipe({ onBack, Title = "h2", Description
       canvas,
       close: () => connect?.close?.(),
       accountId: user?.userId || "",
+      firstPull: !!ctx?.landingDemo,
     });
   };
 
