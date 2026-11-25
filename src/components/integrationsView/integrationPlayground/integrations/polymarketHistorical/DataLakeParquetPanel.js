@@ -98,6 +98,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MetaAddOperationDialog } from "./MetaAddOperationDialog";
+import { MembersOnlyUpgradePortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   applyConnectHomeSheetNameToActiveSheet,
@@ -5972,26 +5973,11 @@ export default function DataLakeParquetPanel({
         onComplete={handleMetaAddOperationComplete}
       />
 
-      <Dialog open={demoUpgradeDialogOpen} onOpenChange={setDemoUpgradeDialogOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Upgrade required</DialogTitle>
-            <DialogDescription>
-              Upgrade to use {demoUpgradeFeature}.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <DialogClose asChild>
-              <Button variant="ghost">Cancel</Button>
-            </DialogClose>
-            <DialogClose asChild>
-              <Button asChild>
-                <a href="/#pricing">See options</a>
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MembersOnlyUpgradePortal
+        open={demoUpgradeDialogOpen}
+        feature={demoUpgradeFeature}
+        onClose={() => setDemoUpgradeDialogOpen(false)}
+      />
 
       <AlertDialog open={newRequestDialogOpen} onOpenChange={setNewRequestDialogOpen}>
         <AlertDialogContent>

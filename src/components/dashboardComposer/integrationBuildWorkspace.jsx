@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { columnMissingFromRows } from "@/lib/integrations/columnPayload";
 import { LandingDemoMembersOnlyDialog } from "@/components/dashboardComposer/landingDemoMembersOnly";
+import { LandingDemoViewportOverlay } from "@/components/dashboardComposer/landingDemoViewportOverlay";
 import {
   AttributesFeatureTip,
   BUILD_TIP_IDS,
@@ -7330,7 +7331,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (enrichPicks.has("summarize")) planned.push({ id: "summary", name: "summarize", status: "pending" });
     if (enrichPicks.has("function")) planned.push({ id: "functions", name: "function_columns", status: "pending" });
     planned.push({ id: "place", name: "place_sheets", status: "pending", args: { tab: sheetTitle } });
-    reporter.plan(planned, { title: `${venueLabel} · ${sheetTitle}`, firstPull: !pulls.length });
+    // Homepage `#demo` always celebrates the completed tip workflow (confetti → ⋮ export tour).
+    reporter.plan(planned, {
+      title: `${venueLabel} · ${sheetTitle}`,
+      firstPull: !!ctx?.landingDemo || !pulls.length,
+    });
     connect?.close?.();
     let marketRows = liveMatchedRows
       ? liveMatchedRows
@@ -10052,7 +10057,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   return (
     <div className="relative flex min-h-0 flex-1 bg-background">
       {functionHelp ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6" onClick={() => setFunctionHelp(false)}>
+        <LandingDemoViewportOverlay open zIndexClassName="z-[550]" onBackdropClick={() => setFunctionHelp(false)}>
           <div
             role="dialog"
             aria-labelledby="function-help-title"
@@ -10088,7 +10093,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               ))}
             </ul>
           </div>
-        </div>
+        </LandingDemoViewportOverlay>
       ) : null}
       <aside className="flex w-[340px] shrink-0 flex-col border-r border-border/70">
         {step === "enrich" && lockedQuery ? (
@@ -11837,7 +11842,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         </div>
       </section>
       {seriesBrowsePrompt ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
+        <LandingDemoViewportOverlay open zIndexClassName="z-[550]">
           <div
             role="dialog"
             aria-labelledby="series-browse-title"
@@ -11859,10 +11864,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </Button>
             </div>
           </div>
-        </div>
+        </LandingDemoViewportOverlay>
       ) : null}
       {sampleSavePrompt ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
+        <LandingDemoViewportOverlay open zIndexClassName="z-[550]">
           <div
             role="dialog"
             aria-labelledby="sample-save-title"
@@ -11886,12 +11891,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </Button>
             </div>
           </div>
-        </div>
+        </LandingDemoViewportOverlay>
       ) : null}
       {placementPrompt === "members" ? (
         <LandingDemoMembersOnlyDialog onBack={backFromMembersPrompt} onUpgrade={closePlacementPrompt} />
       ) : placementPrompt ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
+        <LandingDemoViewportOverlay open zIndexClassName="z-[550]">
           <div
             role="dialog"
             aria-labelledby="pull-destination-title"
@@ -11915,7 +11920,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </Button>
             </div>
           </div>
-        </div>
+        </LandingDemoViewportOverlay>
       ) : null}
     </div>
   );

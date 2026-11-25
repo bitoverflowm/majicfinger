@@ -43,16 +43,7 @@ import DotPattern from "@/components/magicui/dot-pattern";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { MembersOnlyUpgradePortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { scrollToPricingSection } from "@/lib/scrollToPricing";
 import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { CONNECT_HOME_CENTER_VIEW } from "@/lib/connectHomeFlow";
@@ -613,21 +604,11 @@ export default function DashboardComposerPage({ user }) {
   }, [polymarketLiveRealtimeSession, savedChartDashboards]);
 
   const demoDashboardDialog = (
-    <AlertDialog open={demoDashboardDialogOpen} onOpenChange={setDemoDashboardDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Dashboards are a Pro feature</AlertDialogTitle>
-          <AlertDialogDescription>
-            Only Pro users have access to dashboards. Sign up to create and share your custom
-            dashboard.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Not now</AlertDialogCancel>
-          <AlertDialogAction onClick={() => scrollToPricingSection()}>Sign up</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <MembersOnlyUpgradePortal
+      open={demoDashboardDialogOpen}
+      feature="Dashboards"
+      onClose={() => setDemoDashboardDialogOpen(false)}
+    />
   );
 
   if (!draft) {
