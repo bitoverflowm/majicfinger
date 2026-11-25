@@ -36,7 +36,6 @@ export function WarRoomHeroSection({ fixture = false }: { fixture?: boolean }) {
             See plans
             <span aria-hidden>→</span>
           </Link>
-          <p className="text-sm font-medium text-muted-foreground">10K+ users</p>
         </div>
       </div>
       <HomepageExploreTabs fixture={fixture} />
