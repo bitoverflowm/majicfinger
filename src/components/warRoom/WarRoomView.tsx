@@ -600,16 +600,50 @@ export function WarRoomView({
     >
       {(
         [
-          { key: "markets", label: "markets", value: formatCount(viewStats.markets), color: "text-sky-300" },
-          { key: "news", label: "breaking news", value: formatCount(viewStats.news), color: "text-rose-300" },
-          { key: "trades", label: "trades this session", value: formatCount(viewStats.trades), color: "text-amber-300" },
-          { key: "volume", label: "volume tracked", value: formatVolume(viewStats.volume), color: "text-emerald-300" },
-          { key: "traders", label: "traders", value: formatCount(viewStats.traders), color: "text-violet-300" },
+          {
+            key: "markets",
+            label: "markets",
+            value: formatCount(viewStats.markets),
+            color: dark ? "text-sky-300" : "text-sky-700",
+          },
+          {
+            key: "news",
+            label: "breaking news",
+            value: formatCount(viewStats.news),
+            color: dark ? "text-rose-300" : "text-rose-700",
+          },
+          {
+            key: "trades",
+            label: "trades this session",
+            value: formatCount(viewStats.trades),
+            color: dark ? "text-amber-300" : "text-amber-800",
+          },
+          {
+            key: "volume",
+            label: "volume tracked",
+            value: formatVolume(viewStats.volume),
+            color: dark ? "text-emerald-300" : "text-emerald-700",
+          },
+          {
+            key: "traders",
+            label: "traders",
+            value: formatCount(viewStats.traders),
+            color: dark ? "text-violet-300" : "text-violet-700",
+          },
         ] as const
       ).map((stat) => (
         <div key={stat.key} className="leading-none">
-          <span className={cn("font-mono text-[11px] tabular-nums", stat.color)}>{stat.value}</span>
-          <span className="ml-1.5 text-[9px] uppercase tracking-[0.12em] text-slate-500">{stat.label}</span>
+          <span className={cn("font-mono text-[11px] font-semibold tabular-nums", stat.color)}>
+            {stat.value}
+          </span>
+          <span
+            className={cn(
+              "ml-1.5 text-[9px] font-medium uppercase tracking-[0.12em]",
+              dark ? "text-slate-500" : "text-slate-700",
+            )}
+          >
+            {stat.label}
+          </span>
         </div>
       ))}
     </div>

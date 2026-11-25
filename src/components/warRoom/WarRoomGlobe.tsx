@@ -8,6 +8,7 @@ import { MAP_UPDATE_CADENCE_MS } from "@/lib/warRoom/constants";
 import { cn } from "@/lib/utils";
 
 import {
+  applyWarRoomLightBasemapChrome,
   warRoomFallbackStyle,
   warRoomSpaceColor,
   warRoomVectorStyle,
@@ -255,23 +256,18 @@ export function WarRoomGlobe({
           applyProjection(instance);
           const isDark = darkRef.current;
           const space = warRoomSpaceColor(isDark);
-          try {
-            const style = instance.getStyle?.();
-            for (const layer of style?.layers || []) {
-              if (layer?.type === "background" && layer.id) {
-                // Only paint void on fallback/empty styles — leave OpenFreeMap land colors intact.
-                if (!isDark && layer.id === "background") {
-                  /* liberty already has a light background */
-                } else if (isDark) {
+          if (isDark) {
+            try {
+              const style = instance.getStyle?.();
+              for (const layer of style?.layers || []) {
+                if (layer?.type === "background" && layer.id) {
                   instance.setPaintProperty(layer.id, "background-color", space);
                 }
               }
+            } catch {
+              /* style may omit a background layer */
             }
-          } catch {
-            /* style may omit a background layer */
-          }
-          try {
-            if (isDark) {
+            try {
               instance.setFog?.({
                 color: space,
                 "high-color": space,
@@ -279,17 +275,12 @@ export function WarRoomGlobe({
                 "horizon-blend": 0.02,
                 "star-intensity": 0,
               });
-            } else {
-              instance.setFog?.({
-                color: "#dbe4f0",
-                "high-color": "#c5d4e8",
-                "space-color": space,
-                "horizon-blend": 0.08,
-                "star-intensity": 0,
-              });
+            } catch {
+              /* older MapLibre without fog */
             }
-          } catch {
-            /* older MapLibre without fog */
+          } else {
+            // Soft land/ocean + white atmosphere (Magic UI light globe palette).
+            applyWarRoomLightBasemapChrome(instance);
           }
           if (!instance.getSource(SOURCE_ID)) {
             instance.addSource(SOURCE_ID, {
@@ -661,11 +652,7 @@ export function WarRoomGlobe({
   return (
     <div
       ref={containerRef}
-      className={cn(
-        "relative h-full w-full",
-        dark ? "bg-black" : "bg-[#e8eef5]",
-        className,
-      )}
+      className={cn("relative h-full w-full", dark ? "bg-black" : "bg-[#f4f5f7]", className)}
       data-war-room-globe
       data-war-room-globe-theme={dark ? "dark" : "light"}
     />
