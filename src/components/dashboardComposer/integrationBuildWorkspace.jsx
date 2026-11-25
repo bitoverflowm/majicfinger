@@ -10625,7 +10625,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </DropdownMenu>
             ) : null}
             </div>
-            {groups || visibleTableIds.length > 1 ? <DataTypeFeatureTip anchorRef={dataTypePickerRef} /> : null}
+            {groups || visibleTableIds.length > 1 ? (
+              <DataTypeFeatureTip anchorRef={dataTypePickerRef} integrationId={integrationId} />
+            ) : null}
             {pairStreamOn ? (
               <div className="mt-3">
                 <p className="text-[12px] font-medium text-foreground">Pairs</p>
