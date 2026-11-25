@@ -44,6 +44,20 @@ const LIVELINE_WINDOWS = [
   { label: "All", secs: ALL_WINDOW_SECS },
 ];
 
+/**
+ * Liveline always anchors the right edge to wall-clock now. A fixed 90d “All” window
+ * leaves short-lived markets as a stub on the right while hover still reads older prints.
+ * Size All to the span of available points (same idea as Historical IndicatorChart All).
+ */
+function windowForData(requestedSecs: number, data: readonly LivePoint[]): number {
+  if (requestedSecs !== ALL_WINDOW_SECS || data.length < 2) return requestedSecs;
+  const first = data[0].time;
+  const now = Date.now() / 1000;
+  // Liveline pads ~5% past now on the right; stretch slightly so the first print sits at the left.
+  const span = Math.max(60, now - first);
+  return Math.min(ALL_WINDOW_SECS, Math.max(MOVE_WINDOW_SECS, Math.ceil(span * 1.06)));
+}
+
 /** Polymarket/Kalshi prices as 0–1. Rejects garbage that would read as 800¢. */
 function asProb(raw: unknown): number | null {
   const n = Number(raw);
@@ -331,6 +345,7 @@ function ChartCanvas({
   className?: string;
 }) {
   const { dark, chartTheme } = useWarRoomTheme();
+  const viewWindow = windowForData(windowSecs, data);
   return (
     <Liveline
       data={data}
@@ -340,7 +355,7 @@ function ChartCanvas({
       color={dark ? "#60a5fa" : "#2563eb"}
       momentum
       /* Controlled window only — no `windows` / `showValue` (those sit above height:100% canvas and clip). */
-      window={windowSecs}
+      window={viewWindow}
       scrub
       badge
       badgeVariant="default"
