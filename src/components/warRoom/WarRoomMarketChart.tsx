@@ -217,9 +217,10 @@ function TradesFeed({
   tall?: boolean;
   loading?: boolean;
 }) {
+  const { dark } = useWarRoomTheme();
   if (!trades.length) {
     return (
-      <p className="py-2 text-[11px] text-slate-500">
+      <p className={cn("py-2 text-[11px]", dark ? "text-slate-500" : "text-muted-foreground")}>
         {loading ? "Loading trade history…" : "No trades yet — waiting for the next print…"}
       </p>
     );
@@ -233,22 +234,32 @@ function TradesFeed({
         return (
           <li
             key={trade.id}
-            className="flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11px] last:border-b-0"
+            className={cn(
+              "flex items-center gap-2 border-b py-1.5 text-[11px] last:border-b-0",
+              dark ? "border-white/[0.04]" : "border-border/60",
+            )}
           >
             <span
               className={cn(
                 "w-9 shrink-0 font-semibold uppercase",
-                buy && "text-emerald-300",
-                sell && "text-rose-300",
-                !buy && !sell && "text-slate-500",
+                buy && (dark ? "text-emerald-300" : "text-emerald-600"),
+                sell && (dark ? "text-rose-300" : "text-rose-600"),
+                !buy && !sell && (dark ? "text-slate-500" : "text-muted-foreground"),
               )}
             >
               {buy ? "Buy" : sell ? "Sell" : "Print"}
             </span>
-            <span className="font-mono tabular-nums text-slate-100">{formatCents(trade.price)}</span>
-            <span className="ml-auto text-slate-500">
+            <span
+              className={cn(
+                "font-mono tabular-nums",
+                dark ? "text-slate-100" : "text-foreground",
+              )}
+            >
+              {formatCents(trade.price)}
+            </span>
+            <span className={cn("ml-auto", dark ? "text-slate-500" : "text-muted-foreground")}>
               {trade.size != null ? Math.round(trade.size) : "—"}
-              <span className="mx-1 text-slate-600">·</span>
+              <span className={cn("mx-1", dark ? "text-slate-600" : "text-muted-foreground/70")}>·</span>
               {formatAge(new Date(trade.at).toISOString())}
             </span>
           </li>
@@ -267,12 +278,14 @@ function WindowPills({
   onChange: (secs: number) => void;
   className?: string;
 }) {
+  const { dark } = useWarRoomTheme();
   return (
     <div
       role="tablist"
       aria-label="Chart range"
       className={cn(
-        "inline-flex rounded-full bg-white/[0.03] p-0.5 text-[11px]",
+        "inline-flex rounded-full p-0.5 text-[11px]",
+        dark ? "bg-white/[0.03]" : "bg-muted",
         className,
       )}
     >
@@ -287,7 +300,13 @@ function WindowPills({
             onClick={() => onChange(option.secs)}
             className={cn(
               "rounded-full px-2.5 py-1 font-medium transition-colors",
-              active ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300",
+              active
+                ? dark
+                  ? "bg-white/[0.08] text-white"
+                  : "bg-background text-foreground shadow-sm"
+                : dark
+                  ? "text-slate-500 hover:text-slate-300"
+                  : "text-muted-foreground hover:text-foreground",
             )}
           >
             {option.label}
@@ -311,13 +330,14 @@ function ChartCanvas({
   loading?: boolean;
   className?: string;
 }) {
-  const { chartTheme } = useWarRoomTheme();
+  const { dark, chartTheme } = useWarRoomTheme();
   return (
     <Liveline
       data={data}
       value={value}
       theme={chartTheme}
-      color="#60a5fa"
+      /* Stronger blue on light so the line reads on a pale canvas. */
+      color={dark ? "#60a5fa" : "#2563eb"}
       momentum
       /* Controlled window only — no `windows` / `showValue` (those sit above height:100% canvas and clip). */
       window={windowSecs}
@@ -542,11 +562,18 @@ export function WarRoomMarketChart({
     return () => abort.abort();
   }, [venue, tokenId, ticker, conditionId, reportMove]);
 
+  const { dark } = useWarRoomTheme();
   const liveData = useMemo(() => points, [points]);
   const value = livePrice ?? liveData[liveData.length - 1]?.value ?? 0;
   const chartTitle = String(title || ticker || "Market").trim() || "Market";
   const chartBoxClass = tall ? CHART_H_TALL : CHART_H_COMPACT;
   const tradesBoxClass = tall ? TRADES_H_TALL : TRADES_H_COMPACT;
+  const chartSurface = dark
+    ? "border-white/10 bg-black/40"
+    : "border-border/70 bg-white";
+  const iconBtn = dark
+    ? "border-white/10 bg-black/40 text-slate-300 hover:bg-black/60 hover:text-white"
+    : "border-border/70 bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground";
 
   return (
     <div className={cn("flex min-h-0 flex-col gap-2", className)}>
@@ -555,7 +582,7 @@ export function WarRoomMarketChart({
         <button
           type="button"
           onClick={() => setFullscreen(true)}
-          className="ml-auto inline-flex size-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-slate-300 hover:bg-black/60 hover:text-white"
+          className={cn("ml-auto inline-flex size-7 items-center justify-center rounded-md border", iconBtn)}
           aria-label="Open chart fullscreen"
           title="Fullscreen"
         >
@@ -564,7 +591,8 @@ export function WarRoomMarketChart({
       </div>
       <div
         className={cn(
-          "relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40",
+          "relative shrink-0 overflow-hidden rounded-md border",
+          chartSurface,
           chartBoxClass,
           chartClassName,
         )}
@@ -577,29 +605,56 @@ export function WarRoomMarketChart({
         />
       </div>
       <div className={cn("min-h-0 min-w-0 flex-1 overflow-hidden", tradesBoxClass)}>
-        <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <p
+          className={cn(
+            "mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em]",
+            dark ? "text-slate-500" : "text-muted-foreground",
+          )}
+        >
           Trades
         </p>
         <TradesFeed trades={trades} tall={tall} loading={tradesLoading || historyLoading} />
       </div>
 
       <Dialog open={fullscreen} onOpenChange={setFullscreen}>
-        <DialogContent className="flex h-[min(92svh,52rem)] w-[min(96vw,72rem)] max-w-none flex-col gap-3 overflow-hidden border-white/10 bg-[#07090f] p-3 pt-10 text-slate-100 sm:rounded-xl">
+        <DialogContent
+          className={cn(
+            "flex h-[min(92svh,52rem)] w-[min(96vw,72rem)] max-w-none flex-col gap-3 overflow-hidden p-3 pt-10 sm:rounded-xl",
+            dark
+              ? "border-white/10 bg-[#07090f] text-slate-100"
+              : "border-border bg-background text-foreground",
+          )}
+        >
           <div className="flex min-w-0 items-start justify-between gap-3 pr-8">
             <div className="min-w-0">
-              <DialogTitle className="truncate text-[14px] font-medium text-slate-50">
+              <DialogTitle
+                className={cn(
+                  "truncate text-[14px] font-medium",
+                  dark ? "text-slate-50" : "text-foreground",
+                )}
+              >
                 {chartTitle}
               </DialogTitle>
-              <p className="mt-0.5 font-mono text-[12px] tabular-nums text-slate-400">
+              <p
+                className={cn(
+                  "mt-0.5 font-mono text-[12px] tabular-nums",
+                  dark ? "text-slate-400" : "text-muted-foreground",
+                )}
+              >
                 {formatProb(value)}
-                <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                <span
+                  className={cn(
+                    "ml-2 text-[10px] uppercase tracking-[0.12em]",
+                    dark ? "text-slate-500" : "text-muted-foreground",
+                  )}
+                >
                   Focus mode
                 </span>
               </p>
             </div>
             <WindowPills value={windowSecs} onChange={setWindowSecs} />
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/40">
+          <div className={cn("min-h-0 flex-1 overflow-hidden rounded-md border", chartSurface)}>
             <ChartCanvas
               data={liveData}
               value={value}
@@ -608,7 +663,12 @@ export function WarRoomMarketChart({
             />
           </div>
           <div className="max-h-[10rem] shrink-0 overflow-hidden">
-            <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <p
+              className={cn(
+                "mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em]",
+                dark ? "text-slate-500" : "text-muted-foreground",
+              )}
+            >
               Trades
             </p>
             <TradesFeed trades={trades} tall loading={tradesLoading || historyLoading} />

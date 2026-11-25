@@ -389,15 +389,25 @@ function ResearchHandoffButtons({
   origin: WarRoomResearchOrigin;
   onNavigate?: (request: WarRoomNavigateRequest) => void;
 }) {
+  const { dark } = useWarRoomTheme();
   if (!market?.id || !onNavigate) return null;
   const canHolders = Boolean(polymarketConditionId(market));
+  const primaryClass = dark
+    ? "bg-white text-slate-950 hover:bg-white/90"
+    : "bg-foreground text-background hover:bg-foreground/90";
+  const secondaryClass = dark
+    ? "border border-white/12 text-slate-100 hover:bg-white/[0.04]"
+    : "border border-border text-foreground hover:bg-muted";
   return (
     <div className="mt-auto flex shrink-0 gap-2 pt-1">
       {canHolders ? (
         <button
           type="button"
           onClick={() => onNavigate(researchNavigateFromMarket({ target: "holders", market, origin }))}
-          className="inline-flex h-9 min-w-0 flex-1 items-center justify-center rounded-md bg-white text-[12px] font-medium text-slate-950 hover:bg-white/90"
+          className={cn(
+            "inline-flex h-9 min-w-0 flex-1 items-center justify-center rounded-md text-[12px] font-medium",
+            primaryClass,
+          )}
         >
           Research Holders
         </button>
@@ -407,9 +417,7 @@ function ResearchHandoffButtons({
         onClick={() => onNavigate(researchNavigateFromMarket({ target: "markets", market, origin }))}
         className={cn(
           "inline-flex h-9 min-w-0 flex-1 items-center justify-center rounded-md text-[12px] font-medium",
-          canHolders
-            ? "border border-white/12 text-slate-100 hover:bg-white/[0.04]"
-            : "bg-white text-slate-950 hover:bg-white/90",
+          canHolders ? secondaryClass : primaryClass,
         )}
       >
         Research Market
