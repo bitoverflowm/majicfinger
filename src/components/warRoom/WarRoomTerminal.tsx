@@ -9,6 +9,7 @@ import { warRoomHref } from "@/lib/warRoom/href";
 import { cn } from "@/lib/utils";
 
 import { useWarRoomResearchDemo } from "./useWarRoomResearchDemo";
+import { useWarRoomTheme } from "./useWarRoomTheme";
 import { WarRoomView, type WarRoomNavigateRequest } from "./WarRoomView";
 
 const TABS = [
@@ -84,16 +85,28 @@ export function WarRoomTerminal() {
       : holdersSubject?.kind === "trader"
         ? holdersSubject.address
         : "browse";
+  const { dark } = useWarRoomTheme();
 
   return (
-    <div className="flex h-[100svh] min-h-[100svh] flex-col bg-black text-slate-100">
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-1.5">
+    <div
+      className={cn(
+        "flex h-[100svh] min-h-[100svh] flex-col",
+        dark ? "bg-black text-slate-100" : "bg-background text-foreground",
+      )}
+      data-war-room-theme={dark ? "dark" : "light"}
+    >
+      <header
+        className={cn(
+          "flex shrink-0 items-center justify-between gap-3 border-b px-3 py-1.5",
+          dark ? "border-white/10" : "border-border/70",
+        )}
+      >
         <div className="flex min-w-0 items-center gap-2 text-sm">
-          <Link href="/" className="font-medium text-white">
+          <Link href="/" className={cn("font-medium", dark ? "text-white" : "text-foreground")}>
             Lychee
           </Link>
-          <span className="text-slate-600">/</span>
-          <span className="text-slate-300">War Room</span>
+          <span className={dark ? "text-slate-600" : "text-muted-foreground"}>/</span>
+          <span className={dark ? "text-slate-300" : "text-muted-foreground"}>War Room</span>
         </div>
         <div role="tablist" aria-label="War Room research" className="flex flex-wrap justify-end gap-1.5">
           {TABS.map((item) => {
@@ -107,7 +120,13 @@ export function WarRoomTerminal() {
                 onClick={() => onSelectTab(item.id)}
                 className={cn(
                   "rounded-full px-3 py-1 text-[12px] font-medium transition",
-                  selected ? "bg-white text-slate-950" : "text-slate-400 hover:bg-white/10 hover:text-white",
+                  selected
+                    ? dark
+                      ? "bg-white text-slate-950"
+                      : "bg-foreground text-background"
+                    : dark
+                      ? "text-slate-400 hover:bg-white/10 hover:text-white"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
                 {item.label}

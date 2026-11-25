@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 import { formatAge, formatCents } from "./format";
+import { useWarRoomTheme } from "./useWarRoomTheme";
 
 type LivePoint = { time: number; value: number };
 type TradeRow = {
@@ -310,11 +311,12 @@ function ChartCanvas({
   loading?: boolean;
   className?: string;
 }) {
+  const { chartTheme } = useWarRoomTheme();
   return (
     <Liveline
       data={data}
       value={value}
-      theme="dark"
+      theme={chartTheme}
       color="#60a5fa"
       momentum
       /* Controlled window only — no `windows` / `showValue` (those sit above height:100% canvas and clip). */

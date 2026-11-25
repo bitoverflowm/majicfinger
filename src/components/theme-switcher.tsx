@@ -14,7 +14,14 @@ const OPTIONS = [
 ] as const;
 
 /** System / light / dark segmented control. "system" follows the OS appearance. */
-export function ThemeSwitcher({ className }: { className?: string }) {
+export function ThemeSwitcher({
+  className,
+  /** Unique when more than one switcher is mounted (nav + footer). */
+  layoutId = "theme-switcher-pill",
+}: {
+  className?: string;
+  layoutId?: string;
+}) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -49,7 +56,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
           >
             {selected ? (
               <motion.span
-                layoutId="theme-switcher-pill"
+                layoutId={layoutId}
                 transition={{ type: "spring", stiffness: 500, damping: 38 }}
                 className="absolute inset-0 rounded-full bg-black/[0.08] dark:bg-white/[0.12]"
               />

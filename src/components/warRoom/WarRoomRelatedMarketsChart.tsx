@@ -11,6 +11,7 @@ import { parseWarRoomMarketId } from "@/lib/warRoom/ids";
 
 import { formatCents } from "./format";
 import type { MarketRow } from "./MarketsPane";
+import { useWarRoomTheme } from "./useWarRoomTheme";
 
 type LivePoint = { time: number; value: number };
 
@@ -150,6 +151,7 @@ export function WarRoomRelatedMarketsChart({
   markets: MarketRow[];
   className?: string;
 }) {
+  const { chartTheme } = useWarRoomTheme();
   const [series, setSeries] = useState<SeriesRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [windowSecs, setWindowSecs] = useState(DEFAULT_WINDOW_SECS);
@@ -265,7 +267,7 @@ export function WarRoomRelatedMarketsChart({
         color: row.color,
         label: row.label,
       }))}
-      theme="dark"
+      theme={chartTheme}
       color={primary?.color || "#60a5fa"}
       momentum
       showValue

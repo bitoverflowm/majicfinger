@@ -28,6 +28,7 @@ import { WarRoomLayersRail } from "./WarRoomLayersRail";
 import { WAR_ROOM_LOAD_STEPS, WarRoomRailSkeleton } from "./WarRoomLoadingProgress";
 import { relatedMarketsForHeadline } from "./relatedMarkets";
 import { useWarRoomData } from "./useWarRoomData";
+import { useWarRoomTheme } from "./useWarRoomTheme";
 
 function formatCount(n: number) {
   if (!Number.isFinite(n) || n < 0) return "0";
@@ -89,6 +90,7 @@ export function WarRoomView({
   const compactScreen = useCompactScreen();
   /** Until the breakpoint is known, treat as desktop so we don't thrash mobile snapshot fetches. */
   const compact = compactScreen === true;
+  const { dark, loadTone } = useWarRoomTheme();
   const [localMarket, setLocalMarket] = useState("");
   const [mobileView, setMobileView] = useState<"globe" | "feed" | "detail">("globe");
   const [activityId, setActivityId] = useState<string | null>(null);
@@ -435,7 +437,12 @@ export function WarRoomView({
   );
 
   const mobileTabs = (
-    <div className="flex rounded-full border border-white/10 bg-black/70 p-0.5 text-[11px] backdrop-blur">
+    <div
+      className={cn(
+        "flex rounded-full border p-0.5 text-[11px] backdrop-blur",
+        dark ? "border-white/10 bg-black/70" : "border-border/70 bg-background/90",
+      )}
+    >
       {(
         [
           ["globe", "Globe"],
@@ -448,7 +455,13 @@ export function WarRoomView({
           type="button"
           className={cn(
             "rounded-full px-2 py-0.5",
-            mobileView === id ? "bg-white text-slate-950" : "text-slate-300",
+            mobileView === id
+              ? dark
+                ? "bg-white text-slate-950"
+                : "bg-foreground text-background"
+              : dark
+                ? "text-slate-300"
+                : "text-muted-foreground",
           )}
           onClick={() => setMobileView(id)}
         >
@@ -611,7 +624,7 @@ export function WarRoomView({
       ) : null}
       {loading ? (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3">
-          <DashboardLoadingProgress tone="dark" steps={WAR_ROOM_LOAD_STEPS} />
+          <DashboardLoadingProgress tone={loadTone === "dark" ? "dark" : "default"} steps={WAR_ROOM_LOAD_STEPS} />
         </div>
       ) : null}
       {!compact ? (
@@ -643,18 +656,35 @@ export function WarRoomView({
   );
 
   const feed = (
-    <aside className="flex h-full min-h-0 w-full flex-col bg-[#07090f] text-slate-100">
-      <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2.5 py-1.5">
-        <p className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+    <aside
+      className={cn(
+        "flex h-full min-h-0 w-full flex-col",
+        dark ? "bg-[#07090f] text-slate-100" : "bg-background text-foreground",
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-center justify-between gap-2 border-b px-2.5 py-1.5",
+          dark ? "border-white/10" : "border-border/70",
+        )}
+      >
+        <p
+          className={cn(
+            "min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em]",
+            dark ? "text-slate-400" : "text-muted-foreground",
+          )}
+        >
           {marketsRailLabel}
         </p>
-        <span className="shrink-0 text-[10px] text-slate-500">
+        <span className={cn("shrink-0 text-[10px]", dark ? "text-slate-500" : "text-muted-foreground")}>
           {loading && snapshot ? "Updating…" : coldStart ? "Loading…" : statusLabel}
         </span>
       </div>
-      {error ? <p className="px-2.5 py-1 text-[11px] text-rose-300">{error}</p> : null}
+      {error ? (
+        <p className={cn("px-2.5 py-1 text-[11px]", dark ? "text-rose-300" : "text-rose-600")}>{error}</p>
+      ) : null}
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col border-b border-white/10">
+        <div className={cn("flex min-h-0 flex-1 flex-col border-b", dark ? "border-white/10" : "border-border/70")}>
           {coldStart ? (
             <WarRoomRailSkeleton rows={9} />
           ) : (
@@ -671,11 +701,21 @@ export function WarRoomView({
           )}
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2.5 py-1.5">
-            <p className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+          <div
+            className={cn(
+              "flex items-center justify-between gap-2 border-b px-2.5 py-1.5",
+              dark ? "border-white/10" : "border-border/70",
+            )}
+          >
+            <p
+              className={cn(
+                "min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em]",
+                dark ? "text-slate-400" : "text-muted-foreground",
+              )}
+            >
               {activityRailLabel}
             </p>
-            <span className="shrink-0 text-[10px] text-slate-500">
+            <span className={cn("shrink-0 text-[10px]", dark ? "text-slate-500" : "text-muted-foreground")}>
               {coldStart ? "…" : activity.length}
             </span>
           </div>
@@ -711,21 +751,28 @@ export function WarRoomView({
     <div
       ref={rootRef}
       className={cn(
-        "relative flex min-h-0 flex-col bg-black text-slate-100",
+        "relative flex min-h-0 flex-col",
+        dark ? "bg-black text-slate-100" : "bg-background text-foreground",
         embedded ? "h-full w-full" : "h-[100svh] min-h-[100svh]",
         className,
       )}
+      data-war-room-theme={dark ? "dark" : "light"}
     >
       {!embedded ? (
-        <header className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-1.5">
+        <header
+          className={cn(
+            "flex items-center justify-between gap-3 border-b px-3 py-1.5",
+            dark ? "border-white/10" : "border-border/70",
+          )}
+        >
           <div className="flex items-center gap-2 text-sm">
-            <Link href="/" className="font-medium text-white">
+            <Link href="/" className={cn("font-medium", dark ? "text-white" : "text-foreground")}>
               Lychee
             </Link>
-            <span className="text-slate-600">/</span>
-            <span className="text-slate-300">War Room</span>
+            <span className={dark ? "text-slate-600" : "text-muted-foreground"}>/</span>
+            <span className={dark ? "text-slate-300" : "text-muted-foreground"}>War Room</span>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-slate-500">
+          <div className={cn("flex items-center gap-2 text-[11px]", dark ? "text-slate-500" : "text-muted-foreground")}>
             <span>{statusLabel}</span>
             {compact ? mobileTabs : null}
           </div>
