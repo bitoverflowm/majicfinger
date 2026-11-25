@@ -1,25 +1,43 @@
 "use client";
 
 import { useEffect } from "react";
+
 import { FeatureIconLabel, PrimaryIntegrationIconStrip } from "@/components/featureIcons";
 import { LandingDemoViewportOverlay } from "@/components/dashboardComposer/landingDemoViewportOverlay";
 import { Button } from "@/components/ui/button";
 import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
+import { scrollToPricingSection } from "@/lib/scrollToPricing";
 
 function isExportFeature(feature) {
   const text = String(feature || "").toLowerCase();
   return text.includes("export") || text.includes("download");
 }
 
-function membersOnlyHeadline(feature) {
+/** Shared headline for Members only / Pro upgrade gates. */
+export function membersOnlyHeadline(feature) {
   if (isExportFeature(feature)) return "Export and downloads are pro features";
   const label = String(feature || "").trim();
-  if (!label) return "This is a pro feature";
-  return `${label} is a pro feature`;
+  if (!label || /^this feature$/i.test(label)) return "This is a Pro feature";
+  // Prefer "Pro" casing for locked integrations / actions.
+  if (/ is a pro feature\.?$/i.test(label)) {
+    return label.replace(/ is a pro feature\.?$/i, " is a Pro feature");
+  }
+  return `${label} is a Pro feature`;
 }
 
-/** Landing demo upsell for pro-only actions (e.g. Export). Escape goes back instead of exiting the demo. */
-export function LandingDemoMembersOnlyDialog({ feature = "New tab", onBack, onUpgrade, className }) {
+/**
+ * Platform-wide Members only / Pro upgrade dialog.
+ * Viewport-fixed; same feature list + CTAs everywhere (demo Export, Kalshi Historical v2, etc.).
+ */
+export function MembersOnlyUpgradeDialog({
+  feature = "New tab",
+  headline,
+  onBack,
+  onUpgrade,
+  className,
+  /** When true (homepage `#demo`), primary CTA exits the demo into pricing. */
+  exitDemo = false,
+}) {
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -32,25 +50,27 @@ export function LandingDemoMembersOnlyDialog({ feature = "New tab", onBack, onUp
 
   const upgrade = () => {
     onUpgrade?.();
-    exitLandingDemoToSection("pricing");
+    if (exitDemo) exitLandingDemoToSection("pricing");
+    else scrollToPricingSection();
   };
 
   const stop = (event) => event.stopPropagation();
+  const lead = headline || membersOnlyHeadline(feature);
 
   return (
     <LandingDemoViewportOverlay open className={className} onBackdropClick={onBack}>
       <div
         role="dialog"
-        aria-labelledby="landing-demo-members-only-title"
-        aria-describedby="landing-demo-members-only-lead"
+        aria-labelledby="members-only-upgrade-title"
+        aria-describedby="members-only-upgrade-lead"
         className="w-full max-w-md rounded-xl border border-border/70 bg-background p-6 shadow-sm"
         onClick={stop}
       >
-        <h2 id="landing-demo-members-only-title" className="text-[15px] font-semibold text-foreground">
+        <h2 id="members-only-upgrade-title" className="text-[15px] font-semibold text-foreground">
           Members only
         </h2>
-        <p id="landing-demo-members-only-lead" className="mt-2 text-[14px] font-medium leading-snug text-foreground">
-          {membersOnlyHeadline(feature)}
+        <p id="members-only-upgrade-lead" className="mt-2 text-[14px] font-medium leading-snug text-foreground">
+          {lead}
         </p>
         <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">Once you upgrade you can:</p>
         <ul className="mt-2.5 flex flex-col gap-2.5">
@@ -92,8 +112,44 @@ export function LandingDemoMembersOnlyDialog({ feature = "New tab", onBack, onUp
   );
 }
 
-/** Renders the upsell fixed to the viewport, above the nav pills and dock. */
-export function LandingDemoMembersOnlyPortal({ open, feature, onClose }) {
+/** @deprecated Prefer MembersOnlyUpgradeDialog — same UI, landing-demo CTA exit. */
+export function LandingDemoMembersOnlyDialog({ feature, onBack, onUpgrade, className, headline }) {
+  return (
+    <MembersOnlyUpgradeDialog
+      feature={feature}
+      headline={headline}
+      onBack={onBack}
+      onUpgrade={onUpgrade}
+      className={className}
+      exitDemo
+    />
+  );
+}
+
+/** Renders the upsell fixed to the viewport (homepage `#demo` and shared Pro gates). */
+export function LandingDemoMembersOnlyPortal({ open, feature, onClose, headline, exitDemo = true }) {
   if (!open) return null;
-  return <LandingDemoMembersOnlyDialog feature={feature} onBack={onClose} onUpgrade={onClose} className="z-[550]" />;
+  return (
+    <MembersOnlyUpgradeDialog
+      feature={feature}
+      headline={headline}
+      onBack={onClose}
+      onUpgrade={onClose}
+      className="z-[550]"
+      exitDemo={exitDemo}
+    />
+  );
+}
+
+/** Alias for non-demo / platform Pro gates (scrolls to pricing, does not exit a landing demo). */
+export function MembersOnlyUpgradePortal({ open, feature, onClose, headline }) {
+  return (
+    <LandingDemoMembersOnlyPortal
+      open={open}
+      feature={feature}
+      onClose={onClose}
+      headline={headline}
+      exitDemo={false}
+    />
+  );
 }
