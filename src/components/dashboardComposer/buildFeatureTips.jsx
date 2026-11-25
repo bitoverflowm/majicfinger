@@ -63,7 +63,61 @@ function useLoopStep(durations) {
 
 /* ---------- Data type ---------- */
 
-export function DataTypeFeatureTip({ anchorRef }) {
+function PolymarketHistoricalDataTypeTipBody() {
+  return (
+    <ul className="space-y-2 text-[12px] leading-[1.45] text-neutral-700 dark:text-neutral-300">
+      <li className="flex gap-1.5">
+        <span className="mt-[7px] size-1 shrink-0 rounded-full bg-[#0d99ff]" />
+        <span>
+          <span className="font-semibold text-neutral-900 dark:text-white">Markets Search:</span> Pull
+          historical Markets data. Use this if you want to explore one or more historical markets based on
+          your criteria, market meta data, volume, etc. In the next step you can use{" "}
+          <span className="rounded-[3px] bg-[#0d99ff]/15 px-1 font-semibold text-[#0b6fc2] dark:text-[#5cb8ff]">
+            [join]
+          </span>{" "}
+          to automatically pull all trades belonging to each market.
+        </span>
+      </li>
+      <li className="flex gap-1.5">
+        <span className="mt-[7px] size-1 shrink-0 rounded-full bg-[#0d99ff]" />
+        <span>
+          <span className="font-semibold text-neutral-900 dark:text-white">Trades:</span> You can pull
+          trades directly using market ticker or other filter criteria.
+        </span>
+      </li>
+      <li className="flex gap-1.5">
+        <span className="mt-[7px] size-1 shrink-0 rounded-full bg-[#0d99ff]" />
+        <span>
+          <span className="font-semibold text-neutral-900 dark:text-white">Blocks:</span> Each row maps a
+          Polygon block number to its ISO 8601 timestamp.
+        </span>
+      </li>
+    </ul>
+  );
+}
+
+/** Shared data-type tip for integration build (demo + dashboard). Polymarket Historical gets guided copy. */
+export function DataTypeFeatureTip({ anchorRef, integrationId }) {
+  const polymarketHistorical = integrationId === "polymarketHistorical";
+
+  if (polymarketHistorical) {
+    return (
+      <FeatureTip
+        id={BUILD_TIP_IDS.dataType}
+        anchorRef={anchorRef}
+        side="right"
+        align="start"
+        sideOffset={14}
+        className="w-[320px]"
+        title="Click here"
+        description="Select from the following:"
+        body={<PolymarketHistoricalDataTypeTipBody />}
+        action={{ label: "Ok" }}
+        closeOnAction
+      />
+    );
+  }
+
   return (
     <FeatureTip
       id={BUILD_TIP_IDS.dataType}
