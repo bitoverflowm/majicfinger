@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Search, Zap } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { nodeContains } from "@/lib/domNode";
 
 /** @typedef {import("@/lib/dataLake/kalshiSearchSuggestions").KalshiSearchSuggestion} KalshiSearchSuggestion */
 
@@ -159,7 +160,7 @@ export function KalshiPowerToolsSearch({
 
   useEffect(() => {
     function onDoc(e) {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
+      if (rootRef.current && !nodeContains(rootRef.current, e.target)) {
         setSuggestOpen(false);
       }
     }
