@@ -734,8 +734,8 @@ function IntegrationConnectFlow({
     }
     setSelectedId(id);
     onSelectIntegration?.(id);
-    // Historical connect: pick goes straight into the build step (no "Start building").
-    if (historicalSurface) changePhase("build");
+    // Historical / Present connect: pick goes straight into the build step (no "Start building").
+    if (curatedSurface) changePhase("build");
   };
 
   const openRecipe = (id) => {
@@ -940,7 +940,7 @@ function IntegrationConnectFlow({
                 </div>
               ) : null}
             </div>
-            {selected && !historicalSurface ? (
+            {selected && !curatedSurface ? (
               <div className="flex shrink-0 items-center justify-end gap-2 px-6 py-4">
                 {onCancel ? (
                   <Button type="button" variant="outline" onClick={onCancel}>
