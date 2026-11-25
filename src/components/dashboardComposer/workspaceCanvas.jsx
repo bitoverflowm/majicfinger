@@ -33,7 +33,11 @@ import { useFeatureTipDismissal } from "@/components/ui/feature-tip";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { isLandingExploreSurface, isLandingTerminalExploreSurface } from "@/lib/landingDemoExplore";
+import {
+  isLandingConnectExploreSurface,
+  isLandingExploreSurface,
+  isLandingTerminalExploreSurface,
+} from "@/lib/landingDemoExplore";
 import {
   WELCOME_START_TAB_ID,
   defaultStartTab,
@@ -2413,6 +2417,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const ctxDemo = useMyStateV2();
   const landingDemo = !!ctxDemo?.landingDemo;
   const exploreDemo = landingDemo && isLandingExploreSurface(ctxDemo?.landingDemoSurface);
+  const exploreConnectDemo = landingDemo && isLandingConnectExploreSurface(ctxDemo?.landingDemoSurface);
   const exploreHolderDemo = landingDemo && isLandingTerminalExploreSurface(ctxDemo?.landingDemoSurface);
   /** Markets / Holders demo: search is just the bar — no card chrome. */
   const framelessSearch = exploreHolderDemo && block.panel === "search";
@@ -2768,6 +2773,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
             className={cn(
               "absolute right-1.5 top-1.5 z-10 inline-flex size-5 translate-x-1 items-center justify-center rounded-sm bg-background/80 text-muted-foreground opacity-0 transition-[opacity,transform] duration-200 ease-out hover:bg-muted hover:text-foreground",
               "pointer-events-none group-hover/block:pointer-events-auto group-hover/block:translate-x-0 group-hover/block:opacity-100 group-focus-within/block:pointer-events-auto group-focus-within/block:translate-x-0 group-focus-within/block:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:translate-x-0 data-[state=open]:opacity-100",
+              // Historical / Present demo: keep ⋮ visible while the post-pull export tour is active.
+              exploreConnectDemo && touring && "pointer-events-auto translate-x-0 opacity-100",
             )}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {

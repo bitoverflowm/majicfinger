@@ -22,6 +22,8 @@ import {
 
 import { HandToolIcon } from "@/components/dashboardComposer/handToolIcon";
 import { FeatureTip, useFeatureTipDismissal, usePrefersReducedMotion } from "@/components/ui/feature-tip";
+import { useMyStateV2 } from "@/context/stateContextV2";
+import { isLandingConnectExploreSurface } from "@/lib/landingDemoExplore";
 import { cn } from "@/lib/utils";
 
 /**
@@ -667,11 +669,16 @@ export const FIRST_PULL_TIP_ID = "integration-build-first-pull";
 
 const CONFETTI_COLORS = ["#0d99ff", "#5cb8ff", "#0b6fc2", "#b3defe", "#ffc83d", "#ffffff"];
 
-function burstConfetti() {
+/** Same burst used after the first successful pull (dashboard onboarding + homepage `#demo`). */
+export function burstOnboardingConfetti() {
   const base = { colors: CONFETTI_COLORS, startVelocity: 44, gravity: 0.9, ticks: 240, zIndex: 590, disableForReducedMotion: true };
   confetti({ ...base, particleCount: 120, spread: 80, origin: { y: 0.6 } });
   window.setTimeout(() => confetti({ ...base, particleCount: 55, angle: 60, spread: 58, origin: { x: 0, y: 0.72 } }), 160);
   window.setTimeout(() => confetti({ ...base, particleCount: 55, angle: 120, spread: 58, origin: { x: 1, y: 0.72 } }), 280);
+}
+
+function burstConfetti() {
+  burstOnboardingConfetti();
 }
 
 const MEDIA_CONFETTI_COLORS = ["#0d99ff", "#5cb8ff", "#0b6fc2", "#ffc83d", "#ff8a65"];
@@ -763,9 +770,12 @@ function FirstPullTipAnimation() {
 /**
  * After the first pull that finishes, next to View dashboard. Bursts confetti when it opens.
  * Clicking View dashboard (or closing the run card) counts as seeing it.
+ * Homepage `#demo` Historical / Present reuse the same congrats + confetti, then the export ⋮ tour.
  */
 export function FirstPullFeatureTip({ anchorRef, runId, open = true }) {
   const { dismissed } = useFeatureTipDismissal(FIRST_PULL_TIP_ID);
+  const ctx = useMyStateV2();
+  const demoConnect = !!ctx?.landingDemo && isLandingConnectExploreSurface(ctx?.landingDemoSurface);
   const celebratedRef = useRef(null);
   useEffect(() => {
     if (!open || dismissed !== false || !runId || celebratedRef.current === runId) return;
@@ -784,7 +794,11 @@ export function FirstPullFeatureTip({ anchorRef, runId, open = true }) {
       className="w-[288px]"
       media={<FirstPullTipAnimation />}
       title="Hooray, you ran your 1st pull!"
-      description="Congratulations, you ran your first pull. Click here to take a look at your Lychee dashboard."
+      description={
+        demoConnect
+          ? "Congratulations — your demo pull is ready. Take a look at the sheet, then try the ⋮ menu to download your data."
+          : "Congratulations, you ran your first pull. Click here to take a look at your Lychee dashboard."
+      }
       action={{ label: "Ok" }}
       closeOnAction
     />
@@ -914,6 +928,9 @@ function ExportTipAnimation() {
 
 /** On the dashboard, after the first-pull tip: points at Export in a block's open ⋯ menu. */
 export function ExportFeatureTip({ anchorRef, open = true, onDone }) {
+  const ctx = useMyStateV2();
+  const demoConnect = !!ctx?.landingDemo && isLandingConnectExploreSurface(ctx?.landingDemoSurface);
+
   return (
     <FeatureTip
       id={EXPORT_TIP_ID}
@@ -924,8 +941,12 @@ export function ExportFeatureTip({ anchorRef, open = true, onDone }) {
       sideOffset={16}
       className="w-[288px]"
       media={<ExportTipAnimation />}
-      title="Export any component on your dashboard"
-      description="Open the ⋯ menu on any sheet, chart, rich table or stats card and choose Export. Sheets download as CSV, JSON or Excel. Charts, rich tables and stats cards download as PNG, JPG or SVG."
+      title={demoConnect ? "Download your data from the ⋮ menu" : "Export any component on your dashboard"}
+      description={
+        demoConnect
+          ? "Open the ⋮ on your sheet or chart and choose Export to download. In the demo, that path opens membership plans — upgrade to unlock CSV, JSON, and Excel downloads."
+          : "Open the ⋯ menu on any sheet, chart, rich table or stats card and choose Export. Sheets download as CSV, JSON or Excel. Charts, rich tables and stats cards download as PNG, JPG or SVG."
+      }
       action={{ label: "Got it", onClick: onDone }}
       onDismiss={onDone}
       closeOnAction
