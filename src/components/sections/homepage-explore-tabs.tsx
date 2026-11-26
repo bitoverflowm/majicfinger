@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { WarRoomView, type WarRoomNavigateRequest } from "@/components/warRoom/WarRoomView";
@@ -129,36 +130,44 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
   return (
     <section id="demo" className="w-full pb-16">
       <div className="mx-auto w-full max-w-[min(100%,72rem)] px-4 sm:px-6 lg:px-10">
-        <div role="tablist" aria-label="Explore Lychee" className="flex flex-wrap gap-2">
-          {TABS.map((item) => {
-            const selected = tab === item.id;
-            const showAlpha = selected && item.id === "war-room";
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                onClick={() => onSelectExploreTab(item.id)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition",
-                  selected
-                    ? "bg-foreground text-background"
-                    : "bg-muted text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {item.label}
-                {showAlpha ? (
-                  <span
-                    className="inline-flex h-[18px] items-center rounded-full border border-background/30 px-1.5 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-background/85"
-                    aria-label="Alpha"
-                  >
-                    Alpha
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-2">
+          <div role="tablist" aria-label="Explore Lychee" className="flex min-w-0 flex-1 flex-wrap gap-2">
+            {TABS.map((item) => {
+              const selected = tab === item.id;
+              const showAlpha = selected && item.id === "war-room";
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => onSelectExploreTab(item.id)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition",
+                    selected
+                      ? "bg-foreground text-background"
+                      : "bg-muted text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {item.label}
+                  {showAlpha ? (
+                    <span
+                      className="inline-flex h-[18px] items-center rounded-full border border-background/30 px-1.5 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-background/85"
+                      aria-label="Alpha"
+                    >
+                      Alpha
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+          <Link
+            href="/#pricing"
+            className="ml-auto inline-flex shrink-0 items-center rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition hover:bg-foreground/90"
+          >
+            Get full access
+          </Link>
         </div>
       </div>
 
