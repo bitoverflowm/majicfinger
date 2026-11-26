@@ -446,7 +446,7 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                     detail: top.detail,
                   })
                 ) {
-                  setFocused(false);
+                  window.setTimeout(() => setFocused(false), 0);
                   return;
                 }
                 window.location.assign(top?.href || newsHref);
@@ -492,7 +492,8 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                           })
                         ) {
                           e.preventDefault();
-                          setFocused(false);
+                          // Defer blur/close so React teardown cannot block the first scroll frame.
+                          window.setTimeout(() => setFocused(false), 0);
                           return;
                         }
                         setFocused(false);

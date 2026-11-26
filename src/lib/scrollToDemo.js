@@ -85,6 +85,13 @@ export function scrollToDemoSection({ behavior = "smooth" } = {}) {
   if (!section && !resolveDemoMockupEl()) return;
 
   const top = getDemoScrollTop();
+  const y = window.scrollY || 0;
+  // Nudge one pixel toward the target first so the first frame moves even if the
+  // main thread stalls on follow-up React work (Jarvis select-only pick).
+  if (behavior === "smooth" && Number.isFinite(top) && top !== y) {
+    const nudge = top > y ? Math.min(y + 1, top) : Math.max(y - 1, top);
+    window.scrollTo({ top: nudge, behavior: "auto" });
+  }
   window.scrollTo({ top, behavior });
 
   const hashId = section?.id || "demo";
