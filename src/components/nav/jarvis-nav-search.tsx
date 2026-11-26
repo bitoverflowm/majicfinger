@@ -425,6 +425,9 @@ export function JarvisNavSearch({ className }: { className?: string }) {
           >
             <Sparkles className="mt-0.5 size-3.5 shrink-0 text-secondary" aria-hidden />
             <div className="min-w-0 space-y-1.5">
+              <p>
+                Search anything, we will find the right market, ticker, news, data feed, and Jarvis will do the rest
+              </p>
               <p className="font-semibold text-foreground">Jarvis AI — Coming Soon</p>
               <p>Zero-prompt intelligence that learns your markets and brings you moving signals before you even ask.</p>
               <div className="space-y-1">
