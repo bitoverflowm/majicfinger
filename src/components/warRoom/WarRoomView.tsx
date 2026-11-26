@@ -850,7 +850,7 @@ export function WarRoomView({
       {!compact ? (
         <WarRoomLayersRail lockKind={embedded ? "pro" : "coming-soon"} />
       ) : null}
-      {loading ? (
+      {coldStart ? (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3">
           <WarRoomAgentStepsLoader tone={loadTone === "dark" ? "dark" : "default"} />
         </div>
