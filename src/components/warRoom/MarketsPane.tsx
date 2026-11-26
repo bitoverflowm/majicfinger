@@ -24,6 +24,7 @@ export type MarketRow = {
   tokenIds?: string[];
   outcomes?: Array<{ id?: string; label?: string; tokenId?: string }>;
   quoteAt?: string | null;
+  geometry?: { type: string; coordinates: [number, number] } | null;
 };
 
 type Flash = "enter" | "up" | "down" | "rank-up" | "rank-down" | null;

@@ -169,6 +169,39 @@ export function useWarRoomData({
     };
   }, [filterKey, desk, category, exploreFeed, fixture, mobile, wantsBoost]);
 
+  // Nav / deep-link market picks: refetch silently so the selected contract is
+  // injected into feed/map/features. Do not flip `loading` (no blank flash).
+  // Skip the first paint — the filterKey effect already fetches with marketRef.
+  const prevMarketRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = String(market || "").trim();
+    const prev = prevMarketRef.current;
+    prevMarketRef.current = id;
+    if (prev === null || prev === id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (hiddenRef.current) return;
+        const body = await fetchSnapshot({
+          desk,
+          market: id,
+          category,
+          exploreFeed,
+          fixture,
+          mobile,
+        });
+        if (cancelled) return;
+        setSnapshot(body);
+        setError(null);
+      } catch {
+        /* keep current snapshot */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [market, desk, category, exploreFeed, fixture, mobile]);
+
   useEffect(() => {
     const onVis = () => {
       hiddenRef.current = document.hidden;

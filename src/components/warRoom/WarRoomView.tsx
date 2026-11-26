@@ -27,6 +27,7 @@ import { DashboardLoadingProgress } from "@/components/publicEmbed/DashboardLoad
 import { WarRoomLayersRail } from "./WarRoomLayersRail";
 import { WAR_ROOM_LOAD_STEPS, WarRoomRailSkeleton } from "./WarRoomLoadingProgress";
 import { relatedMarketsForHeadline } from "./relatedMarkets";
+import { WAR_ROOM_MARKET_PICK_EVENT } from "@/lib/warRoom/pickMarket";
 import { useWarRoomData } from "./useWarRoomData";
 import { useWarRoomTheme } from "./useWarRoomTheme";
 
@@ -77,6 +78,7 @@ export function WarRoomView({
   market: controlledMarket,
   onMarketChange,
   onNavigate,
+  pickNonce = 0,
   className,
 }: {
   fixture?: boolean;
@@ -85,6 +87,8 @@ export function WarRoomView({
   market?: string;
   onMarketChange?: (id: string | null) => void;
   onNavigate?: (request: WarRoomNavigateRequest) => void;
+  /** Bumps on each nav pick so the same marketId still re-reveals. */
+  pickNonce?: number;
   className?: string;
 }) {
   const compactScreen = useCompactScreen();
@@ -341,45 +345,119 @@ export function WarRoomView({
   }, [snapshot?.fixture, snapshot?.fixtureLabel, snapshot?.stale, transport]);
 
   const coordsForMarket = useCallback(
-    (id: string) => {
+    (id: string, row?: MarketRow | null) => {
       const match = features.features.find(
         (f) => String((f as { properties?: { id?: string } }).properties?.id) === id,
       ) as { geometry?: { coordinates?: [number, number] } } | undefined;
-      return match?.geometry?.coordinates || null;
+      const fromFeature = match?.geometry?.coordinates;
+      if (fromFeature) return fromFeature;
+      const fromRow = row?.geometry?.coordinates;
+      return fromRow || null;
     },
     [features.features],
   );
 
   const openMarketDetail = useCallback(
-    (id: string) => {
-      const row = marketById.get(id);
-      if (!row) return;
+    (id: string, rowOverride?: MarketRow | null) => {
+      const row = rowOverride || marketById.get(id);
+      if (!row) return false;
       setMarket(id);
       setActivityId(null);
-      const coords = coordsForMarket(id);
+      const coords = coordsForMarket(id, row);
       if (coords) {
         setFocusTarget(deepFocus(coords, `market:${id}:${Date.now()}`));
       }
       setDetail({ kind: "market", market: row });
       setDetailOpen(true);
+      setFeedRevealed(true);
       if (compact) setMobileView("detail");
+      return true;
     },
     [compact, coordsForMarket, marketById, setMarket],
   );
 
   // Nav / URL market picks: once the row is in the snapshot, reveal pin + zoom + side panes.
-  const revealedMarketRef = useRef<string | null>(null);
+  const revealedKeyRef = useRef<string | null>(null);
   useEffect(() => {
     const id = String(market || "").trim();
     if (!id) {
-      revealedMarketRef.current = null;
+      revealedKeyRef.current = null;
       return;
     }
-    if (revealedMarketRef.current === id) return;
-    if (!marketById.has(id)) return;
-    revealedMarketRef.current = id;
-    openMarketDetail(id);
-  }, [market, marketById, openMarketDetail]);
+    const key = `${id}#${pickNonce}`;
+    if (revealedKeyRef.current === key) return;
+    if (openMarketDetail(id)) {
+      revealedKeyRef.current = key;
+      return;
+    }
+    // Snapshot may still be loading the injected pick — fetch detail as a fallback.
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/war-room/market?${new URLSearchParams({
+            id,
+            ...(fixture ? { fixture: "1" } : {}),
+          })}`,
+          { credentials: "same-origin" },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (cancelled || !res.ok || !body?.market) return;
+        const m = body.market as {
+          id?: string;
+          title?: string;
+          venue?: string;
+          region?: string;
+          slug?: string | null;
+          venueMarketId?: string | null;
+          quote?: { price?: number | null; move?: number | null } | null;
+          volume24h?: number | null;
+          imageUrl?: string | null;
+          avatarUrl?: string | null;
+          geometry?: { type: string; coordinates: [number, number] } | null;
+          outcomes?: MarketRow["outcomes"];
+          tokenIds?: string[];
+        };
+        const row: MarketRow = {
+          id: String(m.id || id),
+          title: String(m.title || id),
+          venue: String(m.venue || ""),
+          region: String(m.region || "Global"),
+          price: m.quote?.price ?? null,
+          move: m.quote?.move ?? null,
+          volume24h: m.volume24h ?? null,
+          imageUrl: m.imageUrl ?? null,
+          avatarUrl: m.avatarUrl ?? null,
+          slug: m.slug ?? null,
+          venueMarketId: m.venueMarketId ?? null,
+          tokenIds: m.tokenIds,
+          outcomes: m.outcomes,
+          geometry: m.geometry?.type === "Point" ? m.geometry : null,
+        };
+        if (openMarketDetail(row.id, row)) {
+          revealedKeyRef.current = key;
+        }
+      } catch {
+        /* keep waiting for snapshot */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [market, marketById, openMarketDetail, pickNonce, fixture]);
+
+  // Also accept the pick event directly (in case parent state races with scroll).
+  useEffect(() => {
+    const onPick = (event: Event) => {
+      const id = String((event as CustomEvent<{ marketId?: string }>).detail?.marketId || "").trim();
+      if (!id) return;
+      setMarket(id);
+      revealedKeyRef.current = null;
+      if (openMarketDetail(id)) return;
+    };
+    window.addEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
+    return () => window.removeEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
+  }, [openMarketDetail, setMarket]);
 
   const selectActivity = useCallback(
     (row: ActivityRow) => {

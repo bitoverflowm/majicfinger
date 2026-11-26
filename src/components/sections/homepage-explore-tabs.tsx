@@ -50,6 +50,7 @@ const WAR_ROOM_STAGE_ATTR = { "data-war-room-demo": true } as const;
 export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) {
   const [tab, setTab] = useState<TabId>("war-room");
   const [market, setMarket] = useState("");
+  const [pickNonce, setPickNonce] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
   useLandingExploreScrollHandoff(stageRef);
   const {
@@ -67,9 +68,8 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
       const id = String((event as CustomEvent<{ marketId?: string }>).detail?.marketId || "").trim();
       if (!id) return;
       setTab("war-room");
-      // Clear-then-set so re-picking the same market still re-runs the reveal effect.
-      setMarket("");
-      queueMicrotask(() => setMarket(id));
+      setMarket(id);
+      setPickNonce((n) => n + 1);
     };
     window.addEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
     return () => window.removeEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
@@ -161,6 +161,7 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
               fixture={fixture}
               embedded
               market={market}
+              pickNonce={pickNonce}
               onMarketChange={onMarketChange}
               className="absolute inset-0"
               onNavigate={onNavigate}

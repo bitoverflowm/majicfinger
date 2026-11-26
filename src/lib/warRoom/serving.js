@@ -575,6 +575,8 @@ function feedRow(bundle, market) {
     signalSummary: signal?.summary || null,
     signalKind: signal?.kind || null,
     href: warRoomHref({ desk: marketDesk(market) === "global" ? "all" : marketDesk(market), market: market.id }),
+    // Point for nav pick → globe focus when the market isn't already in `features`.
+    geometry: market.geometry?.type === "Point" ? market.geometry : null,
   };
 }
 
@@ -760,13 +762,13 @@ export async function getWarRoomSnapshot(opts = {}) {
   const ranked = rankMarketsForDesk(filtered, cap, exploreFeed);
   const marketById = new Map(pool.map((market) => [market.id, market]));
   const filteredIds = new Set(ranked.map((market) => market.id));
-  const features = ranked.map(featureFromMarket).filter(Boolean).slice(0, cap);
+  let features = ranked.map(featureFromMarket).filter(Boolean).slice(0, cap);
   // Full map index (globe can show more points than the right-rail list).
-  const mapMarkets = ranked.slice(0, cap).map((market) => feedRow(bundle, market));
+  let mapMarkets = ranked.slice(0, cap).map((market) => feedRow(bundle, market));
   // Rail: keep volume order, but for dual-venue tradable reserve slots so a
   // Kalshi-only filter still has a real list (not ~3 survivors of mixed top-48).
   const feedRanked = rankMarketsForDesk(filtered, FEED_ROW_CAP, exploreFeed);
-  const feed = feedRanked.slice(0, FEED_ROW_CAP).map((market) => feedRow(bundle, market));
+  let feed = feedRanked.slice(0, FEED_ROW_CAP).map((market) => feedRow(bundle, market));
   const activity = activityRows(bundle).filter((row) => {
     if (category) return activityMatchesCategory(row, category, marketById);
     // All tradable: keep the full activity stream.
@@ -796,7 +798,7 @@ export async function getWarRoomSnapshot(opts = {}) {
         marker: "news",
       },
     }));
-  const selected = marketId
+  let selected = marketId
     ? ranked.find((m) => m.id === marketId) ||
       pool.find(
         (m) =>
@@ -805,6 +807,33 @@ export async function getWarRoomSnapshot(opts = {}) {
           (!category || matchesCategory(m, category)),
       )
     : null;
+
+  // Nav / deep-link picks often aren't in the tradable top-N. Look the contract up
+  // and inject it so the client can pin, zoom, and open detail immediately.
+  if (marketId && !selected) {
+    const parsed = parseWarRoomMarketId(marketId);
+    let found = findKnownMarket(marketId, bundle) || null;
+    if (!found && parsed && !shell) {
+      found = await lookupVenueMarket(parsed);
+    }
+    if (found) {
+      rememberMarkets([found]);
+      selected = found;
+      marketById.set(found.id, found);
+      const row = feedRow(bundle, found);
+      const feat = featureFromMarket(found);
+      if (feat && !features.some((f) => String(f?.properties?.id || f?.id) === found.id)) {
+        features = [feat, ...features].slice(0, cap + 1);
+      }
+      if (!mapMarkets.some((m) => m.id === found.id)) {
+        mapMarkets = [row, ...mapMarkets];
+      }
+      if (!feed.some((m) => m.id === found.id)) {
+        feed = [row, ...feed].slice(0, FEED_ROW_CAP + 1);
+      }
+    }
+  }
+
   const selectedValid = selected ? selected : marketId ? null : ranked[0] || null;
   const invalidMarket = Boolean(marketId && parseWarRoomMarketId(marketId) && !selectedValid);
   const missingMarket = Boolean(marketId && !parseWarRoomMarketId(marketId));
@@ -840,7 +869,7 @@ export async function getWarRoomSnapshot(opts = {}) {
         ? "invalid_market"
         : null,
     globalCount: pool.filter((m) => marketDesk(m) === "global").length,
-    status: filtered.length ? (bundle.stale ? "stale" : "ok") : "empty",
+    status: filtered.length || selectedValid ? (bundle.stale ? "stale" : "ok") : "empty",
   };
 }
 
