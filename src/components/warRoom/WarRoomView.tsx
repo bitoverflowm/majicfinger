@@ -475,8 +475,12 @@ export function WarRoomView({
     cn(
       "shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors",
       selected
-        ? "bg-white font-medium text-slate-950"
-        : "text-slate-300 hover:bg-white/10 hover:text-white",
+        ? dark
+          ? "bg-white font-medium text-slate-950"
+          : "bg-slate-900 font-medium text-white"
+        : dark
+          ? "text-slate-300 hover:bg-white/10 hover:text-white"
+          : "text-slate-600 hover:bg-black/[0.06] hover:text-slate-900",
     );
 
   const exploreFeedGroups = useMemo(() => {
@@ -491,7 +495,14 @@ export function WarRoomView({
   }, []);
 
   const categoryBar = (
-    <div className="pointer-events-auto absolute left-1/2 top-3 z-20 flex max-w-[min(100%,56rem)] -translate-x-1/2 flex-col gap-1 rounded-2xl border border-white/10 bg-black/70 px-1.5 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-md">
+    <div
+      className={cn(
+        "pointer-events-auto absolute left-1/2 top-3 z-20 flex max-w-[min(100%,56rem)] -translate-x-1/2 flex-col gap-1 rounded-2xl border px-1.5 py-1.5 backdrop-blur-md",
+        dark
+          ? "border-white/10 bg-black/70 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
+          : "border-black/10 bg-[#f3f2f1] shadow-[0_8px_28px_rgba(15,23,42,0.12)]",
+      )}
+    >
       <div
         role="tablist"
         aria-label="Markets to show"
@@ -540,7 +551,12 @@ export function WarRoomView({
           ),
         )}
       </div>
-      <div className="flex max-w-full items-center gap-2 overflow-x-auto border-t border-white/10 pt-1">
+      <div
+        className={cn(
+          "flex max-w-full items-center gap-2 overflow-x-auto border-t pt-1",
+          dark ? "border-white/10" : "border-black/10",
+        )}
+      >
         <div
           role="tablist"
           aria-label="Categories"
@@ -562,7 +578,10 @@ export function WarRoomView({
         <div
           role="radiogroup"
           aria-label="Venues"
-          className="flex shrink-0 items-center rounded-full border border-white/10 bg-black/50 p-0.5"
+          className={cn(
+            "flex shrink-0 items-center rounded-full border p-0.5",
+            dark ? "border-white/10 bg-black/50" : "border-black/10 bg-white/70",
+          )}
         >
           {VENUE_FILTERS.map((option) => {
             const selected = venueFilter === option.id;
@@ -580,8 +599,12 @@ export function WarRoomView({
                       ? "bg-[#28CC95] text-slate-950"
                       : option.id === "polymarket"
                         ? "bg-[#2E5CFF] text-white"
-                        : "bg-white text-slate-950"
-                    : "text-slate-400 hover:text-white",
+                        : dark
+                          ? "bg-white text-slate-950"
+                          : "bg-slate-900 text-white"
+                    : dark
+                      ? "text-slate-400 hover:text-white"
+                      : "text-slate-500 hover:text-slate-900",
                 )}
               >
                 {option.label}

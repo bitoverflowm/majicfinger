@@ -47,15 +47,41 @@ const LIVELINE_WINDOWS = [
 /**
  * Liveline always anchors the right edge to wall-clock now. A fixed 90d “All” window
  * leaves short-lived markets as a stub on the right while hover still reads older prints.
- * Size All to the span of available points (same idea as Historical IndicatorChart All).
+ * Size All to the span of available points (same idea as hub full-history Liveline windows).
  */
 function windowForData(requestedSecs: number, data: readonly LivePoint[]): number {
   if (requestedSecs !== ALL_WINDOW_SECS || data.length < 2) return requestedSecs;
-  const first = data[0].time;
+  let oldest = Number.POSITIVE_INFINITY;
+  let newest = Number.NEGATIVE_INFINITY;
+  for (const point of data) {
+    if (!Number.isFinite(point.time)) continue;
+    if (point.time < oldest) oldest = point.time;
+    if (point.time > newest) newest = point.time;
+  }
+  if (!Number.isFinite(oldest) || !Number.isFinite(newest)) return requestedSecs;
   const now = Date.now() / 1000;
-  // Liveline pads ~5% past now on the right; stretch slightly so the first print sits at the left.
-  const span = Math.max(60, now - first);
-  return Math.min(ALL_WINDOW_SECS, Math.max(MOVE_WINDOW_SECS, Math.ceil(span * 1.06)));
+  // Cover from first print through now; pad for Liveline’s ~5% right buffer so the
+  // oldest point lands near the left edge instead of floating mid-canvas.
+  const coverOldest = Math.max(60, now - oldest);
+  const spanSecs = Math.max(60, newest - oldest);
+  const padded = Math.ceil(Math.max(spanSecs, coverOldest) * 1.08) + 12;
+  return Math.min(ALL_WINDOW_SECS, Math.max(MOVE_WINDOW_SECS, padded));
+}
+
+/** Default Liveline time format is always HH:MM:SS — day ticks become “00:00:00”. */
+function formatAxisTime(t: number, windowSecs: number) {
+  const d = new Date(t * 1000);
+  if (!Number.isFinite(d.getTime())) return "—";
+  if (windowSecs >= 7 * 24 * 3600) {
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  if (windowSecs >= 24 * 3600) {
+    return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+  const h = d.getHours().toString().padStart(2, "0");
+  const m = d.getMinutes().toString().padStart(2, "0");
+  const s = d.getSeconds().toString().padStart(2, "0");
+  return `${h}:${m}:${s}`;
 }
 
 /** Polymarket/Kalshi prices as 0–1. Rejects garbage that would read as 800¢. */
@@ -86,7 +112,8 @@ async function seedPolymarketHistory(tokenId: string, signal: AbortSignal): Prom
         value,
       };
     })
-    .filter(Boolean) as LivePoint[];
+    .filter(Boolean)
+    .sort((a: LivePoint, b: LivePoint) => a.time - b.time) as LivePoint[];
 }
 
 /** Hourly candles across the full seed window (same stitch as Connect trade history). */
@@ -346,9 +373,13 @@ function ChartCanvas({
 }) {
   const { dark, chartTheme } = useWarRoomTheme();
   const viewWindow = windowForData(windowSecs, data);
+  const chartData = useMemo(() => {
+    if (data.length < 2) return data;
+    return [...data].sort((a, b) => a.time - b.time);
+  }, [data]);
   return (
     <Liveline
-      data={data}
+      data={chartData}
       value={value}
       theme={chartTheme}
       /* Stronger blue on light so the line reads on a pale canvas. */
@@ -362,6 +393,7 @@ function ChartCanvas({
       loading={loading}
       emptyText="Loading price history…"
       formatValue={formatProb}
+      formatTime={(t) => formatAxisTime(t, viewWindow)}
       /* No exaggerate — tight Y margin lets momentum overshoot the plot. */
       padding={{ top: 20, right: 48, bottom: 28, left: 10 }}
       className={cn("h-full min-h-0 w-full", className)}

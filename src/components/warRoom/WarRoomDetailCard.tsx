@@ -108,15 +108,17 @@ function Metric({
   value: string;
   tone?: "up" | "down" | "muted";
 }) {
+  const { dark } = useWarRoomTheme();
   return (
     <div className="min-w-0">
       <p className="text-[9px] uppercase tracking-[0.12em] text-slate-500">{label}</p>
       <p
         className={cn(
-          "mt-0.5 font-mono text-[13px] tabular-nums leading-none text-slate-100",
-          tone === "up" && "text-emerald-300",
-          tone === "down" && "text-rose-300",
-          tone === "muted" && "text-slate-400",
+          "mt-0.5 font-mono text-[13px] tabular-nums leading-none",
+          !tone && (dark ? "text-slate-100" : "text-slate-900"),
+          tone === "up" && (dark ? "text-emerald-300" : "text-emerald-700"),
+          tone === "down" && (dark ? "text-rose-300" : "text-rose-700"),
+          tone === "muted" && (dark ? "text-slate-400" : "text-slate-600"),
         )}
       >
         {value}
@@ -824,7 +826,12 @@ export function WarRoomDetailCard({
           <p className="text-[12px] text-slate-500">Loading market…</p>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <div className="flex shrink-0 items-end justify-between gap-3 border-b border-white/[0.06] pb-2.5">
+            <div
+              className={cn(
+                "flex shrink-0 items-end justify-between gap-3 border-b pb-2.5",
+                dark ? "border-white/[0.06]" : "border-border/70",
+              )}
+            >
               <Metric label="Price" value={formatCents(livePrice ?? market.price)} />
               <Metric
                 label="Move"
