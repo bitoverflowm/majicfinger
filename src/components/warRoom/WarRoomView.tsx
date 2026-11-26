@@ -116,8 +116,13 @@ export function WarRoomView({
   const [detail, setDetail] = useState<WarRoomDetailTarget | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [feedRevealed, setFeedRevealed] = useState(false);
-  /** While true, hide news ping flood so the selected market ping wins. */
-  const [suppressNewsPings, setSuppressNewsPings] = useState(false);
+  /**
+   * Nav / Jarvis pick path: render only the selected market pin(s) + left detail.
+   * Do not paint the full tradable desk, news pings, or right-rail flood.
+   */
+  const [selectOnly, setSelectOnly] = useState(false);
+  const [pickRow, setPickRow] = useState<MarketRow | null>(null);
+  const [pickBusy, setPickBusy] = useState(false);
   const [categoryId, setCategoryId] = useState("");
   const [exploreFeedId, setExploreFeedId] = useState("tradable");
   const [venueFilter, setVenueFilter] = useState<VenueFilter>("both");
@@ -155,11 +160,12 @@ export function WarRoomView({
 
   const { snapshot, error, loading, transport } = useWarRoomData({
     desk: "all",
-    market,
+    market: selectOnly ? "" : market,
     category: categoryId,
     exploreFeed: categoryId ? undefined : exploreFeedId || "tradable",
     fixture,
     mobile: compact,
+    selectOnly,
   });
 
   /** Cold start only — never blank rails/globe once we have a snapshot. */
@@ -179,6 +185,9 @@ export function WarRoomView({
     setDetail(null);
     setDetailOpen(false);
     setFocusTarget(null);
+    setSelectOnly(false);
+    setPickRow(null);
+    setPickBusy(false);
     setMarket(null);
   }, [setMarket]);
 
@@ -219,13 +228,14 @@ export function WarRoomView({
     return emptyCollection as { type: "FeatureCollection"; features: Array<Record<string, unknown>> };
   }, [snapshot?.features, emptyCollection]);
   const pings = useMemo(() => {
-    if (suppressNewsPings) return emptyCollection;
+    // Select-only / pick path: no news ping flood.
+    if (selectOnly) return emptyCollection;
     const raw = snapshot?.pings as { type?: string; features?: unknown } | null | undefined;
     if (raw?.type === "FeatureCollection" && Array.isArray(raw.features)) {
       return raw as { type: "FeatureCollection"; features: never[] };
     }
     return emptyCollection;
-  }, [snapshot?.pings, emptyCollection, suppressNewsPings]);
+  }, [snapshot?.pings, emptyCollection, selectOnly]);
   const allMarkets = (Array.isArray(snapshot?.feed) ? snapshot.feed : []) as MarketRow[];
   /** All globe points — feed is a rail-sized slice; clicks must resolve against this. */
   const allMapMarkets = (
@@ -236,6 +246,39 @@ export function WarRoomView({
   const allActivity = (Array.isArray(snapshot?.activity) ? snapshot.activity : []) as ActivityRow[];
 
   const features = useMemo(() => {
+    const pickId = String(market || "").trim();
+    const pickCenter =
+      focusTarget?.center ||
+      coordsFromGeometry(pickRow?.geometry) ||
+      (selectOnly ? PICK_FALLBACK_COORDS : null);
+
+    // Select-only pick: one pin (or series pins later) — never the full tradable desk.
+    if (selectOnly && pickId) {
+      const fromDesk = allFeatures.features.filter(
+        (f) => String((f as { properties?: { id?: string } }).properties?.id) === pickId,
+      );
+      if (fromDesk.length) {
+        return { type: "FeatureCollection" as const, features: fromDesk };
+      }
+      const center = pickCenter || PICK_FALLBACK_COORDS;
+      return {
+        type: "FeatureCollection" as const,
+        features: [
+          {
+            type: "Feature" as const,
+            id: pickId,
+            geometry: { type: "Point" as const, coordinates: center },
+            properties: {
+              id: pickId,
+              title: pickRow?.title || pickId,
+              venue: pickRow?.venue || "",
+              price: pickRow?.price ?? null,
+            },
+          },
+        ],
+      };
+    }
+
     const base =
       venueFilter === "both"
         ? allFeatures
@@ -248,53 +291,62 @@ export function WarRoomView({
               ),
             ),
           };
-    const pickId = String(market || "").trim();
-    const pickCenter = focusTarget?.center;
     if (!pickId || !pickCenter) return base;
     const already = base.features.some(
       (f) => String((f as { properties?: { id?: string } }).properties?.id) === pickId,
     );
     if (already) return base;
-    // Inject a single pick pin so zoom has a real marker before snapshot catch-up.
-    const row = (Array.isArray(snapshot?.mapMarkets) ? snapshot.mapMarkets : []).find(
-      (m: { id?: string }) => String(m?.id) === pickId,
-    ) as MarketRow | undefined;
-    const synthetic = {
-      type: "Feature" as const,
-      id: pickId,
-      geometry: { type: "Point" as const, coordinates: pickCenter },
-      properties: {
-        id: pickId,
-        title: row?.title || pickId,
-        venue: row?.venue || "",
-        price: row?.price ?? null,
-      },
-    };
     return {
       type: "FeatureCollection" as const,
-      features: [synthetic, ...base.features],
+      features: [
+        {
+          type: "Feature" as const,
+          id: pickId,
+          geometry: { type: "Point" as const, coordinates: pickCenter },
+          properties: {
+            id: pickId,
+            title: pickRow?.title || pickId,
+            venue: pickRow?.venue || "",
+            price: pickRow?.price ?? null,
+          },
+        },
+        ...base.features,
+      ],
     };
-  }, [allFeatures, venueFilter, market, focusTarget?.center, snapshot?.mapMarkets]);
+  }, [
+    allFeatures,
+    venueFilter,
+    market,
+    focusTarget?.center,
+    selectOnly,
+    pickRow,
+  ]);
 
   const markets = useMemo(() => {
+    if (selectOnly) {
+      if (pickRow) return [pickRow];
+      const id = String(market || "").trim();
+      const hit = allMarkets.find((row) => row.id === id) || allMapMarkets.find((row) => row.id === id);
+      return hit ? [hit] : [];
+    }
     if (venueFilter === "both") return allMarkets;
     // Venue filter: prefer the denser map index so Kalshi/Poly-only isn't stuck
     // on whatever survived the mixed top-N rail slice.
     const source = allMapMarkets.length ? allMapMarkets : allMarkets;
     return source.filter((row) => venueMatches(venueFilter, row.venue));
-  }, [allMarkets, allMapMarkets, venueFilter]);
-  const mapMarkets = useMemo(
-    () =>
-      venueFilter === "both" ? allMapMarkets : allMapMarkets.filter((row) => venueMatches(venueFilter, row.venue)),
-    [allMapMarkets, venueFilter],
-  );
-  const activity = useMemo(
-    () =>
-      venueFilter === "both"
-        ? allActivity
-        : allActivity.filter((row) => row.kind === "headline" || venueMatches(venueFilter, row.venue)),
-    [allActivity, venueFilter],
-  );
+  }, [allMarkets, allMapMarkets, venueFilter, selectOnly, pickRow, market]);
+  const mapMarkets = useMemo(() => {
+    if (selectOnly) return markets;
+    return venueFilter === "both"
+      ? allMapMarkets
+      : allMapMarkets.filter((row) => venueMatches(venueFilter, row.venue));
+  }, [allMapMarkets, venueFilter, selectOnly, markets]);
+  const activity = useMemo(() => {
+    if (selectOnly) return [] as ActivityRow[];
+    return venueFilter === "both"
+      ? allActivity
+      : allActivity.filter((row) => row.kind === "headline" || venueMatches(venueFilter, row.venue));
+  }, [allActivity, venueFilter, selectOnly]);
 
   const selectedId = useMemo(() => {
     const id = market || snapshot?.selectedMarketId || null;
@@ -409,18 +461,47 @@ export function WarRoomView({
 
   const focusMarketPing = useCallback(
     (id: string, coords: [number, number], nonce = pickNonce) => {
-      setSuppressNewsPings(true);
       setFocusTarget(deepFocus(coords, `market:${id}:${nonce}:${Date.now()}`));
     },
     [pickNonce],
   );
 
+  const stubPickRow = useCallback((id: string, seed?: MarketRow | null): MarketRow => {
+    if (seed && seed.id === id) return seed;
+    const venue = id.startsWith("polymarket:") ? "polymarket" : id.startsWith("kalshi:") ? "kalshi" : "";
+    return {
+      id,
+      title: seed?.title || "Loading market…",
+      venue: seed?.venue || venue,
+      region: seed?.region || "Global",
+      price: seed?.price ?? null,
+      move: seed?.move ?? null,
+      volume24h: seed?.volume24h ?? null,
+      imageUrl: seed?.imageUrl ?? null,
+      avatarUrl: seed?.avatarUrl ?? null,
+      slug: seed?.slug ?? null,
+      venueMarketId: seed?.venueMarketId ?? null,
+      tokenIds: seed?.tokenIds,
+      outcomes: seed?.outcomes,
+      geometry: seed?.geometry || { type: "Point", coordinates: PICK_FALLBACK_COORDS },
+    };
+  }, []);
+
   const openMarketDetail = useCallback(
-    (id: string, rowOverride?: MarketRow | null, opts?: { focus?: boolean }) => {
-      const row = rowOverride || marketById.get(id);
+    (id: string, rowOverride?: MarketRow | null, opts?: { focus?: boolean; selectOnly?: boolean }) => {
+      const row = rowOverride || marketById.get(id) || (opts?.selectOnly ? stubPickRow(id) : null);
       if (!row) return false;
       setMarket(id);
       setActivityId(null);
+      if (opts?.selectOnly) {
+        setSelectOnly(true);
+        setPickRow(row);
+      } else {
+        // Desk / in-map selection exits the nav select-only lens.
+        setSelectOnly(false);
+        setPickRow(null);
+        setPickBusy(false);
+      }
       const coords = coordsForMarket(id, row);
       if (opts?.focus !== false && coords) {
         focusMarketPing(id, coords);
@@ -431,30 +512,20 @@ export function WarRoomView({
       if (compact) setMobileView("detail");
       return true;
     },
-    [compact, coordsForMarket, focusMarketPing, marketById, setMarket],
+    [compact, coordsForMarket, focusMarketPing, marketById, setMarket, stubPickRow],
   );
 
-  // Nav / URL market picks: once the row is in the snapshot, reveal pin + zoom + side panes.
+  // Nav select-only: fetch market detail only (never full desk). Event handler opens UI immediately.
   const revealedKeyRef = useRef<string | null>(null);
   useEffect(() => {
     const id = String(market || "").trim();
-    if (!id) {
-      revealedKeyRef.current = null;
-      return;
-    }
-    const key = `${id}#${pickNonce}`;
+    if (!id || !selectOnly) return;
+    const key = `${id}#${pickNonce}#so`;
     if (revealedKeyRef.current === key) return;
+    revealedKeyRef.current = key;
 
-    const reveal = (row?: MarketRow | null) => {
-      if (!openMarketDetail(id, row, { focus: true })) return false;
-      revealedKeyRef.current = key;
-      return true;
-    };
-
-    if (reveal()) return;
-
-    // Snapshot may still be loading the injected pick — fetch detail as a fallback.
     let cancelled = false;
+    setPickBusy(true);
     (async () => {
       try {
         const res = await fetch(
@@ -481,10 +552,10 @@ export function WarRoomView({
           outcomes?: MarketRow["outcomes"];
           tokenIds?: string[];
         };
-        const geom = m.geometry?.type === "Point" ? m.geometry : {
-          type: "Point" as const,
-          coordinates: PICK_FALLBACK_COORDS,
-        };
+        const geom =
+          m.geometry?.type === "Point"
+            ? m.geometry
+            : { type: "Point" as const, coordinates: PICK_FALLBACK_COORDS };
         const row: MarketRow = {
           id: String(m.id || id),
           title: String(m.title || id),
@@ -501,40 +572,36 @@ export function WarRoomView({
           outcomes: m.outcomes,
           geometry: geom,
         };
-        if (!cancelled) reveal(row);
+        if (cancelled) return;
+        openMarketDetail(row.id, row, { focus: true, selectOnly: true });
       } catch {
-        /* keep waiting for snapshot */
+        /* keep optimistic stub from the pick event */
+      } finally {
+        if (!cancelled) setPickBusy(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [market, marketById, openMarketDetail, pickNonce, fixture]);
+  }, [market, pickNonce, selectOnly, fixture, openMarketDetail]);
 
-  // Clear news-ping suppress a few seconds after a successful pick focus.
-  useEffect(() => {
-    if (!suppressNewsPings) return;
-    const t = window.setTimeout(() => setSuppressNewsPings(false), 4500);
-    return () => window.clearTimeout(t);
-  }, [suppressNewsPings, focusTarget?.key]);
-
-  // Also accept the pick event directly (in case parent state races with scroll).
+  // Accept the pick event: enter select-only immediately (scroll already started).
   useEffect(() => {
     const onPick = (event: Event) => {
-      const id = String((event as CustomEvent<{ marketId?: string }>).detail?.marketId || "").trim();
+      const detail = (event as CustomEvent<{ marketId?: string; selectOnly?: boolean }>).detail;
+      const id = String(detail?.marketId || "").trim();
       if (!id) return;
-      setSuppressNewsPings(true);
-      setMarket(id);
+      const only = detail?.selectOnly !== false;
       revealedKeyRef.current = null;
-      // Optimistic ping/zoom with fallback coords so the globe moves even before fetch.
-      const row = marketById.get(id);
-      const coords = coordsForMarket(id, row || null);
-      focusMarketPing(id, coords);
-      if (row) openMarketDetail(id, row, { focus: true });
+      const seed = marketById.get(id) || null;
+      const optimistic = stubPickRow(id, seed);
+      // Left panel + pin/zoom in the same turn — do not wait for desk snapshot.
+      openMarketDetail(id, optimistic, { focus: true, selectOnly: only });
+      setPickBusy(true);
     };
     window.addEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
     return () => window.removeEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
-  }, [coordsForMarket, focusMarketPing, marketById, openMarketDetail, setMarket]);
+  }, [marketById, openMarketDetail, stubPickRow]);
 
   const selectActivity = useCallback(
     (row: ActivityRow) => {
@@ -850,7 +917,7 @@ export function WarRoomView({
       {!compact ? (
         <WarRoomLayersRail lockKind={embedded ? "pro" : "coming-soon"} />
       ) : null}
-      {coldStart ? (
+      {coldStart || pickBusy ? (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3">
           <WarRoomAgentStepsLoader tone={loadTone === "dark" ? "dark" : "default"} />
         </div>
@@ -973,7 +1040,8 @@ export function WarRoomView({
   );
 
   const showLeft = detailOpen;
-  const showRight = compact ? mobileView === "feed" : feedRevealed;
+  // Select-only nav picks hide the “all tradable” right rail entirely.
+  const showRight = selectOnly ? false : compact ? mobileView === "feed" : feedRevealed;
 
   return (
     <div

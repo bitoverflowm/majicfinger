@@ -86,6 +86,8 @@ export function useWarRoomData({
   exploreFeed,
   fixture,
   mobile,
+  /** Nav pick path: do not refetch the full tradable desk when `market` changes. */
+  selectOnly = false,
 }: {
   desk: string;
   market: string;
@@ -93,6 +95,7 @@ export function useWarRoomData({
   exploreFeed?: string;
   fixture?: boolean;
   mobile?: boolean;
+  selectOnly?: boolean;
 }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -171,13 +174,17 @@ export function useWarRoomData({
 
   // Nav / deep-link market picks: refetch silently so the selected contract is
   // injected into feed/map/features. Do not flip `loading` (no blank flash).
+  // Skip when `selectOnly` — pick path uses `/api/war-room/market` instead of the full desk.
   // Skip the first paint — the filterKey effect already fetches with marketRef.
   const prevMarketRef = useRef<string | null>(null);
+  const selectOnlyRef = useRef(selectOnly);
+  selectOnlyRef.current = selectOnly;
   useEffect(() => {
     const id = String(market || "").trim();
     const prev = prevMarketRef.current;
     prevMarketRef.current = id;
     if (prev === null || prev === id) return;
+    if (selectOnlyRef.current) return;
     let cancelled = false;
     (async () => {
       try {
@@ -209,6 +216,8 @@ export function useWarRoomData({
     document.addEventListener("visibilitychange", onVis);
     const interval = window.setInterval(() => {
       if (hiddenRef.current || pollInflightRef.current) return;
+      // Select-only nav picks must not rehydrate the full tradable desk/pings.
+      if (selectOnlyRef.current) return;
       pollInflightRef.current = true;
       // Silent background refresh — no loading chrome.
       fetchSnapshot({

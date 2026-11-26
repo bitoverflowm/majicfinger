@@ -19,19 +19,13 @@ export function requestWarRoomMarketPick(marketId) {
   const onWarRoom = path === "/war-room" || path.startsWith("/war-room/");
 
   if (onHome) {
-    // Scroll first, then emit so War Room can focus after the stage is in view.
+    // Scroll + emit in the same turn — never wait on desk/snapshot before scrolling.
     scrollToDemoSection({ behavior: "smooth" });
-    const emit = () => {
-      window.dispatchEvent(
-        new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, { detail: { marketId: id } }),
-      );
-    };
-    // Two rAFs + short delay: let smooth scroll start and the globe layout settle.
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        window.setTimeout(emit, 280);
-      });
-    });
+    window.dispatchEvent(
+      new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, {
+        detail: { marketId: id, selectOnly: true },
+      }),
+    );
     return true;
   }
 
@@ -41,7 +35,9 @@ export function requestWarRoomMarketPick(marketId) {
       window.history.replaceState(null, "", href);
     }
     window.dispatchEvent(
-      new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, { detail: { marketId: id } }),
+      new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, {
+        detail: { marketId: id, selectOnly: true },
+      }),
     );
     return true;
   }
