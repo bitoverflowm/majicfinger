@@ -293,11 +293,13 @@ export function JarvisNavSearch({ className }: { className?: string }) {
     };
   }, [query]);
 
-  const open = focused && (loading || hits.length > 0 || query.trim().length >= 2);
+  const open = focused;
+  const term = query.trim();
+  const searching = term.length >= 2;
   const placeholder = PLACEHOLDERS[placeholderIndex];
   const newsHref = useMemo(
-    () => (query.trim() ? `/news-archive?q=${encodeURIComponent(query.trim())}` : "/news"),
-    [query],
+    () => (term ? `/news-archive?q=${encodeURIComponent(term)}` : "/news"),
+    [term],
   );
 
   return (
@@ -340,43 +342,61 @@ export function JarvisNavSearch({ className }: { className?: string }) {
       </div>
       {open ? (
         <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
-          {loading && hits.length === 0 ? (
-            <p className="px-3 py-2.5 text-xs text-muted-foreground">
-              Searching Kalshi, Polymarket, holders, news, and crypto feeds…
-            </p>
-          ) : hits.length === 0 ? (
-            <Link href={newsHref} className="block px-3 py-2.5 text-sm hover:bg-accent" onClick={() => setFocused(false)}>
-              Search news for “{query.trim()}”
-            </Link>
-          ) : (
-            <ul className="max-h-80 overflow-y-auto py-1">
-              {hits.map((hit) => (
-                <li key={hit.id}>
-                  <Link
-                    href={hit.href}
-                    className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-accent"
-                    onClick={() => setFocused(false)}
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate">{hit.label}</span>
-                      {hit.detail ? (
-                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{hit.detail}</span>
-                      ) : null}
-                    </span>
-                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {hit.source}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="flex items-start gap-2 border-t border-border bg-muted/40 px-3 py-2.5 text-[11px] leading-snug text-muted-foreground">
+          {searching ? (
+            loading && hits.length === 0 ? (
+              <p className="px-3 py-2.5 text-xs text-muted-foreground">
+                Searching Kalshi, Polymarket, holders, news, and crypto feeds…
+              </p>
+            ) : hits.length === 0 ? (
+              <Link
+                href={newsHref}
+                className="block px-3 py-2.5 text-sm hover:bg-accent"
+                onClick={() => setFocused(false)}
+              >
+                Search news for “{term}”
+              </Link>
+            ) : (
+              <ul className="max-h-80 overflow-y-auto py-1">
+                {hits.map((hit) => (
+                  <li key={hit.id}>
+                    <Link
+                      href={hit.href}
+                      className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-accent"
+                      onClick={() => setFocused(false)}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate">{hit.label}</span>
+                        {hit.detail ? (
+                          <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                            {hit.detail}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {hit.source}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : null}
+          <div
+            className={cn(
+              "flex items-start gap-2 bg-muted/40 px-3 py-2.5 text-[12px] leading-snug text-muted-foreground",
+              searching ? "border-t border-border" : "",
+            )}
+          >
             <Sparkles className="mt-0.5 size-3.5 shrink-0 text-secondary" aria-hidden />
-            <p>
-              <span className="font-medium text-foreground">Jarvis AI is coming soon.</span> This search already
-              covers Kalshi, Polymarket, holders, news, Binance, and Chainlink — picks open War Room when we can.
-            </p>
+            <div className="min-w-0 space-y-1">
+              <p className="font-semibold text-foreground">Jarvis AI — Coming Soon</p>
+              <p>Zero-prompt intelligence that learns your markets and brings you moving signals before you even ask.</p>
+              <p>
+                Live feeds: All trades & whale moves • Kalshi • Polymarket • Equities • News • Weather • Flight
+                patterns • Satellite & global incidents
+              </p>
+              <p>Available in-browser or via MCP for your favorite agent.</p>
+            </div>
           </div>
         </div>
       ) : null}
