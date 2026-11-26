@@ -307,9 +307,11 @@ export function WarRoomView({
   const marketById = useMemo(() => {
     const map = new Map<string, MarketRow>();
     // Keep full index so a selected market stays resolvable while the venue filter changes.
+    // Prefer denser map index, then rail feed (nav picks may land in feed before map).
     for (const row of allMapMarkets) map.set(row.id, row);
+    for (const row of allMarkets) if (!map.has(row.id)) map.set(row.id, row);
     return map;
-  }, [allMapMarkets]);
+  }, [allMapMarkets, allMarkets]);
 
   // Drop selection when it falls outside the active venue filter.
   useEffect(() => {
