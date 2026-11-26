@@ -438,7 +438,14 @@ export function JarvisNavSearch({ className }: { className?: string }) {
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 const top = hits[0];
-                if (top?.marketId && requestWarRoomMarketPick(top.marketId)) {
+                if (
+                  top?.marketId &&
+                  requestWarRoomMarketPick(top.marketId, {
+                    title: top.label,
+                    venue: top.source,
+                    detail: top.detail,
+                  })
+                ) {
                   setFocused(false);
                   return;
                 }
@@ -477,7 +484,14 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                       className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-accent"
                       onClick={(e) => {
                         setFocused(false);
-                        if (hit.marketId && requestWarRoomMarketPick(hit.marketId)) {
+                        if (
+                          hit.marketId &&
+                          requestWarRoomMarketPick(hit.marketId, {
+                            title: hit.label,
+                            venue: hit.source,
+                            detail: hit.detail,
+                          })
+                        ) {
                           e.preventDefault();
                         }
                       }}

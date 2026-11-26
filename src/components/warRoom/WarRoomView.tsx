@@ -466,26 +466,43 @@ export function WarRoomView({
     [pickNonce],
   );
 
-  const stubPickRow = useCallback((id: string, seed?: MarketRow | null): MarketRow => {
-    if (seed && seed.id === id) return seed;
-    const venue = id.startsWith("polymarket:") ? "polymarket" : id.startsWith("kalshi:") ? "kalshi" : "";
-    return {
-      id,
-      title: seed?.title || "Loading market…",
-      venue: seed?.venue || venue,
-      region: seed?.region || "Global",
-      price: seed?.price ?? null,
-      move: seed?.move ?? null,
-      volume24h: seed?.volume24h ?? null,
-      imageUrl: seed?.imageUrl ?? null,
-      avatarUrl: seed?.avatarUrl ?? null,
-      slug: seed?.slug ?? null,
-      venueMarketId: seed?.venueMarketId ?? null,
-      tokenIds: seed?.tokenIds,
-      outcomes: seed?.outcomes,
-      geometry: seed?.geometry || { type: "Point", coordinates: PICK_FALLBACK_COORDS },
-    };
-  }, []);
+  const stubPickRow = useCallback(
+    (
+      id: string,
+      seed?: MarketRow | null,
+      meta?: { title?: string; venue?: string; detail?: string },
+    ): MarketRow => {
+      if (seed && seed.id === id && seed.title && seed.title !== "Loading market…") return seed;
+      const venueFromId = id.startsWith("polymarket:")
+        ? "polymarket"
+        : id.startsWith("kalshi:")
+          ? "kalshi"
+          : "";
+      const venueRaw = String(meta?.venue || seed?.venue || venueFromId || "").toLowerCase();
+      const venue = venueRaw.includes("poly")
+        ? "polymarket"
+        : venueRaw.includes("kalshi")
+          ? "kalshi"
+          : venueFromId;
+      return {
+        id,
+        title: String(meta?.title || seed?.title || "Selected market"),
+        venue,
+        region: seed?.region || "Global",
+        price: seed?.price ?? null,
+        move: seed?.move ?? null,
+        volume24h: seed?.volume24h ?? null,
+        imageUrl: seed?.imageUrl ?? null,
+        avatarUrl: seed?.avatarUrl ?? null,
+        slug: seed?.slug ?? null,
+        venueMarketId: seed?.venueMarketId ?? null,
+        tokenIds: seed?.tokenIds,
+        outcomes: seed?.outcomes,
+        geometry: seed?.geometry || { type: "Point", coordinates: PICK_FALLBACK_COORDS },
+      };
+    },
+    [],
+  );
 
   const openMarketDetail = useCallback(
     (id: string, rowOverride?: MarketRow | null, opts?: { focus?: boolean; selectOnly?: boolean }) => {
@@ -517,6 +534,8 @@ export function WarRoomView({
 
   // Nav select-only: fetch market detail only (never full desk). Event handler opens UI immediately.
   const revealedKeyRef = useRef<string | null>(null);
+  const openMarketDetailRef = useRef(openMarketDetail);
+  openMarketDetailRef.current = openMarketDetail;
   useEffect(() => {
     const id = String(market || "").trim();
     if (!id || !selectOnly) return;
@@ -526,6 +545,10 @@ export function WarRoomView({
 
     let cancelled = false;
     setPickBusy(true);
+    // Never leave Agent Steps stuck if the market lookup hangs.
+    const busyCap = window.setTimeout(() => {
+      if (!cancelled) setPickBusy(false);
+    }, 2400);
     (async () => {
       try {
         const res = await fetch(
@@ -536,7 +559,11 @@ export function WarRoomView({
           { credentials: "same-origin" },
         );
         const body = await res.json().catch(() => ({}));
-        if (cancelled || !res.ok || !body?.market) return;
+        if (cancelled) return;
+        if (!res.ok || !body?.market) {
+          setPickBusy(false);
+          return;
+        }
         const m = body.market as {
           id?: string;
           title?: string;
@@ -572,29 +599,42 @@ export function WarRoomView({
           outcomes: m.outcomes,
           geometry: geom,
         };
-        if (cancelled) return;
-        openMarketDetail(row.id, row, { focus: true, selectOnly: true });
+        openMarketDetailRef.current(row.id, row, { focus: true, selectOnly: true });
       } catch {
         /* keep optimistic stub from the pick event */
       } finally {
-        if (!cancelled) setPickBusy(false);
+        window.clearTimeout(busyCap);
+        setPickBusy(false);
       }
     })();
     return () => {
       cancelled = true;
+      window.clearTimeout(busyCap);
     };
-  }, [market, pickNonce, selectOnly, fixture, openMarketDetail]);
+  }, [market, pickNonce, selectOnly, fixture]);
 
   // Accept the pick event: enter select-only immediately (scroll already started).
   useEffect(() => {
     const onPick = (event: Event) => {
-      const detail = (event as CustomEvent<{ marketId?: string; selectOnly?: boolean }>).detail;
+      const detail = (
+        event as CustomEvent<{
+          marketId?: string;
+          selectOnly?: boolean;
+          title?: string;
+          venue?: string;
+          detail?: string;
+        }>
+      ).detail;
       const id = String(detail?.marketId || "").trim();
       if (!id) return;
       const only = detail?.selectOnly !== false;
       revealedKeyRef.current = null;
       const seed = marketById.get(id) || null;
-      const optimistic = stubPickRow(id, seed);
+      const optimistic = stubPickRow(id, seed, {
+        title: detail?.title,
+        venue: detail?.venue,
+        detail: detail?.detail,
+      });
       // Left panel + pin/zoom in the same turn — do not wait for desk snapshot.
       openMarketDetail(id, optimistic, { focus: true, selectOnly: only });
       setPickBusy(true);
@@ -912,8 +952,8 @@ export function WarRoomView({
 
   const globe = (
     <div className="relative h-full w-full">
-      {categoryBar}
-      {viewStatsOverlay}
+      {selectOnly ? null : categoryBar}
+      {selectOnly ? null : viewStatsOverlay}
       {!compact ? (
         <WarRoomLayersRail lockKind={embedded ? "pro" : "coming-soon"} />
       ) : null}
