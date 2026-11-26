@@ -821,7 +821,25 @@ export async function getWarRoomSnapshot(opts = {}) {
       selected = found;
       marketById.set(found.id, found);
       const row = feedRow(bundle, found);
-      const feat = featureFromMarket(found);
+      let feat = featureFromMarket(found);
+      // Nav picks must always land a map pin — synthesize geometry if lookup had none.
+      if (!feat && found.id) {
+        const fallback = found.geometry?.type === "Point"
+          ? found.geometry
+          : { type: "Point", coordinates: [-77.0365, 38.8977] };
+        feat = {
+          type: "Feature",
+          id: found.id,
+          geometry: fallback,
+          properties: {
+            id: found.id,
+            title: found.title || found.id,
+            venue: found.venue || "",
+            price: found.quote?.price ?? null,
+          },
+        };
+        if (!found.geometry) found.geometry = fallback;
+      }
       if (feat && !features.some((f) => String(f?.properties?.id || f?.id) === found.id)) {
         features = [feat, ...features].slice(0, cap + 1);
       }

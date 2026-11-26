@@ -23,13 +23,27 @@ import {
   type WarRoomDetailTarget,
   type WarRoomNavigateRequest,
 } from "./WarRoomDetailCard";
-import { DashboardLoadingProgress } from "@/components/publicEmbed/DashboardLoadingProgress";
 import { WarRoomLayersRail } from "./WarRoomLayersRail";
-import { WAR_ROOM_LOAD_STEPS, WarRoomRailSkeleton } from "./WarRoomLoadingProgress";
+import { WarRoomAgentStepsLoader, WarRoomRailSkeleton } from "./WarRoomLoadingProgress";
 import { relatedMarketsForHeadline } from "./relatedMarkets";
 import { WAR_ROOM_MARKET_PICK_EVENT } from "@/lib/warRoom/pickMarket";
 import { useWarRoomData } from "./useWarRoomData";
 import { useWarRoomTheme } from "./useWarRoomTheme";
+
+/** DC fallback when a pick has no geometry yet — politics / Trump / impeach land here. */
+const PICK_FALLBACK_COORDS: [number, number] = [-77.0365, 38.8977];
+
+function coordsFromGeometry(
+  geometry: { type?: string; coordinates?: [number, number] | number[] } | null | undefined,
+): [number, number] | null {
+  if (!geometry || geometry.type !== "Point") return null;
+  const c = geometry.coordinates;
+  if (!Array.isArray(c) || c.length < 2) return null;
+  const lon = Number(c[0]);
+  const lat = Number(c[1]);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+  return [lon, lat];
+}
 
 function formatCount(n: number) {
   if (!Number.isFinite(n) || n < 0) return "0";
@@ -102,6 +116,8 @@ export function WarRoomView({
   const [detail, setDetail] = useState<WarRoomDetailTarget | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [feedRevealed, setFeedRevealed] = useState(false);
+  /** While true, hide news ping flood so the selected market ping wins. */
+  const [suppressNewsPings, setSuppressNewsPings] = useState(false);
   const [categoryId, setCategoryId] = useState("");
   const [exploreFeedId, setExploreFeedId] = useState("tradable");
   const [venueFilter, setVenueFilter] = useState<VenueFilter>("both");
@@ -203,12 +219,13 @@ export function WarRoomView({
     return emptyCollection as { type: "FeatureCollection"; features: Array<Record<string, unknown>> };
   }, [snapshot?.features, emptyCollection]);
   const pings = useMemo(() => {
+    if (suppressNewsPings) return emptyCollection;
     const raw = snapshot?.pings as { type?: string; features?: unknown } | null | undefined;
     if (raw?.type === "FeatureCollection" && Array.isArray(raw.features)) {
       return raw as { type: "FeatureCollection"; features: never[] };
     }
     return emptyCollection;
-  }, [snapshot?.pings, emptyCollection]);
+  }, [snapshot?.pings, emptyCollection, suppressNewsPings]);
   const allMarkets = (Array.isArray(snapshot?.feed) ? snapshot.feed : []) as MarketRow[];
   /** All globe points — feed is a rail-sized slice; clicks must resolve against this. */
   const allMapMarkets = (
@@ -219,14 +236,45 @@ export function WarRoomView({
   const allActivity = (Array.isArray(snapshot?.activity) ? snapshot.activity : []) as ActivityRow[];
 
   const features = useMemo(() => {
-    if (venueFilter === "both") return allFeatures;
+    const base =
+      venueFilter === "both"
+        ? allFeatures
+        : {
+            type: "FeatureCollection" as const,
+            features: allFeatures.features.filter((f) =>
+              venueMatches(
+                venueFilter,
+                String((f as { properties?: { venue?: string } }).properties?.venue || ""),
+              ),
+            ),
+          };
+    const pickId = String(market || "").trim();
+    const pickCenter = focusTarget?.center;
+    if (!pickId || !pickCenter) return base;
+    const already = base.features.some(
+      (f) => String((f as { properties?: { id?: string } }).properties?.id) === pickId,
+    );
+    if (already) return base;
+    // Inject a single pick pin so zoom has a real marker before snapshot catch-up.
+    const row = (Array.isArray(snapshot?.mapMarkets) ? snapshot.mapMarkets : []).find(
+      (m: { id?: string }) => String(m?.id) === pickId,
+    ) as MarketRow | undefined;
+    const synthetic = {
+      type: "Feature" as const,
+      id: pickId,
+      geometry: { type: "Point" as const, coordinates: pickCenter },
+      properties: {
+        id: pickId,
+        title: row?.title || pickId,
+        venue: row?.venue || "",
+        price: row?.price ?? null,
+      },
+    };
     return {
       type: "FeatureCollection" as const,
-      features: allFeatures.features.filter((f) =>
-        venueMatches(venueFilter, String((f as { properties?: { venue?: string } }).properties?.venue || "")),
-      ),
+      features: [synthetic, ...base.features],
     };
-  }, [allFeatures, venueFilter]);
+  }, [allFeatures, venueFilter, market, focusTarget?.center, snapshot?.mapMarkets]);
 
   const markets = useMemo(() => {
     if (venueFilter === "both") return allMarkets;
@@ -348,24 +396,34 @@ export function WarRoomView({
     (id: string, row?: MarketRow | null) => {
       const match = features.features.find(
         (f) => String((f as { properties?: { id?: string } }).properties?.id) === id,
-      ) as { geometry?: { coordinates?: [number, number] } } | undefined;
-      const fromFeature = match?.geometry?.coordinates;
+      ) as { geometry?: { type?: string; coordinates?: [number, number] } } | undefined;
+      const fromFeature = coordsFromGeometry(match?.geometry);
       if (fromFeature) return fromFeature;
-      const fromRow = row?.geometry?.coordinates;
-      return fromRow || null;
+      const fromRow = coordsFromGeometry(row?.geometry);
+      if (fromRow) return fromRow;
+      // Always land somewhere — nav picks must ping/zoom even before snapshot inject.
+      return PICK_FALLBACK_COORDS;
     },
     [features.features],
   );
 
+  const focusMarketPing = useCallback(
+    (id: string, coords: [number, number], nonce = pickNonce) => {
+      setSuppressNewsPings(true);
+      setFocusTarget(deepFocus(coords, `market:${id}:${nonce}:${Date.now()}`));
+    },
+    [pickNonce],
+  );
+
   const openMarketDetail = useCallback(
-    (id: string, rowOverride?: MarketRow | null) => {
+    (id: string, rowOverride?: MarketRow | null, opts?: { focus?: boolean }) => {
       const row = rowOverride || marketById.get(id);
       if (!row) return false;
       setMarket(id);
       setActivityId(null);
       const coords = coordsForMarket(id, row);
-      if (coords) {
-        setFocusTarget(deepFocus(coords, `market:${id}:${Date.now()}`));
+      if (opts?.focus !== false && coords) {
+        focusMarketPing(id, coords);
       }
       setDetail({ kind: "market", market: row });
       setDetailOpen(true);
@@ -373,7 +431,7 @@ export function WarRoomView({
       if (compact) setMobileView("detail");
       return true;
     },
-    [compact, coordsForMarket, marketById, setMarket],
+    [compact, coordsForMarket, focusMarketPing, marketById, setMarket],
   );
 
   // Nav / URL market picks: once the row is in the snapshot, reveal pin + zoom + side panes.
@@ -386,10 +444,15 @@ export function WarRoomView({
     }
     const key = `${id}#${pickNonce}`;
     if (revealedKeyRef.current === key) return;
-    if (openMarketDetail(id)) {
+
+    const reveal = (row?: MarketRow | null) => {
+      if (!openMarketDetail(id, row, { focus: true })) return false;
       revealedKeyRef.current = key;
-      return;
-    }
+      return true;
+    };
+
+    if (reveal()) return;
+
     // Snapshot may still be loading the injected pick — fetch detail as a fallback.
     let cancelled = false;
     (async () => {
@@ -418,6 +481,10 @@ export function WarRoomView({
           outcomes?: MarketRow["outcomes"];
           tokenIds?: string[];
         };
+        const geom = m.geometry?.type === "Point" ? m.geometry : {
+          type: "Point" as const,
+          coordinates: PICK_FALLBACK_COORDS,
+        };
         const row: MarketRow = {
           id: String(m.id || id),
           title: String(m.title || id),
@@ -432,11 +499,9 @@ export function WarRoomView({
           venueMarketId: m.venueMarketId ?? null,
           tokenIds: m.tokenIds,
           outcomes: m.outcomes,
-          geometry: m.geometry?.type === "Point" ? m.geometry : null,
+          geometry: geom,
         };
-        if (openMarketDetail(row.id, row)) {
-          revealedKeyRef.current = key;
-        }
+        if (!cancelled) reveal(row);
       } catch {
         /* keep waiting for snapshot */
       }
@@ -446,18 +511,30 @@ export function WarRoomView({
     };
   }, [market, marketById, openMarketDetail, pickNonce, fixture]);
 
+  // Clear news-ping suppress a few seconds after a successful pick focus.
+  useEffect(() => {
+    if (!suppressNewsPings) return;
+    const t = window.setTimeout(() => setSuppressNewsPings(false), 4500);
+    return () => window.clearTimeout(t);
+  }, [suppressNewsPings, focusTarget?.key]);
+
   // Also accept the pick event directly (in case parent state races with scroll).
   useEffect(() => {
     const onPick = (event: Event) => {
       const id = String((event as CustomEvent<{ marketId?: string }>).detail?.marketId || "").trim();
       if (!id) return;
+      setSuppressNewsPings(true);
       setMarket(id);
       revealedKeyRef.current = null;
-      if (openMarketDetail(id)) return;
+      // Optimistic ping/zoom with fallback coords so the globe moves even before fetch.
+      const row = marketById.get(id);
+      const coords = coordsForMarket(id, row || null);
+      focusMarketPing(id, coords);
+      if (row) openMarketDetail(id, row, { focus: true });
     };
     window.addEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
     return () => window.removeEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
-  }, [openMarketDetail, setMarket]);
+  }, [coordsForMarket, focusMarketPing, marketById, openMarketDetail, setMarket]);
 
   const selectActivity = useCallback(
     (row: ActivityRow) => {
@@ -775,7 +852,7 @@ export function WarRoomView({
       ) : null}
       {loading ? (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3">
-          <DashboardLoadingProgress tone={loadTone === "dark" ? "dark" : "default"} steps={WAR_ROOM_LOAD_STEPS} />
+          <WarRoomAgentStepsLoader tone={loadTone === "dark" ? "dark" : "default"} />
         </div>
       ) : null}
       {!compact ? (

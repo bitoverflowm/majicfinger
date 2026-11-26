@@ -183,7 +183,11 @@ export function WarRoomGlobe({
           /* layer may not exist yet */
         }
       }
-      for (const id of entering) {
+      // Prefer the selected market ping — don't flood the globe with enter pulses.
+      const pulseIds = selectedRef.current
+        ? entering.filter((id) => id === selectedRef.current)
+        : entering.slice(0, 3);
+      for (const id of pulseIds) {
         try {
           map.setFeatureState({ source: SOURCE_ID, id }, { pulse: 1 });
           window.setTimeout(() => {
@@ -571,16 +575,23 @@ export function WarRoomGlobe({
     } catch {
       /* ignore */
     }
+    // Nav picks set focusTarget; skip the shallow selected-only ease when a deep focus is pending.
+    if (focusTarget?.center) return;
     const match = (features?.features || []).find((f) => String(f.properties?.id) === selectedMarketId);
     const coords = match?.geometry?.coordinates;
-    if (coords && interactive && !keepGlobe) {
+    if (coords && interactive) {
       try {
-        map.easeTo({ center: coords, zoom: Math.max(map.getZoom(), 2.6), duration: 500 });
+        map.easeTo({
+          center: coords,
+          zoom: Math.max(map.getZoom(), keepGlobe ? 3.8 : 2.6),
+          duration: 700,
+          essential: true,
+        });
       } catch {
         /* ignore */
       }
     }
-  }, [selectedMarketId, features, interactive, keepGlobe]);
+  }, [selectedMarketId, features, interactive, keepGlobe, focusTarget]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -599,13 +610,12 @@ export function WarRoomGlobe({
         onAnchorChangeRef.current?.(null);
       }
     };
-    if (focusKeyRef.current !== key) {
-      focusKeyRef.current = key;
+    const runFocus = () => {
       try {
         const currentBearing = typeof map.getBearing === "function" ? map.getBearing() : 0;
         map.easeTo({
           center: focusTarget.center,
-          zoom: focusTarget.zoom ?? 4.6,
+          zoom: focusTarget.zoom ?? (keepGlobe ? 4.4 : 4.6),
           pitch: focusTarget.pitch ?? 48,
           bearing: focusTarget.bearing ?? currentBearing + 52,
           duration: 1100,
@@ -614,15 +624,22 @@ export function WarRoomGlobe({
       } catch {
         /* ignore */
       }
+    };
+    // Map may still be resizing after smooth scroll into `#demo` — ease now + once more.
+    if (focusKeyRef.current !== key) {
+      focusKeyRef.current = key;
+      runFocus();
     }
+    const retry = window.setTimeout(runFocus, 420);
     publishAnchor();
     map.on("move", publishAnchor);
     map.on("moveend", publishAnchor);
     return () => {
+      window.clearTimeout(retry);
       map.off("move", publishAnchor);
       map.off("moveend", publishAnchor);
     };
-  }, [focusTarget]);
+  }, [focusTarget, keepGlobe]);
 
   useEffect(() => {
     if (!resetNonce) return;
