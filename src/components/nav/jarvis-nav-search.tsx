@@ -77,12 +77,93 @@ function pushHit(list: Hit[], hit: Hit, seen: Set<string>) {
   list.push(hit);
 }
 
+/** Round-robin by source so Kalshi embeddings can't fill the whole list. */
+function interleaveHits(hits: Hit[], limit = 12): Hit[] {
+  const buckets = new Map<string, Hit[]>();
+  for (const hit of hits) {
+    const key = hit.source || "Other";
+    const list = buckets.get(key);
+    if (list) list.push(hit);
+    else buckets.set(key, [hit]);
+  }
+  // Prefer a stable, mixed order: markets first, then holders/traders, feeds, news.
+  const preferred = [
+    "Kalshi",
+    "Polymarket",
+    "News",
+    "Holders",
+    "Kalshi Trader",
+    "Binance",
+    "Chainlink",
+  ];
+  const keys = [
+    ...preferred.filter((k) => buckets.has(k)),
+    ...[...buckets.keys()].filter((k) => !preferred.includes(k)),
+  ];
+  const queues = keys.map((k) => [...(buckets.get(k) || [])]);
+  const out: Hit[] = [];
+  while (out.length < limit) {
+    let added = false;
+    for (const q of queues) {
+      if (!q.length || out.length >= limit) continue;
+      out.push(q.shift()!);
+      added = true;
+    }
+    if (!added) break;
+  }
+  return out;
+}
+
+/** Spectrum “Loading State Drive”–inspired pixel grid — secondary/muted only. */
+function JarvisSearchLoader({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setElapsed(Math.max(0, (Date.now() - startedAt) / 1000));
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [startedAt]);
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-3" aria-live="polite" aria-busy="true">
+      <div className="grid size-7 shrink-0 grid-cols-4 gap-0.5" aria-hidden>
+        {Array.from({ length: 16 }).map((_, i) => (
+          <motion.span
+            key={i}
+            className="block size-1.5 rounded-[1px] bg-secondary"
+            animate={{ opacity: [0.2, 1, 0.2], scale: [0.85, 1, 0.85] }}
+            transition={{
+              duration: 1.05,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: (i % 4) * 0.08 + Math.floor(i / 4) * 0.05,
+            }}
+          />
+        ))}
+      </div>
+      <div className="min-w-0 flex-1">
+        <motion.p
+          className="text-xs font-medium text-muted-foreground"
+          animate={{ opacity: [0.45, 1, 0.45] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        >
+          Searching markets, holders, news, and feeds…
+        </motion.p>
+        <p className="mt-0.5 font-mono text-[10px] tabular-nums text-muted-foreground/80">
+          {elapsed.toFixed(1)}s
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function JarvisNavSearch({ className }: { className?: string }) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [hits, setHits] = useState<Hit[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingStartedAt, setLoadingStartedAt] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
   const seq = useRef(0);
 
@@ -112,6 +193,7 @@ export function JarvisNavSearch({ className }: { className?: string }) {
     const my = ++seq.current;
     const ac = new AbortController();
     setLoading(true);
+    setLoadingStartedAt(Date.now());
     const t = window.setTimeout(async () => {
       try {
         const next: Hit[] = [];
@@ -308,7 +390,7 @@ export function JarvisNavSearch({ className }: { className?: string }) {
           seen,
         );
 
-        setHits(next.slice(0, 12));
+        setHits(interleaveHits(next, 12));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
       } finally {
@@ -377,9 +459,7 @@ export function JarvisNavSearch({ className }: { className?: string }) {
         <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
           {searching ? (
             loading && hits.length === 0 ? (
-              <p className="px-3 py-2.5 text-xs text-muted-foreground">
-                Searching Kalshi, Polymarket, holders, news, and crypto feeds…
-              </p>
+              <JarvisSearchLoader startedAt={loadingStartedAt || Date.now()} />
             ) : hits.length === 0 ? (
               <Link
                 href={newsHref}
