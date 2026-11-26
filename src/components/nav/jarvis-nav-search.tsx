@@ -10,7 +10,11 @@ import { priceStreamPairs } from "@/lib/priceStreams";
 import { cn } from "@/lib/utils";
 import { warRoomHref } from "@/lib/warRoom/href";
 import { warRoomMarketId } from "@/lib/warRoom/ids";
-import { kickWarRoomDemoScroll, requestWarRoomMarketPick } from "@/lib/warRoom/pickMarket";
+import {
+  kickWarRoomDemoScroll,
+  requestWarRoomMarketPick,
+  requestWarRoomNewsPick,
+} from "@/lib/warRoom/pickMarket";
 
 const JARVIS_LIVE_FEED_TAGS: Array<{ venue: string; label?: string }> = [
   { venue: "all-trades", label: "All trades & whales" },
@@ -42,6 +46,8 @@ type Hit = {
   source: string;
   /** When set, pick scrolls to homepage `#demo` War Room (or `/war-room`) and reveals the market. */
   marketId?: string;
+  /** Jarvis news row → War Room headline (not /news-archive). */
+  newsQuery?: string;
 };
 
 function isWallet(q: string) {
@@ -383,9 +389,10 @@ export function JarvisNavSearch({ className }: { className?: string }) {
           {
             id: `news-${term.toLowerCase()}`,
             label: `News for “${term}”`,
-            detail: "Open news archive",
-            href: `/news-archive?q=${encodeURIComponent(term)}`,
+            detail: "Open in War Room",
+            href: "/#demo",
             source: "News",
+            newsQuery: term,
           },
           seen,
         );
@@ -449,6 +456,13 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                   window.setTimeout(() => setFocused(false), 0);
                   return;
                 }
+                if (
+                  top?.newsQuery &&
+                  requestWarRoomNewsPick({ query: top.newsQuery, title: top.label })
+                ) {
+                  window.setTimeout(() => setFocused(false), 0);
+                  return;
+                }
                 window.location.assign(top?.href || newsHref);
               }
               if (e.key === "Escape") {
@@ -483,7 +497,7 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                       href={hit.href}
                       className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-accent"
                       onClickCapture={() => {
-                        if (hit.marketId) kickWarRoomDemoScroll();
+                        if (hit.marketId || hit.newsQuery) kickWarRoomDemoScroll();
                       }}
                       onClick={(e) => {
                         if (
@@ -497,6 +511,18 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                         ) {
                           e.preventDefault();
                           // Defer blur/close so React teardown cannot block the first scroll frame.
+                          window.setTimeout(() => setFocused(false), 0);
+                          return;
+                        }
+                        if (
+                          hit.newsQuery &&
+                          requestWarRoomNewsPick({
+                            query: hit.newsQuery,
+                            title: hit.label,
+                            scroll: false,
+                          })
+                        ) {
+                          e.preventDefault();
                           window.setTimeout(() => setFocused(false), 0);
                           return;
                         }

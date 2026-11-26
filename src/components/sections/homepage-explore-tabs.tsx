@@ -7,7 +7,7 @@ import { useWarRoomResearchDemo } from "@/components/warRoom/useWarRoomResearchD
 import { DashboardDemoSectionLazy } from "@/components/sections/dashboard-demo-section-lazy";
 import { useLandingExploreScrollHandoff } from "@/hooks/useLandingExploreScrollHandoff";
 import { cn } from "@/lib/utils";
-import { WAR_ROOM_MARKET_PICK_EVENT } from "@/lib/warRoom/pickMarket";
+import { WAR_ROOM_MARKET_PICK_EVENT, WAR_ROOM_NEWS_PICK_EVENT } from "@/lib/warRoom/pickMarket";
 
 const TABS = [
   { id: "war-room", label: "War Room" },
@@ -64,15 +64,23 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
   } = useWarRoomResearchDemo();
 
   useEffect(() => {
-    const onPick = (event: Event) => {
+    const onMarketPick = (event: Event) => {
       const id = String((event as CustomEvent<{ marketId?: string }>).detail?.marketId || "").trim();
       if (!id) return;
       setTab("war-room");
       setMarket(id);
       setPickNonce((n) => n + 1);
     };
-    window.addEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
-    return () => window.removeEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
+    const onNewsPick = () => {
+      setTab("war-room");
+      setPickNonce((n) => n + 1);
+    };
+    window.addEventListener(WAR_ROOM_MARKET_PICK_EVENT, onMarketPick as EventListener);
+    window.addEventListener(WAR_ROOM_NEWS_PICK_EVENT, onNewsPick as EventListener);
+    return () => {
+      window.removeEventListener(WAR_ROOM_MARKET_PICK_EVENT, onMarketPick as EventListener);
+      window.removeEventListener(WAR_ROOM_NEWS_PICK_EVENT, onNewsPick as EventListener);
+    };
   }, []);
 
   const onNavigate = useCallback(

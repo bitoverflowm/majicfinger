@@ -5,6 +5,9 @@ import { warRoomHref } from "./href";
 /** Homepage `#demo` / War Room terminal — select a market and reveal pin/detail. */
 export const WAR_ROOM_MARKET_PICK_EVENT = "lychee:war-room-market-pick";
 
+/** Homepage `#demo` / War Room — select a news headline (same as right-rail news click). */
+export const WAR_ROOM_NEWS_PICK_EVENT = "lychee:war-room-news-pick";
+
 /** Kick homepage smooth-scroll immediately (use from click capture before React work). */
 export function kickWarRoomDemoScroll() {
   if (typeof window === "undefined") return;
@@ -55,6 +58,42 @@ export function requestWarRoomMarketPick(marketId, meta = {}) {
       window.history.replaceState(null, "", href);
     }
     window.dispatchEvent(new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, { detail }));
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Jarvis / nav news pick → War Room headline reveal (not /news-archive).
+ * @param {{ query?: string; title?: string; scroll?: boolean }} [meta]
+ * @returns {boolean}
+ */
+export function requestWarRoomNewsPick(meta = {}) {
+  if (typeof window === "undefined") return false;
+  const query = String(meta.query || meta.title || "").trim();
+  if (!query) return false;
+
+  const path = window.location.pathname || "/";
+  const onHome = path === "/" || path === "";
+  const onWarRoom = path === "/war-room" || path.startsWith("/war-room/");
+  const shouldScroll = meta.scroll !== false;
+  const detail = {
+    query,
+    title: meta.title ? String(meta.title) : query,
+    selectOnly: true,
+  };
+
+  if (onHome) {
+    if (shouldScroll) scrollToDemoSection({ behavior: "smooth" });
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(WAR_ROOM_NEWS_PICK_EVENT, { detail }));
+    }, 0);
+    return true;
+  }
+
+  if (onWarRoom) {
+    window.dispatchEvent(new CustomEvent(WAR_ROOM_NEWS_PICK_EVENT, { detail }));
     return true;
   }
 

@@ -26,12 +26,68 @@ import {
 import { WarRoomLayersRail } from "./WarRoomLayersRail";
 import { WarRoomAgentStepsLoader, WarRoomRailSkeleton } from "./WarRoomLoadingProgress";
 import { relatedMarketsForHeadline } from "./relatedMarkets";
-import { WAR_ROOM_MARKET_PICK_EVENT } from "@/lib/warRoom/pickMarket";
+import { WAR_ROOM_MARKET_PICK_EVENT, WAR_ROOM_NEWS_PICK_EVENT } from "@/lib/warRoom/pickMarket";
 import { useWarRoomData } from "./useWarRoomData";
 import { useWarRoomTheme } from "./useWarRoomTheme";
 
 /** DC fallback when a pick has no geometry yet — politics / Trump / impeach land here. */
 const PICK_FALLBACK_COORDS: [number, number] = [-77.0365, 38.8977];
+
+function normalizeNewsQuery(raw: string) {
+  return String(raw || "")
+    .trim()
+    .replace(/^news\s+for\s+[“"']?/i, "")
+    .replace(/[”"']$/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function matchHeadlineActivity(rows: ActivityRow[], query: string, title?: string): ActivityRow | null {
+  const headlines = rows.filter((row) => row.kind === "headline");
+  if (!headlines.length) return null;
+  const needles = [normalizeNewsQuery(title || ""), normalizeNewsQuery(query)].filter(Boolean);
+  for (const needle of needles) {
+    const exact = headlines.find((row) => row.title.toLowerCase() === needle);
+    if (exact) return exact;
+  }
+  for (const needle of needles) {
+    const partial = headlines.find((row) => row.title.toLowerCase().includes(needle));
+    if (partial) return partial;
+  }
+  const tokens = needles
+    .flatMap((n) => n.split(/\s+/))
+    .filter((t) => t.length >= 4);
+  if (tokens.length) {
+    let best: ActivityRow | null = null;
+    let bestScore = 0;
+    for (const row of headlines) {
+      const hay = row.title.toLowerCase();
+      let score = 0;
+      for (const t of tokens) if (hay.includes(t)) score += 1;
+      if (score > bestScore) {
+        bestScore = score;
+        best = row;
+      }
+    }
+    if (best && bestScore >= Math.min(2, tokens.length)) return best;
+  }
+  return null;
+}
+
+function stubNewsActivity(query: string, title?: string): ActivityRow {
+  const label = String(title || query || "News").trim() || "News";
+  const id = `jarvis-news:${normalizeNewsQuery(label).slice(0, 48) || "pick"}`;
+  return {
+    id,
+    kind: "headline",
+    venue: "news",
+    title: label.replace(/^News for [“"']?/i, "").replace(/[”"']$/g, "").trim() || label,
+    summary: label,
+    geometry: { type: "Point", coordinates: PICK_FALLBACK_COORDS },
+    region: "Global",
+    data: { publisher: "News", markets: [], snippet: null },
+  };
+}
 
 function coordsFromGeometry(
   geometry: { type?: string; coordinates?: [number, number] | number[] } | null | undefined,
@@ -123,6 +179,9 @@ export function WarRoomView({
   const [selectOnly, setSelectOnly] = useState(false);
   const [pickRow, setPickRow] = useState<MarketRow | null>(null);
   const [pickBusy, setPickBusy] = useState(false);
+  /** Jarvis news pick — keep a synthetic ping when the desk feed has no match yet. */
+  const [newsPickRow, setNewsPickRow] = useState<ActivityRow | null>(null);
+  const pendingNewsPickRef = useRef<{ query: string; title?: string } | null>(null);
   const [categoryId, setCategoryId] = useState("");
   const [exploreFeedId, setExploreFeedId] = useState("tradable");
   const [venueFilter, setVenueFilter] = useState<VenueFilter>("both");
@@ -228,14 +287,36 @@ export function WarRoomView({
     return emptyCollection as { type: "FeatureCollection"; features: Array<Record<string, unknown>> };
   }, [snapshot?.features, emptyCollection]);
   const pings = useMemo(() => {
-    // Select-only / pick path: no news ping flood.
+    // Select-only market pick: no news ping flood.
     if (selectOnly) return emptyCollection;
     const raw = snapshot?.pings as { type?: string; features?: unknown } | null | undefined;
-    if (raw?.type === "FeatureCollection" && Array.isArray(raw.features)) {
-      return raw as { type: "FeatureCollection"; features: never[] };
-    }
-    return emptyCollection;
-  }, [snapshot?.pings, emptyCollection, selectOnly]);
+    const base =
+      raw?.type === "FeatureCollection" && Array.isArray(raw.features)
+        ? (raw as { type: "FeatureCollection"; features: Array<Record<string, unknown>> })
+        : emptyCollection;
+    if (!newsPickRow?.geometry?.coordinates) return base as { type: "FeatureCollection"; features: never[] };
+    const pickId = newsPickRow.id;
+    const already = base.features.some(
+      (f) => String((f as { properties?: { id?: string } }).properties?.id) === pickId,
+    );
+    if (already) return base as { type: "FeatureCollection"; features: never[] };
+    return {
+      type: "FeatureCollection" as const,
+      features: [
+        {
+          type: "Feature" as const,
+          id: pickId,
+          geometry: newsPickRow.geometry,
+          properties: {
+            id: pickId,
+            kind: "headline",
+            title: newsPickRow.title,
+          },
+        },
+        ...base.features,
+      ],
+    } as { type: "FeatureCollection"; features: never[] };
+  }, [snapshot?.pings, emptyCollection, selectOnly, newsPickRow]);
   const allMarkets = (Array.isArray(snapshot?.feed) ? snapshot.feed : []) as MarketRow[];
   /** All globe points — feed is a rail-sized slice; clicks must resolve against this. */
   const allMapMarkets = (
@@ -343,10 +424,14 @@ export function WarRoomView({
   }, [allMapMarkets, venueFilter, selectOnly, markets]);
   const activity = useMemo(() => {
     if (selectOnly) return [] as ActivityRow[];
-    return venueFilter === "both"
-      ? allActivity
-      : allActivity.filter((row) => row.kind === "headline" || venueMatches(venueFilter, row.venue));
-  }, [allActivity, venueFilter, selectOnly]);
+    const base =
+      venueFilter === "both"
+        ? allActivity
+        : allActivity.filter((row) => row.kind === "headline" || venueMatches(venueFilter, row.venue));
+    if (!newsPickRow) return base;
+    if (base.some((row) => row.id === newsPickRow.id)) return base;
+    return [newsPickRow, ...base];
+  }, [allActivity, venueFilter, selectOnly, newsPickRow]);
 
   const selectedId = useMemo(() => {
     const id = market || snapshot?.selectedMarketId || null;
@@ -513,6 +598,8 @@ export function WarRoomView({
       if (opts?.selectOnly) {
         setSelectOnly(true);
         setPickRow(row);
+        setNewsPickRow(null);
+        pendingNewsPickRef.current = null;
       } else {
         // Desk / in-map selection exits the nav select-only lens.
         setSelectOnly(false);
@@ -679,6 +766,64 @@ export function WarRoomView({
     },
     [compact, coordsForMarket, marketById, markets, setMarket],
   );
+
+  const selectActivityRef = useRef(selectActivity);
+  selectActivityRef.current = selectActivity;
+
+  const applyNewsPick = useCallback(
+    (query: string, title?: string, allowStub = false) => {
+      const hit = matchHeadlineActivity(allActivity, query, title);
+      if (hit) {
+        pendingNewsPickRef.current = null;
+        setNewsPickRow(null);
+        setSelectOnly(false);
+        setPickRow(null);
+        setPickBusy(false);
+        selectActivityRef.current(hit);
+        return true;
+      }
+      if (!allowStub) return false;
+      const stub = stubNewsActivity(query, title);
+      // Keep pending so a later desk/activity load can upgrade stub → real headline.
+      pendingNewsPickRef.current = { query, title };
+      setSelectOnly(false);
+      setPickRow(null);
+      setPickBusy(false);
+      setNewsPickRow(stub);
+      selectActivityRef.current(stub);
+      return true;
+    },
+    [allActivity],
+  );
+
+  // Jarvis news → same as right-rail headline click (not /news-archive).
+  useEffect(() => {
+    const onNews = (event: Event) => {
+      const detail = (event as CustomEvent<{ query?: string; title?: string }>).detail;
+      const query = String(detail?.query || detail?.title || "").trim();
+      if (!query) return;
+      const title = detail?.title ? String(detail.title) : undefined;
+      pendingNewsPickRef.current = { query, title };
+      setSelectOnly(false);
+      setPickRow(null);
+      setPickBusy(false);
+      // Clear market select-only lens so the desk/activity can paint again.
+      setMarket(null);
+      if (!applyNewsPick(query, title, false)) {
+        // Desk may still be loading — stub immediately so left panel + ping show now.
+        applyNewsPick(query, title, true);
+      }
+    };
+    window.addEventListener(WAR_ROOM_NEWS_PICK_EVENT, onNews as EventListener);
+    return () => window.removeEventListener(WAR_ROOM_NEWS_PICK_EVENT, onNews as EventListener);
+  }, [applyNewsPick, setMarket]);
+
+  // When activity arrives after a news pick, upgrade stub → real headline if possible.
+  useEffect(() => {
+    const pending = pendingNewsPickRef.current;
+    if (!pending) return;
+    applyNewsPick(pending.query, pending.title, false);
+  }, [allActivity, applyNewsPick]);
 
   const handleNavigate = useCallback(
     (request: WarRoomNavigateRequest) => {
