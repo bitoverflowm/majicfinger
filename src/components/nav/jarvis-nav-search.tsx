@@ -10,7 +10,7 @@ import { priceStreamPairs } from "@/lib/priceStreams";
 import { cn } from "@/lib/utils";
 import { warRoomHref } from "@/lib/warRoom/href";
 import { warRoomMarketId } from "@/lib/warRoom/ids";
-import { requestWarRoomMarketPick } from "@/lib/warRoom/pickMarket";
+import { kickWarRoomDemoScroll, requestWarRoomMarketPick } from "@/lib/warRoom/pickMarket";
 
 const JARVIS_LIVE_FEED_TAGS: Array<{ venue: string; label?: string }> = [
   { venue: "all-trades", label: "All trades & whales" },
@@ -482,6 +482,9 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                     <Link
                       href={hit.href}
                       className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-accent"
+                      onClickCapture={() => {
+                        if (hit.marketId) kickWarRoomDemoScroll();
+                      }}
                       onClick={(e) => {
                         if (
                           hit.marketId &&
@@ -489,6 +492,7 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                             title: hit.label,
                             venue: hit.source,
                             detail: hit.detail,
+                            scroll: false,
                           })
                         ) {
                           e.preventDefault();

@@ -5,13 +5,21 @@ import { warRoomHref } from "./href";
 /** Homepage `#demo` / War Room terminal — select a market and reveal pin/detail. */
 export const WAR_ROOM_MARKET_PICK_EVENT = "lychee:war-room-market-pick";
 
+/** Kick homepage smooth-scroll immediately (use from click capture before React work). */
+export function kickWarRoomDemoScroll() {
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname || "/";
+  if (path !== "/" && path !== "") return;
+  scrollToDemoSection({ behavior: "smooth" });
+}
+
 /**
  * @typedef {{ title?: string; venue?: string; detail?: string }} WarRoomPickMeta
  */
 
 /**
  * @param {string | null | undefined} marketId `kalshi:…` / `polymarket:0x…`
- * @param {WarRoomPickMeta} [meta] optional label from search so left panel is not blank if lookup fails
+ * @param {WarRoomPickMeta & { scroll?: boolean }} [meta] optional label; `scroll:false` when caller already scrolled (capture phase)
  * @returns {boolean} true when handled in-place (homepage or `/war-room`)
  */
 export function requestWarRoomMarketPick(marketId, meta = {}) {
@@ -22,6 +30,7 @@ export function requestWarRoomMarketPick(marketId, meta = {}) {
   const path = window.location.pathname || "/";
   const onHome = path === "/" || path === "";
   const onWarRoom = path === "/war-room" || path.startsWith("/war-room/");
+  const shouldScroll = meta.scroll !== false;
   const detail = {
     marketId: id,
     selectOnly: true,
@@ -31,8 +40,9 @@ export function requestWarRoomMarketPick(marketId, meta = {}) {
   };
 
   if (onHome) {
-    // Scroll first. Defer the pick event so React select-only work cannot block the scroll.
-    scrollToDemoSection({ behavior: "smooth" });
+    // Prefer capture-phase scroll from the caller; otherwise scroll here before emit.
+    if (shouldScroll) scrollToDemoSection({ behavior: "smooth" });
+    // Defer the pick event so React select-only work cannot block the scroll.
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, { detail }));
     }, 0);
