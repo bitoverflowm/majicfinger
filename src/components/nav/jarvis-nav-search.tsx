@@ -419,26 +419,28 @@ export function JarvisNavSearch({ className }: { className?: string }) {
           ) : null}
           <div
             className={cn(
-              "flex items-start gap-2 bg-muted/40 px-3 py-2.5 text-[12px] leading-snug text-muted-foreground",
+              "bg-muted/40 text-[12px] leading-snug text-muted-foreground",
               searching ? "border-t border-border" : "",
             )}
           >
-            <Sparkles className="mt-0.5 size-3.5 shrink-0 text-secondary" aria-hidden />
-            <div className="min-w-0 space-y-1.5">
-              <p>
-                Search anything, we will find the right market, ticker, news, data feed, and Jarvis will do the rest
-              </p>
-              <p className="font-semibold text-foreground">Jarvis AI — Coming Soon</p>
-              <p>Zero-prompt intelligence that learns your markets and brings you moving signals before you even ask.</p>
-              <div className="space-y-1">
-                <p>Live feeds:</p>
-                <div className="flex flex-wrap gap-1">
-                  {JARVIS_LIVE_FEED_TAGS.map((tag) => (
-                    <VenueTag key={tag.venue} venue={tag.venue} label={tag.label} />
-                  ))}
+            <p className="px-3 py-2.5">
+              Search anything, we will find the right market, ticker, news, data feed, and Jarvis will do the rest
+            </p>
+            <div className="flex items-start gap-2 border-t border-border px-3 py-2.5">
+              <Sparkles className="mt-0.5 size-3.5 shrink-0 text-secondary" aria-hidden />
+              <div className="min-w-0 space-y-1.5">
+                <p className="font-semibold text-foreground">Jarvis AI — Coming Soon</p>
+                <p>Zero-prompt intelligence that learns your markets and brings you moving signals before you even ask.</p>
+                <div className="space-y-1">
+                  <p>Live feeds:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {JARVIS_LIVE_FEED_TAGS.map((tag) => (
+                      <VenueTag key={tag.venue} venue={tag.venue} label={tag.label} />
+                    ))}
+                  </div>
                 </div>
+                <p>Available in-browser or via MCP for your favorite agent.</p>
               </div>
-              <p>Available in-browser or via MCP for your favorite agent.</p>
             </div>
           </div>
         </div>
