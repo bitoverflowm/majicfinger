@@ -26,12 +26,25 @@ import {
 import { WarRoomLayersRail } from "./WarRoomLayersRail";
 import { WarRoomAgentStepsLoader, WarRoomRailSkeleton } from "./WarRoomLoadingProgress";
 import { relatedMarketsForHeadline } from "./relatedMarkets";
-import { WAR_ROOM_MARKET_PICK_EVENT, WAR_ROOM_NEWS_PICK_EVENT } from "@/lib/warRoom/pickMarket";
+import {
+  WAR_ROOM_MARKET_PICK_EVENT,
+  WAR_ROOM_NEWS_PICK_EVENT,
+  consumePendingSelectOnlyMarketPick,
+  peekPendingSelectOnlyMarketPick,
+} from "@/lib/warRoom/pickMarket";
 import { useWarRoomData } from "./useWarRoomData";
 import { useWarRoomTheme } from "./useWarRoomTheme";
 
 /** DC fallback when a pick has no geometry yet — politics / Trump / impeach land here. */
 const PICK_FALLBACK_COORDS: [number, number] = [-77.0365, 38.8977];
+/** Taipei — optimistic pin for Taiwan / China-invade titles before market lookup returns. */
+const TAIWAN_FALLBACK_COORDS: [number, number] = [121.5654, 25.033];
+
+function fallbackCoordsForPick(meta?: { title?: string; detail?: string } | null): [number, number] {
+  const hay = `${meta?.title || ""} ${meta?.detail || ""}`.toLowerCase();
+  if (/taiwan|taipei|invade taiwan|china invade/i.test(hay)) return TAIWAN_FALLBACK_COORDS;
+  return PICK_FALLBACK_COORDS;
+}
 
 function normalizeNewsQuery(raw: string) {
   return String(raw || "")
@@ -175,8 +188,9 @@ export function WarRoomView({
   /**
    * Nav / Jarvis pick path: render only the selected market pin(s) + left detail.
    * Do not paint the full tradable desk, news pings, or right-rail flood.
+   * Seed from pending pick so `/war-room` remounts after `?market=` still open select-only.
    */
-  const [selectOnly, setSelectOnly] = useState(false);
+  const [selectOnly, setSelectOnly] = useState(() => Boolean(peekPendingSelectOnlyMarketPick()?.selectOnly));
   const [pickRow, setPickRow] = useState<MarketRow | null>(null);
   const [pickBusy, setPickBusy] = useState(false);
   /** Jarvis news pick — keep a synthetic ping when the desk feed has no match yet. */
@@ -327,7 +341,7 @@ export function WarRoomView({
   const allActivity = (Array.isArray(snapshot?.activity) ? snapshot.activity : []) as ActivityRow[];
 
   const features = useMemo(() => {
-    const pickId = String(market || "").trim();
+    const pickId = String(market || pickRow?.id || "").trim();
     const pickCenter =
       focusTarget?.center ||
       coordsFromGeometry(pickRow?.geometry) ||
@@ -531,13 +545,14 @@ export function WarRoomView({
 
   const coordsForMarket = useCallback(
     (id: string, row?: MarketRow | null) => {
+      // Prefer the row (fresh `/api/war-room/market` geometry) over a stale select-only stub pin.
+      const fromRow = coordsFromGeometry(row?.geometry);
+      if (fromRow) return fromRow;
       const match = features.features.find(
         (f) => String((f as { properties?: { id?: string } }).properties?.id) === id,
       ) as { geometry?: { type?: string; coordinates?: [number, number] } } | undefined;
       const fromFeature = coordsFromGeometry(match?.geometry);
       if (fromFeature) return fromFeature;
-      const fromRow = coordsFromGeometry(row?.geometry);
-      if (fromRow) return fromRow;
       // Always land somewhere — nav picks must ping/zoom even before snapshot inject.
       return PICK_FALLBACK_COORDS;
     },
@@ -569,9 +584,10 @@ export function WarRoomView({
         : venueRaw.includes("kalshi")
           ? "kalshi"
           : venueFromId;
+      const title = String(meta?.title || seed?.title || "Selected market");
       return {
         id,
-        title: String(meta?.title || seed?.title || "Selected market"),
+        title,
         venue,
         region: seed?.region || "Global",
         price: seed?.price ?? null,
@@ -583,7 +599,11 @@ export function WarRoomView({
         venueMarketId: seed?.venueMarketId ?? null,
         tokenIds: seed?.tokenIds,
         outcomes: seed?.outcomes,
-        geometry: seed?.geometry || { type: "Point", coordinates: PICK_FALLBACK_COORDS },
+        geometry:
+          seed?.geometry || {
+            type: "Point",
+            coordinates: fallbackCoordsForPick({ title, detail: meta?.detail }),
+          },
       };
     },
     [],
@@ -700,6 +720,32 @@ export function WarRoomView({
     };
   }, [market, pickNonce, selectOnly, fixture]);
 
+  const applySelectOnlyPick = useCallback(
+    (detail: {
+      marketId?: string;
+      selectOnly?: boolean;
+      title?: string;
+      venue?: string;
+      detail?: string;
+    }) => {
+      const id = String(detail?.marketId || "").trim();
+      if (!id) return false;
+      const only = detail?.selectOnly !== false;
+      revealedKeyRef.current = null;
+      const seed = marketById.get(id) || null;
+      const optimistic = stubPickRow(id, seed, {
+        title: detail?.title,
+        venue: detail?.venue,
+        detail: detail?.detail,
+      });
+      // Left panel + pin/zoom in the same turn — do not wait for desk snapshot.
+      openMarketDetail(id, optimistic, { focus: true, selectOnly: only });
+      if (only) setPickBusy(true);
+      return true;
+    },
+    [marketById, openMarketDetail, stubPickRow],
+  );
+
   // Accept the pick event: enter select-only immediately (scroll already started).
   useEffect(() => {
     const onPick = (event: Event) => {
@@ -712,23 +758,25 @@ export function WarRoomView({
           detail?: string;
         }>
       ).detail;
-      const id = String(detail?.marketId || "").trim();
-      if (!id) return;
-      const only = detail?.selectOnly !== false;
-      revealedKeyRef.current = null;
-      const seed = marketById.get(id) || null;
-      const optimistic = stubPickRow(id, seed, {
-        title: detail?.title,
-        venue: detail?.venue,
-        detail: detail?.detail,
-      });
-      // Left panel + pin/zoom in the same turn — do not wait for desk snapshot.
-      openMarketDetail(id, optimistic, { focus: true, selectOnly: only });
-      setPickBusy(true);
+      applySelectOnlyPick(detail || {});
     };
     window.addEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
     return () => window.removeEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
-  }, [marketById, openMarketDetail, stubPickRow]);
+  }, [applySelectOnlyPick]);
+
+  // `/war-room` soft-nav remount: re-apply pending Jarvis pick as select-only (no desk flood).
+  useEffect(() => {
+    const pending = peekPendingSelectOnlyMarketPick();
+    if (!pending?.selectOnly || !pending.marketId) return;
+    // Prefer pending id; controlled `market` may lag one frame behind replaceState/router.
+    if (market && market !== pending.marketId) return;
+    if (selectOnly && pickRow?.id === pending.marketId) {
+      consumePendingSelectOnlyMarketPick();
+      return;
+    }
+    applySelectOnlyPick(pending);
+    consumePendingSelectOnlyMarketPick();
+  }, [market, pickNonce, selectOnly, pickRow?.id, applySelectOnlyPick]);
 
   const selectActivity = useCallback(
     (row: ActivityRow) => {

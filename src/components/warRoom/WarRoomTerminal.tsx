@@ -39,6 +39,8 @@ export function WarRoomTerminal() {
   const market = searchParams?.get("market") || "";
   const fixture = ["1", "true", "yes"].includes(String(searchParams?.get("fixture") || "").toLowerCase());
   const [tab, setTab] = useState<TabId>("war-room");
+  /** Bumps on Jarvis / nav pick so WarRoomView re-applies select-only after URL sync. */
+  const [pickNonce, setPickNonce] = useState(0);
   const {
     marketSubject,
     holdersSubject,
@@ -63,10 +65,12 @@ export function WarRoomTerminal() {
       const id = String((event as CustomEvent<{ marketId?: string }>).detail?.marketId || "").trim();
       if (!id) return;
       setTab("war-room");
+      setPickNonce((n) => n + 1);
       onMarketChange(id);
     };
     const onNewsPick = () => {
       setTab("war-room");
+      setPickNonce((n) => n + 1);
     };
     window.addEventListener(WAR_ROOM_MARKET_PICK_EVENT, onMarketPick as EventListener);
     window.addEventListener(WAR_ROOM_NEWS_PICK_EVENT, onNewsPick as EventListener);
@@ -228,6 +232,7 @@ export function WarRoomTerminal() {
             fixture={fixture}
             embedded
             market={market}
+            pickNonce={pickNonce}
             onMarketChange={onMarketChange}
             onNavigate={onNavigate}
             className="h-full"

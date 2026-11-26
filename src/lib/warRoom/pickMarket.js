@@ -8,6 +8,37 @@ export const WAR_ROOM_MARKET_PICK_EVENT = "lychee:war-room-market-pick";
 /** Homepage `#demo` / War Room — select a news headline (same as right-rail news click). */
 export const WAR_ROOM_NEWS_PICK_EVENT = "lychee:war-room-news-pick";
 
+/**
+ * Survives `/war-room` remounts when Next soft-navigates on `?market=` —
+ * the CustomEvent alone is not enough if WarRoomView remounts with selectOnly=false.
+ * @type {{ marketId: string; title?: string; venue?: string; detail?: string; selectOnly: boolean; at: number } | null}
+ */
+let pendingSelectOnlyMarketPick = null;
+
+const PENDING_PICK_TTL_MS = 15_000;
+
+/**
+ * @returns {{ marketId: string; title?: string; venue?: string; detail?: string; selectOnly: boolean; at: number } | null}
+ */
+export function peekPendingSelectOnlyMarketPick() {
+  const pending = pendingSelectOnlyMarketPick;
+  if (!pending) return null;
+  if (Date.now() - pending.at > PENDING_PICK_TTL_MS) {
+    pendingSelectOnlyMarketPick = null;
+    return null;
+  }
+  return pending;
+}
+
+/**
+ * @returns {{ marketId: string; title?: string; venue?: string; detail?: string; selectOnly: boolean; at: number } | null}
+ */
+export function consumePendingSelectOnlyMarketPick() {
+  const pending = peekPendingSelectOnlyMarketPick();
+  pendingSelectOnlyMarketPick = null;
+  return pending;
+}
+
 /** Kick homepage smooth-scroll immediately (use from click capture before React work). */
 export function kickWarRoomDemoScroll() {
   if (typeof window === "undefined") return;
@@ -42,6 +73,9 @@ export function requestWarRoomMarketPick(marketId, meta = {}) {
     detail: meta.detail ? String(meta.detail) : undefined,
   };
 
+  // Always stash before emit/navigate so remounted WarRoomView can re-enter select-only.
+  pendingSelectOnlyMarketPick = { ...detail, at: Date.now() };
+
   if (onHome) {
     // Prefer capture-phase scroll from the caller; otherwise scroll here before emit.
     if (shouldScroll) scrollToDemoSection({ behavior: "smooth" });
@@ -57,7 +91,10 @@ export function requestWarRoomMarketPick(marketId, meta = {}) {
     if (window.location.pathname + window.location.search !== href) {
       window.history.replaceState(null, "", href);
     }
-    window.dispatchEvent(new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, { detail }));
+    // Defer like homepage so Terminal URL sync / remount cannot race ahead of listeners.
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, { detail }));
+    }, 0);
     return true;
   }
 

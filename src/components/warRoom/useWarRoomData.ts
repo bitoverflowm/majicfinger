@@ -114,6 +114,12 @@ export function useWarRoomData({
   const wantsBoost = Boolean(category || exploreFeed);
 
   useEffect(() => {
+    // Jarvis / nav select-only: never hydrate the tradable desk (pins/rails flood).
+    if (selectOnly) {
+      setLoading(false);
+      return;
+    }
+
     const gen = ++filterGenRef.current;
     let cancelled = false;
     setLoading(true);
@@ -159,7 +165,9 @@ export function useWarRoomData({
         });
         if (!applySnapshot(body)) return;
       } catch (err) {
-        if (!cancelled && filterGenRef.current === gen) {
+        if (!cancelled && filterGenRef.current !== gen) {
+          /* superseded */
+        } else if (!cancelled && filterGenRef.current === gen) {
           setError(err instanceof Error ? err.message : "Failed to load");
         }
       } finally {
@@ -170,7 +178,7 @@ export function useWarRoomData({
     return () => {
       cancelled = true;
     };
-  }, [filterKey, desk, category, exploreFeed, fixture, mobile, wantsBoost]);
+  }, [filterKey, desk, category, exploreFeed, fixture, mobile, wantsBoost, selectOnly]);
 
   // Nav / deep-link market picks: refetch silently so the selected contract is
   // injected into feed/map/features. Do not flip `loading` (no blank flash).
@@ -179,6 +187,12 @@ export function useWarRoomData({
   const prevMarketRef = useRef<string | null>(null);
   const selectOnlyRef = useRef(selectOnly);
   selectOnlyRef.current = selectOnly;
+  // Drop any previously hydrated desk the moment we enter select-only.
+  useEffect(() => {
+    if (!selectOnly) return;
+    setSnapshot(null);
+    setLoading(false);
+  }, [selectOnly]);
   useEffect(() => {
     const id = String(market || "").trim();
     const prev = prevMarketRef.current;
