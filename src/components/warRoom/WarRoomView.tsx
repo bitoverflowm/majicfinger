@@ -29,7 +29,7 @@ import { relatedMarketsForHeadline } from "./relatedMarkets";
 import {
   WAR_ROOM_MARKET_PICK_EVENT,
   WAR_ROOM_NEWS_PICK_EVENT,
-  consumePendingSelectOnlyMarketPick,
+  clearPendingSelectOnlyMarketPick,
   peekPendingSelectOnlyMarketPick,
 } from "@/lib/warRoom/pickMarket";
 import { useWarRoomData } from "./useWarRoomData";
@@ -39,10 +39,16 @@ import { useWarRoomTheme } from "./useWarRoomTheme";
 const PICK_FALLBACK_COORDS: [number, number] = [-77.0365, 38.8977];
 /** Taipei — optimistic pin for Taiwan / China-invade titles before market lookup returns. */
 const TAIWAN_FALLBACK_COORDS: [number, number] = [121.5654, 25.033];
+/** Helsinki — optimistic pin for Finland titles before market lookup returns. */
+const FINLAND_FALLBACK_COORDS: [number, number] = [24.9384, 60.1699];
+
+/** Wait for camera settle before streaming the rest of the desk. */
+const POST_FOCUS_STREAM_MS = 1600;
 
 function fallbackCoordsForPick(meta?: { title?: string; detail?: string } | null): [number, number] {
   const hay = `${meta?.title || ""} ${meta?.detail || ""}`.toLowerCase();
   if (/taiwan|taipei|invade taiwan|china invade/i.test(hay)) return TAIWAN_FALLBACK_COORDS;
+  if (/finland|finnish|helsinki/i.test(hay)) return FINLAND_FALLBACK_COORDS;
   return PICK_FALLBACK_COORDS;
 }
 
@@ -190,9 +196,14 @@ export function WarRoomView({
    * Do not paint the full tradable desk, news pings, or right-rail flood.
    * Seed from pending pick so `/war-room` remounts after `?market=` still open select-only.
    */
-  const [selectOnly, setSelectOnly] = useState(() => Boolean(peekPendingSelectOnlyMarketPick()?.selectOnly));
+  const [selectOnly, setSelectOnly] = useState(() => {
+    const pending = peekPendingSelectOnlyMarketPick();
+    return Boolean(pending?.selectOnly);
+  });
   const [pickRow, setPickRow] = useState<MarketRow | null>(null);
   const [pickBusy, setPickBusy] = useState(false);
+  /** After focus settles, allow desk stream while keeping the left panel open. */
+  const focusStreamArmedRef = useRef(false);
   /** Jarvis news pick — keep a synthetic ping when the desk feed has no match yet. */
   const [newsPickRow, setNewsPickRow] = useState<ActivityRow | null>(null);
   const pendingNewsPickRef = useRef<{ query: string; title?: string } | null>(null);
@@ -241,8 +252,8 @@ export function WarRoomView({
     selectOnly,
   });
 
-  /** Cold start only — never blank rails/globe once we have a snapshot. */
-  const coldStart = loading && !snapshot;
+  /** Cold start only — never blank rails/globe once we have a snapshot or an active pick lens. */
+  const coldStart = loading && !snapshot && !pickRow && !detailOpen;
 
   const marketsRailLabel = useMemo(
     () => exploreMarketsByVolumeLabel({ exploreFeed: exploreFeedId, category: categoryId }),
@@ -261,6 +272,8 @@ export function WarRoomView({
     setSelectOnly(false);
     setPickRow(null);
     setPickBusy(false);
+    focusStreamArmedRef.current = false;
+    clearPendingSelectOnlyMarketPick();
     setMarket(null);
   }, [setMarket]);
 
@@ -620,11 +633,14 @@ export function WarRoomView({
         setPickRow(row);
         setNewsPickRow(null);
         pendingNewsPickRef.current = null;
+        focusStreamArmedRef.current = false;
       } else {
         // Desk / in-map selection exits the nav select-only lens.
         setSelectOnly(false);
         setPickRow(null);
         setPickBusy(false);
+        focusStreamArmedRef.current = false;
+        clearPendingSelectOnlyMarketPick();
       }
       const coords = coordsForMarket(id, row);
       if (opts?.focus !== false && coords) {
@@ -638,6 +654,20 @@ export function WarRoomView({
     },
     [compact, coordsForMarket, focusMarketPing, marketById, setMarket, stubPickRow],
   );
+
+  // After camera/focus settles on a Jarvis pick: stream right rail + other pins (keep left panel).
+  useEffect(() => {
+    if (!selectOnly || !focusTarget || pickBusy) return;
+    if (focusStreamArmedRef.current) return;
+    focusStreamArmedRef.current = true;
+    const timer = window.setTimeout(() => {
+      // Exit hard solo lens so desk fetch may start; keep detail/pickRow painted.
+      clearPendingSelectOnlyMarketPick();
+      setSelectOnly(false);
+      setPickBusy(false);
+    }, POST_FOCUS_STREAM_MS);
+    return () => window.clearTimeout(timer);
+  }, [selectOnly, focusTarget, pickBusy]);
 
   // Nav select-only: fetch market detail only (never full desk). Event handler opens UI immediately.
   const revealedKeyRef = useRef<string | null>(null);
@@ -764,18 +794,14 @@ export function WarRoomView({
     return () => window.removeEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
   }, [applySelectOnlyPick]);
 
-  // `/war-room` soft-nav remount: re-apply pending Jarvis pick as select-only (no desk flood).
+  // `/war-room` soft-nav / HMR remount: re-apply sticky Jarvis pick as select-only (no desk flood).
   useEffect(() => {
     const pending = peekPendingSelectOnlyMarketPick();
     if (!pending?.selectOnly || !pending.marketId) return;
     // Prefer pending id; controlled `market` may lag one frame behind replaceState/router.
     if (market && market !== pending.marketId) return;
-    if (selectOnly && pickRow?.id === pending.marketId) {
-      consumePendingSelectOnlyMarketPick();
-      return;
-    }
+    if (selectOnly && pickRow?.id === pending.marketId) return;
     applySelectOnlyPick(pending);
-    consumePendingSelectOnlyMarketPick();
   }, [market, pickNonce, selectOnly, pickRow?.id, applySelectOnlyPick]);
 
   const selectActivity = useCallback(
@@ -1150,7 +1176,8 @@ export function WarRoomView({
       {!compact ? (
         <WarRoomLayersRail lockKind={embedded ? "pro" : "coming-soon"} />
       ) : null}
-      {coldStart || pickBusy ? (
+      {/* Never overlay Agent Steps once the pick left panel is open — avoids “stuck 25s” over select-only. */}
+      {(coldStart || pickBusy) && !detailOpen ? (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3">
           <WarRoomAgentStepsLoader tone={loadTone === "dark" ? "dark" : "default"} />
         </div>

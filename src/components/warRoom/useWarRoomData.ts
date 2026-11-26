@@ -100,18 +100,37 @@ export function useWarRoomData({
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** True while a filter/view change is fetching — never blanks existing UI. */
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!selectOnly);
 
   const hiddenRef = useRef(false);
   const filterGenRef = useRef(0);
   const pollInflightRef = useRef(false);
   const marketRef = useRef(market);
   marketRef.current = market;
+  const selectOnlyRef = useRef(selectOnly);
+  selectOnlyRef.current = selectOnly;
 
   // Only filter/view inputs — not `market`, or every ping click would flash loading.
   const filterKey = `${desk}|${category || ""}|${exploreFeed || ""}|${fixture ? 1 : 0}|${mobile ? 1 : 0}`;
   // Tradable still Gamma-boosts 200+ markers — paint the desk shell first.
   const wantsBoost = Boolean(category || exploreFeed);
+
+  const applySnapshot = useCallback((body: Snapshot, gen?: number) => {
+    // Hard gate: never let an in-flight desk/poll paint over select-only.
+    if (selectOnlyRef.current) return false;
+    if (gen != null && filterGenRef.current !== gen) return false;
+    setSnapshot(body);
+    setError(null);
+    return true;
+  }, []);
+
+  // Entering select-only: invalidate in-flight gens and drop any desk already painted.
+  useEffect(() => {
+    if (!selectOnly) return;
+    filterGenRef.current += 1;
+    setSnapshot(null);
+    setLoading(false);
+  }, [selectOnly]);
 
   useEffect(() => {
     // Jarvis / nav select-only: never hydrate the tradable desk (pins/rails flood).
@@ -123,13 +142,6 @@ export function useWarRoomData({
     const gen = ++filterGenRef.current;
     let cancelled = false;
     setLoading(true);
-
-    const applySnapshot = (body: Snapshot) => {
-      if (cancelled || filterGenRef.current !== gen) return false;
-      setSnapshot(body);
-      setError(null);
-      return true;
-    };
 
     (async () => {
       try {
@@ -147,13 +159,13 @@ export function useWarRoomData({
               mobile,
               shell: true,
             });
-            applySnapshot(shell);
+            if (!cancelled) applySnapshot(shell, gen);
           } catch {
             /* full fetch below still runs */
           }
         }
 
-        if (cancelled || filterGenRef.current !== gen) return;
+        if (cancelled || filterGenRef.current !== gen || selectOnlyRef.current) return;
 
         const body = await fetchSnapshot({
           desk,
@@ -163,11 +175,9 @@ export function useWarRoomData({
           fixture,
           mobile,
         });
-        if (!applySnapshot(body)) return;
+        if (!cancelled) applySnapshot(body, gen);
       } catch (err) {
-        if (!cancelled && filterGenRef.current !== gen) {
-          /* superseded */
-        } else if (!cancelled && filterGenRef.current === gen) {
+        if (!cancelled && filterGenRef.current === gen && !selectOnlyRef.current) {
           setError(err instanceof Error ? err.message : "Failed to load");
         }
       } finally {
@@ -178,21 +188,12 @@ export function useWarRoomData({
     return () => {
       cancelled = true;
     };
-  }, [filterKey, desk, category, exploreFeed, fixture, mobile, wantsBoost, selectOnly]);
+  }, [filterKey, desk, category, exploreFeed, fixture, mobile, wantsBoost, selectOnly, applySnapshot]);
 
   // Nav / deep-link market picks: refetch silently so the selected contract is
   // injected into feed/map/features. Do not flip `loading` (no blank flash).
   // Skip when `selectOnly` — pick path uses `/api/war-room/market` instead of the full desk.
-  // Skip the first paint — the filterKey effect already fetches with marketRef.
   const prevMarketRef = useRef<string | null>(null);
-  const selectOnlyRef = useRef(selectOnly);
-  selectOnlyRef.current = selectOnly;
-  // Drop any previously hydrated desk the moment we enter select-only.
-  useEffect(() => {
-    if (!selectOnly) return;
-    setSnapshot(null);
-    setLoading(false);
-  }, [selectOnly]);
   useEffect(() => {
     const id = String(market || "").trim();
     const prev = prevMarketRef.current;
@@ -211,9 +212,8 @@ export function useWarRoomData({
           fixture,
           mobile,
         });
-        if (cancelled) return;
-        setSnapshot(body);
-        setError(null);
+        if (cancelled || selectOnlyRef.current) return;
+        applySnapshot(body);
       } catch {
         /* keep current snapshot */
       }
@@ -221,7 +221,7 @@ export function useWarRoomData({
     return () => {
       cancelled = true;
     };
-  }, [market, desk, category, exploreFeed, fixture, mobile]);
+  }, [market, desk, category, exploreFeed, fixture, mobile, applySnapshot]);
 
   useEffect(() => {
     const onVis = () => {
@@ -243,8 +243,8 @@ export function useWarRoomData({
         mobile,
       })
         .then((body) => {
-          setSnapshot(body);
-          setError(null);
+          if (selectOnlyRef.current) return;
+          applySnapshot(body);
         })
         .catch(() => {})
         .finally(() => {
@@ -255,9 +255,10 @@ export function useWarRoomData({
       document.removeEventListener("visibilitychange", onVis);
       window.clearInterval(interval);
     };
-  }, [filterKey, desk, category, exploreFeed, fixture, mobile, snapshot?.pollIntervalMs]);
+  }, [filterKey, desk, category, exploreFeed, fixture, mobile, snapshot?.pollIntervalMs, applySnapshot]);
 
   const reload = useCallback(async () => {
+    if (selectOnlyRef.current) return null;
     const gen = ++filterGenRef.current;
     setLoading(true);
     try {
@@ -269,19 +270,18 @@ export function useWarRoomData({
         fixture,
         mobile,
       });
-      if (filterGenRef.current !== gen) return null;
-      setSnapshot(body);
-      setError(null);
+      if (filterGenRef.current !== gen || selectOnlyRef.current) return null;
+      applySnapshot(body, gen);
       return body;
     } catch (err) {
-      if (filterGenRef.current === gen) {
+      if (filterGenRef.current === gen && !selectOnlyRef.current) {
         setError(err instanceof Error ? err.message : "Failed to load");
       }
       return null;
     } finally {
       if (filterGenRef.current === gen) setLoading(false);
     }
-  }, [desk, category, exploreFeed, fixture, mobile]);
+  }, [desk, category, exploreFeed, fixture, mobile, applySnapshot]);
 
   return { snapshot, detail: null as Detail, error, loading, transport: "poll" as const, reload };
 }

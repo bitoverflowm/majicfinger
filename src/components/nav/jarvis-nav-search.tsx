@@ -367,8 +367,38 @@ export function JarvisNavSearch({ className }: { className?: string }) {
               );
               continue;
             }
+            // Events often lack conditionId — expand nested markets so Jarvis picks stay select-only.
+            if (entity === "event") {
+              const nested = Array.isArray(row.markets)
+                ? row.markets
+                : Array.isArray(row.raw?.markets)
+                  ? row.raw.markets
+                  : [];
+              let expanded = 0;
+              for (const m of nested.slice(0, 4)) {
+                const conditionId = String(m?.conditionId || m?.id || "").trim();
+                const pick = polyMarketHit(conditionId);
+                if (!pick.marketId) continue;
+                pushHit(
+                  next,
+                  {
+                    id: `poly-event-${conditionId}`,
+                    label: String(m.question || m.title || row.title || "Polymarket market"),
+                    detail: String(row.title || row.slug || "Event"),
+                    href: pick.href,
+                    marketId: pick.marketId,
+                    source: "Polymarket",
+                  },
+                  seen,
+                );
+                expanded += 1;
+              }
+              if (expanded) continue;
+            }
             const conditionId = String(row.conditionId || (entity === "market" ? row.id : "") || "").trim();
             const pick = polyMarketHit(conditionId);
+            // Skip bare /war-room links with no marketId — those paint the full desk.
+            if (!pick.marketId && entity !== "market") continue;
             pushHit(
               next,
               {
@@ -382,6 +412,73 @@ export function JarvisNavSearch({ className }: { className?: string }) {
               seen,
             );
           }
+        }
+
+        // Finland geopolitics: “next president of finland” ranks FIFA/US noise first.
+        // Boost live PM + presidential election markets and prepend so they survive interleave.
+        const finlandish = /finland|finnish/i.test(term) && /president|prime\s*minister|election|orpo|stubb/i.test(term);
+        if (finlandish) {
+          const finHits: Hit[] = [];
+          const boostQueries = [
+            "Next Prime Minister of Finland",
+            "Finland Presidential Election Winner",
+          ];
+          for (const boostQ of boostQueries) {
+            try {
+              const finRes = await fetch(
+                `/api/integrations/polymarket?${new URLSearchParams({
+                  query: "metadataSuggestions",
+                  q: boostQ,
+                  limit_per_type: "6",
+                  search_profiles: "false",
+                  keep_closed_markets: "1",
+                })}`,
+                { signal: ac.signal, credentials: "same-origin" },
+              );
+              if (!finRes.ok) continue;
+              const finBody = await finRes.json().catch(() => ({}));
+              for (const row of finBody.suggestions || []) {
+                const entity = String(row.entity || "market");
+                const nested = Array.isArray(row.markets)
+                  ? row.markets
+                  : Array.isArray(row.raw?.markets)
+                    ? row.raw.markets
+                    : [];
+                const candidates =
+                  entity === "event" && nested.length
+                    ? nested.slice(0, 4)
+                    : entity === "market"
+                      ? [row]
+                      : [];
+                for (const m of candidates) {
+                  const conditionId = String(
+                    m?.conditionId || (entity === "market" ? row.conditionId || row.id : "") || "",
+                  ).trim();
+                  const pick = polyMarketHit(conditionId);
+                  if (!pick.marketId) continue;
+                  const label = String(m.question || m.title || row.title || "Finland market");
+                  if (!/finland|finnish|orpo|stubb|haavisto|lindtman/i.test(label + String(row.title || ""))) {
+                    continue;
+                  }
+                  pushHit(
+                    finHits,
+                    {
+                      id: `poly-fin-${conditionId}`,
+                      label,
+                      detail: String(row.title || "Finland"),
+                      href: pick.href,
+                      marketId: pick.marketId,
+                      source: "Polymarket",
+                    },
+                    seen,
+                  );
+                }
+              }
+            } catch {
+              /* ignore targeted finland boost errors */
+            }
+          }
+          if (finHits.length) next.unshift(...finHits);
         }
 
         pushHit(

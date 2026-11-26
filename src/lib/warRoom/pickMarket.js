@@ -8,35 +8,82 @@ export const WAR_ROOM_MARKET_PICK_EVENT = "lychee:war-room-market-pick";
 /** Homepage `#demo` / War Room — select a news headline (same as right-rail news click). */
 export const WAR_ROOM_NEWS_PICK_EVENT = "lychee:war-room-news-pick";
 
+const LENS_STORAGE_KEY = "lychee:war-room-pick-lens";
+const PENDING_PICK_TTL_MS = 120_000;
+
 /**
- * Survives `/war-room` remounts when Next soft-navigates on `?market=` —
- * the CustomEvent alone is not enough if WarRoomView remounts with selectOnly=false.
+ * Survives `/war-room` remounts, Next soft-nav, and Design Mode HMR.
+ * Module var is fast; sessionStorage is durable across remounts.
  * @type {{ marketId: string; title?: string; venue?: string; detail?: string; selectOnly: boolean; at: number } | null}
  */
 let pendingSelectOnlyMarketPick = null;
 
-const PENDING_PICK_TTL_MS = 15_000;
-
-/**
- * @returns {{ marketId: string; title?: string; venue?: string; detail?: string; selectOnly: boolean; at: number } | null}
- */
-export function peekPendingSelectOnlyMarketPick() {
-  const pending = pendingSelectOnlyMarketPick;
-  if (!pending) return null;
-  if (Date.now() - pending.at > PENDING_PICK_TTL_MS) {
-    pendingSelectOnlyMarketPick = null;
+function readStoredLens() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(LENS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.marketId) return null;
+    if (Date.now() - Number(parsed.at || 0) > PENDING_PICK_TTL_MS) {
+      window.sessionStorage.removeItem(LENS_STORAGE_KEY);
+      return null;
+    }
+    return {
+      marketId: String(parsed.marketId),
+      title: parsed.title ? String(parsed.title) : undefined,
+      venue: parsed.venue ? String(parsed.venue) : undefined,
+      detail: parsed.detail ? String(parsed.detail) : undefined,
+      selectOnly: parsed.selectOnly !== false,
+      at: Number(parsed.at) || Date.now(),
+    };
+  } catch {
     return null;
   }
-  return pending;
+}
+
+function writeStoredLens(detail) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(LENS_STORAGE_KEY, JSON.stringify(detail));
+  } catch {
+    /* private mode */
+  }
 }
 
 /**
  * @returns {{ marketId: string; title?: string; venue?: string; detail?: string; selectOnly: boolean; at: number } | null}
  */
+export function peekPendingSelectOnlyMarketPick() {
+  if (pendingSelectOnlyMarketPick) {
+    if (Date.now() - pendingSelectOnlyMarketPick.at > PENDING_PICK_TTL_MS) {
+      pendingSelectOnlyMarketPick = null;
+    } else {
+      return pendingSelectOnlyMarketPick;
+    }
+  }
+  const stored = readStoredLens();
+  if (stored) pendingSelectOnlyMarketPick = stored;
+  return stored;
+}
+
+/**
+ * Keep sticky lens for remounts — do not wipe sessionStorage here.
+ * @returns {{ marketId: string; title?: string; venue?: string; detail?: string; selectOnly: boolean; at: number } | null}
+ */
 export function consumePendingSelectOnlyMarketPick() {
-  const pending = peekPendingSelectOnlyMarketPick();
+  return peekPendingSelectOnlyMarketPick();
+}
+
+/** Clear sticky lens when leaving pick mode (explore chips, news, clear). */
+export function clearPendingSelectOnlyMarketPick() {
   pendingSelectOnlyMarketPick = null;
-  return pending;
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(LENS_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Kick homepage smooth-scroll immediately (use from click capture before React work). */
@@ -71,15 +118,15 @@ export function requestWarRoomMarketPick(marketId, meta = {}) {
     title: meta.title ? String(meta.title) : undefined,
     venue: meta.venue ? String(meta.venue) : undefined,
     detail: meta.detail ? String(meta.detail) : undefined,
+    at: Date.now(),
   };
 
-  // Always stash before emit/navigate so remounted WarRoomView can re-enter select-only.
-  pendingSelectOnlyMarketPick = { ...detail, at: Date.now() };
+  // Sticky before emit/navigate so remounted WarRoomView / HMR re-enters select-only.
+  pendingSelectOnlyMarketPick = detail;
+  writeStoredLens(detail);
 
   if (onHome) {
-    // Prefer capture-phase scroll from the caller; otherwise scroll here before emit.
     if (shouldScroll) scrollToDemoSection({ behavior: "smooth" });
-    // Defer the pick event so React select-only work cannot block the scroll.
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, { detail }));
     }, 0);
@@ -91,7 +138,6 @@ export function requestWarRoomMarketPick(marketId, meta = {}) {
     if (window.location.pathname + window.location.search !== href) {
       window.history.replaceState(null, "", href);
     }
-    // Defer like homepage so Terminal URL sync / remount cannot race ahead of listeners.
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, { detail }));
     }, 0);
@@ -120,6 +166,8 @@ export function requestWarRoomNewsPick(meta = {}) {
     title: meta.title ? String(meta.title) : query,
     selectOnly: true,
   };
+
+  clearPendingSelectOnlyMarketPick();
 
   if (onHome) {
     if (shouldScroll) scrollToDemoSection({ behavior: "smooth" });
