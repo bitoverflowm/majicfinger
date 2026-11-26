@@ -31,9 +31,11 @@ export function requestWarRoomMarketPick(marketId, meta = {}) {
   };
 
   if (onHome) {
-    // Scroll + emit in the same turn — never wait on desk/snapshot before scrolling.
+    // Scroll first. Defer the pick event so React select-only work cannot block the scroll.
     scrollToDemoSection({ behavior: "smooth" });
-    window.dispatchEvent(new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, { detail }));
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(WAR_ROOM_MARKET_PICK_EVENT, { detail }));
+    }, 0);
     return true;
   }
 

@@ -483,7 +483,6 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                       href={hit.href}
                       className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-accent"
                       onClick={(e) => {
-                        setFocused(false);
                         if (
                           hit.marketId &&
                           requestWarRoomMarketPick(hit.marketId, {
@@ -493,7 +492,10 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                           })
                         ) {
                           e.preventDefault();
+                          setFocused(false);
+                          return;
                         }
+                        setFocused(false);
                       }}
                     >
                       <span className="min-w-0">
