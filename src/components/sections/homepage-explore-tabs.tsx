@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { WarRoomView, type WarRoomNavigateRequest } from "@/components/warRoom/WarRoomView";
 import { useWarRoomResearchDemo } from "@/components/warRoom/useWarRoomResearchDemo";
 import { DashboardDemoSectionLazy } from "@/components/sections/dashboard-demo-section-lazy";
 import { useLandingExploreScrollHandoff } from "@/hooks/useLandingExploreScrollHandoff";
 import { cn } from "@/lib/utils";
+import { WAR_ROOM_MARKET_PICK_EVENT } from "@/lib/warRoom/pickMarket";
 
 const TABS = [
   { id: "war-room", label: "War Room" },
@@ -48,6 +49,7 @@ const WAR_ROOM_STAGE_ATTR = { "data-war-room-demo": true } as const;
  */
 export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) {
   const [tab, setTab] = useState<TabId>("war-room");
+  const [market, setMarket] = useState("");
   const stageRef = useRef<HTMLDivElement>(null);
   useLandingExploreScrollHandoff(stageRef);
   const {
@@ -60,13 +62,33 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
     applyResearchNavigate,
   } = useWarRoomResearchDemo();
 
+  useEffect(() => {
+    const onPick = (event: Event) => {
+      const id = String((event as CustomEvent<{ marketId?: string }>).detail?.marketId || "").trim();
+      if (!id) return;
+      setTab("war-room");
+      // Clear-then-set so re-picking the same market still re-runs the reveal effect.
+      setMarket("");
+      queueMicrotask(() => setMarket(id));
+    };
+    window.addEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
+    return () => window.removeEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
+  }, []);
+
   const onNavigate = useCallback(
     (request: WarRoomNavigateRequest) => {
+      if (request.type === "war-room-market" && request.marketId) {
+        setMarket(request.marketId);
+      }
       const next = applyResearchNavigate(request);
       if (next) setTab(next);
     },
     [applyResearchNavigate],
   );
+
+  const onMarketChange = useCallback((id: string | null) => {
+    setMarket(id || "");
+  }, []);
 
   const onSelectExploreTab = useCallback(
     (id: TabId) => {
@@ -138,6 +160,8 @@ export function HomepageExploreTabs({ fixture = false }: { fixture?: boolean }) 
             <WarRoomView
               fixture={fixture}
               embedded
+              market={market}
+              onMarketChange={onMarketChange}
               className="absolute inset-0"
               onNavigate={onNavigate}
             />

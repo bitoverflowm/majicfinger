@@ -41,11 +41,23 @@ export function formatAge(iso: string | null | undefined, now = Date.now()) {
 }
 
 export function venueLabel(venue: string | null | undefined) {
-  const v = String(venue || "").toLowerCase();
+  const v = String(venue || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, "-");
   if (v === "kalshi") return "Kalshi";
+  if (v === "kalshi-trader") return "Kalshi Trader";
   if (v === "polymarket") return "Polymarket";
   if (v === "nws") return "NWS";
   if (v === "news") return "News";
+  if (v === "binance") return "Binance";
+  if (v === "chainlink") return "Chainlink";
+  if (v === "holders") return "Holders";
+  if (v === "whale" || v === "whales" || v === "all-trades") return "All trades";
+  if (v === "equities" || v === "equity") return "Equities";
+  if (v === "weather") return "Weather";
+  if (v === "flight" || v === "flights" || v === "flight-patterns") return "Flight";
+  if (v === "satellite" || v === "incidents" || v === "global-incidents") return "Satellite";
   return venue || "Source";
 }
 

@@ -365,6 +365,20 @@ export function WarRoomView({
     [compact, coordsForMarket, marketById, setMarket],
   );
 
+  // Nav / URL market picks: once the row is in the snapshot, reveal pin + zoom + side panes.
+  const revealedMarketRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = String(market || "").trim();
+    if (!id) {
+      revealedMarketRef.current = null;
+      return;
+    }
+    if (revealedMarketRef.current === id) return;
+    if (!marketById.has(id)) return;
+    revealedMarketRef.current = id;
+    openMarketDetail(id);
+  }, [market, marketById, openMarketDetail]);
+
   const selectActivity = useCallback(
     (row: ActivityRow) => {
       setActivityId(row.id);

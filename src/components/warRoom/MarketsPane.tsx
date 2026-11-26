@@ -5,8 +5,9 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import { formatAge, formatCents, formatMove, formatVolume, venueLabel } from "./format";
+import { formatAge, formatCents, formatMove, formatVolume } from "./format";
 import { useWarRoomTheme } from "./useWarRoomTheme";
+import { VenueTag } from "./VenueTag";
 
 export type MarketRow = {
   id: string;
@@ -24,24 +25,6 @@ export type MarketRow = {
   outcomes?: Array<{ id?: string; label?: string; tokenId?: string }>;
   quoteAt?: string | null;
 };
-
-function VenueBadge({ venue, dark }: { venue: string; dark: boolean }) {
-  const v = String(venue || "").toLowerCase();
-  const kalshi = v === "kalshi";
-  const poly = v === "polymarket";
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide",
-        kalshi && "bg-[#28CC95]/20 text-[#28CC95]",
-        poly && (dark ? "bg-[#2E5CFF]/20 text-[#8da4ff]" : "bg-[#2E5CFF]/15 text-[#2E5CFF]"),
-        !kalshi && !poly && (dark ? "bg-white/10 text-slate-300" : "bg-muted text-muted-foreground"),
-      )}
-    >
-      {venueLabel(venue)}
-    </span>
-  );
-}
 
 type Flash = "enter" | "up" | "down" | "rank-up" | "rank-down" | null;
 
@@ -137,7 +120,7 @@ export function MarketsPane({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <VenueBadge venue={row.venue} dark={dark} />
+                    <VenueTag venue={row.venue} dark={dark} />
                     <span
                       className={cn(
                         "truncate text-[11px] font-medium leading-tight",

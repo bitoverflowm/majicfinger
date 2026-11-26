@@ -5,10 +5,26 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
+import { VenueTag } from "@/components/warRoom/VenueTag";
 import { priceStreamPairs } from "@/lib/priceStreams";
 import { cn } from "@/lib/utils";
 import { warRoomHref } from "@/lib/warRoom/href";
 import { warRoomMarketId } from "@/lib/warRoom/ids";
+import { requestWarRoomMarketPick } from "@/lib/warRoom/pickMarket";
+
+const JARVIS_LIVE_FEED_TAGS: Array<{ venue: string; label?: string }> = [
+  { venue: "all-trades", label: "All trades & whales" },
+  { venue: "kalshi" },
+  { venue: "polymarket" },
+  { venue: "equities" },
+  { venue: "news" },
+  { venue: "weather" },
+  { venue: "flight-patterns", label: "Flight patterns" },
+  { venue: "satellite", label: "Satellite & incidents" },
+  { venue: "binance" },
+  { venue: "chainlink" },
+  { venue: "holders" },
+];
 
 const PLACEHOLDERS = [
   "Search Kalshi markets…",
@@ -24,6 +40,8 @@ type Hit = {
   detail?: string;
   href: string;
   source: string;
+  /** When set, pick scrolls to homepage `#demo` War Room (or `/war-room`) and reveals the market. */
+  marketId?: string;
 };
 
 function isWallet(q: string) {
@@ -37,16 +55,20 @@ function matchesPair(term: string, pair: { id: string; name: string; title: stri
   );
 }
 
-function kalshiMarketHref(ticker: string | null | undefined) {
-  const id = String(ticker || "").trim();
-  if (!id) return "/war-room";
-  return warRoomHref({ market: warRoomMarketId("kalshi", id) });
+function kalshiMarketHit(ticker: string | null | undefined) {
+  const raw = String(ticker || "").trim();
+  if (!raw) return { href: "/war-room" as const, marketId: undefined as string | undefined };
+  const marketId = warRoomMarketId("kalshi", raw);
+  return { href: warRoomHref({ market: marketId }), marketId };
 }
 
-function polyMarketHref(conditionId: string | null | undefined) {
-  const id = String(conditionId || "").trim();
-  if (!id || !/^0x[a-fA-F0-9]{64}$/i.test(id)) return "/war-room";
-  return warRoomHref({ market: warRoomMarketId("polymarket", id) });
+function polyMarketHit(conditionId: string | null | undefined) {
+  const raw = String(conditionId || "").trim();
+  if (!raw || !/^0x[a-fA-F0-9]{64}$/i.test(raw)) {
+    return { href: "/war-room" as const, marketId: undefined as string | undefined };
+  }
+  const marketId = warRoomMarketId("polymarket", raw);
+  return { href: warRoomHref({ market: marketId }), marketId };
 }
 
 function pushHit(list: Hit[], hit: Hit, seen: Set<string>) {
@@ -177,13 +199,15 @@ export function JarvisNavSearch({ className }: { className?: string }) {
             const nestedTicker = String(markets[0]?.ticker || "").trim();
             const ticker = nestedTicker || String(row.ticker || "").trim();
             if (!ticker && !row.title) continue;
+            const pick = kalshiMarketHit(ticker);
             pushHit(
               next,
               {
                 id: `kalshi-embed-${ticker || row.title}`,
                 label: String(row.title || ticker),
                 detail: nestedTicker && nestedTicker !== ticker ? nestedTicker : row.subtitle || ticker,
-                href: kalshiMarketHref(ticker),
+                href: pick.href,
+                marketId: pick.marketId,
                 source: "Kalshi",
               },
               seen,
@@ -196,13 +220,15 @@ export function JarvisNavSearch({ className }: { className?: string }) {
           for (const row of body.suggestions || []) {
             const ticker = String(row.ticker || "").trim();
             if (!ticker) continue;
+            const pick = kalshiMarketHit(ticker);
             pushHit(
               next,
               {
                 id: `kalshi-${ticker}`,
                 label: String(row.title || ticker),
                 detail: row.subtitle || ticker,
-                href: kalshiMarketHref(ticker),
+                href: pick.href,
+                marketId: pick.marketId,
                 source: "Kalshi",
               },
               seen,
@@ -226,7 +252,7 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                 label: nickname,
                 detail: "Kalshi trader",
                 href: "/kalshi-live-data",
-                source: "Holders",
+                source: "Kalshi Trader",
               },
               seen,
             );
@@ -254,13 +280,15 @@ export function JarvisNavSearch({ className }: { className?: string }) {
               continue;
             }
             const conditionId = String(row.conditionId || (entity === "market" ? row.id : "") || "").trim();
+            const pick = polyMarketHit(conditionId);
             pushHit(
               next,
               {
                 id: `poly-${conditionId || row.id || row.slug || row.title}`,
                 label: String(row.title || row.slug || "Polymarket market"),
                 detail: row.subtitle || (row.closed ? "Closed" : undefined),
-                href: polyMarketHref(conditionId),
+                href: pick.href,
+                marketId: pick.marketId,
                 source: "Polymarket",
               },
               seen,
@@ -327,7 +355,12 @@ export function JarvisNavSearch({ className }: { className?: string }) {
             onFocus={() => setFocused(true)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                window.location.assign(hits[0]?.href || newsHref);
+                const top = hits[0];
+                if (top?.marketId && requestWarRoomMarketPick(top.marketId)) {
+                  setFocused(false);
+                  return;
+                }
+                window.location.assign(top?.href || newsHref);
               }
               if (e.key === "Escape") {
                 setFocused(false);
@@ -362,7 +395,12 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                     <Link
                       href={hit.href}
                       className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-accent"
-                      onClick={() => setFocused(false)}
+                      onClick={(e) => {
+                        setFocused(false);
+                        if (hit.marketId && requestWarRoomMarketPick(hit.marketId)) {
+                          e.preventDefault();
+                        }
+                      }}
                     >
                       <span className="min-w-0">
                         <span className="block truncate">{hit.label}</span>
@@ -372,9 +410,7 @@ export function JarvisNavSearch({ className }: { className?: string }) {
                           </span>
                         ) : null}
                       </span>
-                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {hit.source}
-                      </span>
+                      <VenueTag venue={hit.source} />
                     </Link>
                   </li>
                 ))}
@@ -388,13 +424,17 @@ export function JarvisNavSearch({ className }: { className?: string }) {
             )}
           >
             <Sparkles className="mt-0.5 size-3.5 shrink-0 text-secondary" aria-hidden />
-            <div className="min-w-0 space-y-1">
+            <div className="min-w-0 space-y-1.5">
               <p className="font-semibold text-foreground">Jarvis AI — Coming Soon</p>
               <p>Zero-prompt intelligence that learns your markets and brings you moving signals before you even ask.</p>
-              <p>
-                Live feeds: All trades & whale moves • Kalshi • Polymarket • Equities • News • Weather • Flight
-                patterns • Satellite & global incidents
-              </p>
+              <div className="space-y-1">
+                <p>Live feeds:</p>
+                <div className="flex flex-wrap gap-1">
+                  {JARVIS_LIVE_FEED_TAGS.map((tag) => (
+                    <VenueTag key={tag.venue} venue={tag.venue} label={tag.label} />
+                  ))}
+                </div>
+              </div>
               <p>Available in-browser or via MCP for your favorite agent.</p>
             </div>
           </div>

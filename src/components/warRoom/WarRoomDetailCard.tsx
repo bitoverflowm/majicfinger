@@ -9,7 +9,7 @@ import { parseWarRoomMarketId } from "@/lib/warRoom/ids";
 import { relevanceScore } from "@/lib/mcp/research/relevance";
 
 import type { ActivityRow } from "./ActivityPane";
-import { formatAge, formatCents, formatMove, formatVolume, venueLabel } from "./format";
+import { formatAge, formatCents, formatMove, formatVolume } from "./format";
 import type { MarketRow } from "./MarketsPane";
 import { pulseMarketToRow } from "./relatedMarkets";
 import {
@@ -19,6 +19,7 @@ import {
   type WarRoomResearchOrigin,
 } from "./researchHandoff";
 import { useWarRoomTheme } from "./useWarRoomTheme";
+import { VenueTag } from "./VenueTag";
 import { WarRoomMarketChart } from "./WarRoomMarketChart";
 import { WarRoomRelatedMarketsChart } from "./WarRoomRelatedMarketsChart";
 
@@ -28,28 +29,6 @@ export type WarRoomDetailTarget =
   | { kind: "news"; activity: ActivityRow; relatedMarkets?: MarketRow[] };
 
 export type { WarRoomNavigateRequest };
-
-function VenueTag({ venue, dark = true }: { venue: string; dark?: boolean }) {
-  const v = String(venue || "").toLowerCase();
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide",
-        v === "kalshi" && "bg-[#28CC95]/20 text-[#28CC95]",
-        v === "polymarket" &&
-          (dark ? "bg-[#2E5CFF]/20 text-[#8da4ff]" : "bg-[#2E5CFF]/15 text-[#2E5CFF]"),
-        v === "news" &&
-          (dark ? "bg-violet-400/20 text-violet-200" : "bg-violet-500/15 text-violet-700"),
-        v !== "kalshi" &&
-          v !== "polymarket" &&
-          v !== "news" &&
-          (dark ? "bg-white/10 text-slate-300" : "bg-muted text-muted-foreground"),
-      )}
-    >
-      {venueLabel(venue)}
-    </span>
-  );
-}
 
 function isVenueWordmark(src: string) {
   return /\/kalshi\.png$|\/landing\/logos\/kalshi|\/polymarket\.png$/i.test(src);

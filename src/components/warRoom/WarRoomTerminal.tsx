@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { DashboardDemoSectionLazy } from "@/components/sections/dashboard-demo-section-lazy";
 import { warRoomHref } from "@/lib/warRoom/href";
+import { WAR_ROOM_MARKET_PICK_EVENT } from "@/lib/warRoom/pickMarket";
 import { cn } from "@/lib/utils";
 
 import { useWarRoomResearchDemo } from "./useWarRoomResearchDemo";
@@ -51,6 +52,17 @@ export function WarRoomTerminal() {
     },
     [fixture, router],
   );
+
+  useEffect(() => {
+    const onPick = (event: Event) => {
+      const id = String((event as CustomEvent<{ marketId?: string }>).detail?.marketId || "").trim();
+      if (!id) return;
+      setTab("war-room");
+      onMarketChange(id);
+    };
+    window.addEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
+    return () => window.removeEventListener(WAR_ROOM_MARKET_PICK_EVENT, onPick as EventListener);
+  }, [onMarketChange]);
 
   const onNavigate = useCallback(
     (request: WarRoomNavigateRequest) => {
