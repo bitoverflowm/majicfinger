@@ -1018,6 +1018,20 @@ export function WarRoomView({
           : "text-slate-600 hover:bg-black/[0.06] hover:text-slate-900",
     );
 
+  /** Venue toggles: VenueTag brand fills when on; same blank chip as categories when off. */
+  const venueStripToggleClass = (id: VenueId, selected: boolean) =>
+    cn(
+      "h-auto min-h-0 shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium shadow-none ring-offset-0",
+      "focus-visible:ring-1 focus-visible:ring-offset-0",
+      selected
+        ? id === "kalshi"
+          ? "bg-[#28CC95] text-slate-950 hover:bg-[#28CC95] hover:text-slate-950 data-[state=on]:bg-[#28CC95] data-[state=on]:text-slate-950"
+          : "bg-[#2E5CFF] text-white hover:bg-[#2E5CFF] hover:text-white data-[state=on]:bg-[#2E5CFF] data-[state=on]:text-white"
+        : dark
+          ? "bg-transparent text-slate-300 hover:bg-white/10 hover:text-white data-[state=on]:bg-transparent"
+          : "bg-transparent text-slate-600 hover:bg-black/[0.06] hover:text-slate-900 data-[state=on]:bg-transparent",
+    );
+
   const exploreFeedGroups = useMemo(() => {
     const groups: Array<{ label: string; feeds: typeof EXPLORE_FEEDS }> = [];
     for (const item of EXPLORE_FEEDS) {
@@ -1104,7 +1118,7 @@ export function WarRoomView({
                 onPressedChange={(next) =>
                   setVenueToggles((prev) => ({ ...prev, [option.id]: next }))
                 }
-                className={stripToggleClass(selected)}
+                className={venueStripToggleClass(option.id, selected)}
               >
                 {option.label}
               </Toggle>
