@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { ActivityPane, type ActivityRow } from "./ActivityPane";
 import { formatVolume } from "./format";
 import { GlobeStage } from "./GlobeStage";
+import type { WarRoomGlobeProps } from "./WarRoomGlobe";
 import { MarketsPane, type MarketRow } from "./MarketsPane";
 import {
   WarRoomDetailCard,
@@ -1202,8 +1203,8 @@ export function WarRoomView({
       ) : null}
       <GlobeStage
         enhance={embedded ? "auto" : compact ? "never" : "always"}
-        features={features}
-        pings={pings}
+        features={features as WarRoomGlobeProps["features"]}
+        pings={pings as WarRoomGlobeProps["pings"]}
         selectedMarketId={selectedId}
         focusTarget={focusTarget}
         resetNonce={mapResetNonce}

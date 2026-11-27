@@ -272,7 +272,8 @@ export function WarRoomGlobe({
               /* style may omit a background layer */
             }
             try {
-              instance.setFog?.({
+              // MapLibre fog is runtime-optional; typings omit setFog on Map.
+              (instance as { setFog?: (fog: Record<string, unknown>) => void }).setFog?.({
                 color: space,
                 "high-color": space,
                 "space-color": space,
