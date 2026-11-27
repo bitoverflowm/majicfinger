@@ -32,6 +32,13 @@ export default async function handler(req, res) {
     Array.isArray(req.query.exploreFeed) ? req.query.exploreFeed[0] : req.query.exploreFeed,
   );
   const shell = ["1", "true"].includes(String(req.query.shell || "").toLowerCase());
+  const boostLimitRaw = Number(
+    Array.isArray(req.query.boostLimit) ? req.query.boostLimit[0] : req.query.boostLimit,
+  );
+  const boostLimit =
+    !shell && Number.isFinite(boostLimitRaw) && boostLimitRaw > 0
+      ? Math.min(220, Math.floor(boostLimitRaw))
+      : undefined;
 
   try {
     const snapshot = await getWarRoomSnapshot({
@@ -43,6 +50,7 @@ export default async function handler(req, res) {
       mobile,
       forceFixture: fixture,
       shell,
+      boostLimit,
     });
     res.setHeader("Cache-Control", snapshot.fixture ? "private, no-store" : snapshotCacheControl());
     return res.status(200).json(snapshot);

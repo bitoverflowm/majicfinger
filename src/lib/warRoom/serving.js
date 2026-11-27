@@ -135,6 +135,29 @@ async function cachedBoost(key, loader) {
   return current?.inflight || [];
 }
 
+/** Clamp an optional progressive boostLimit to the venue default max. */
+function resolveBoostLimit(requested, defaultLimit) {
+  const def = Math.max(1, Math.floor(Number(defaultLimit) || DESKTOP_POINT_CAP));
+  const raw = Number(requested);
+  if (!Number.isFinite(raw) || raw <= 0) return def;
+  return Math.max(1, Math.min(def, Math.floor(raw)));
+}
+
+/**
+ * Prefer a warmer/fuller cache entry when a progressive tier asks for fewer rows.
+ * @param {string} fullKey
+ * @param {number} limit
+ */
+function sliceCachedBoost(fullKey, limit) {
+  const now = Date.now();
+  const hit = boostMemo.get(fullKey);
+  if (!hit || hit.inflight || !Array.isArray(hit.markets) || now - hit.at >= BOOST_CACHE_TTL_MS) {
+    return null;
+  }
+  if (!hit.markets.length) return null;
+  return hit.markets.slice(0, Math.max(1, limit));
+}
+
 function nowIso(ms = Date.now()) {
   return new Date(ms).toISOString();
 }
@@ -290,14 +313,22 @@ function mapBoostedMarkets(rows, observedTs, existingIds, accept) {
  * @param {string} observedTs
  * @param {Set<string>} existingIds
  */
-async function categoryPolymarketBoost(category, observedTs, existingIds) {
+async function categoryPolymarketBoost(category, observedTs, existingIds, boostLimit) {
   const definition = CATEGORIES.find((row) => row.id === category);
   if (!definition) return [];
   const tagSlug = definition.tags[0];
   if (!tagSlug) return [];
+  const limit = resolveBoostLimit(boostLimit, 120);
+  const fullKey = `poly-tag:${tagSlug}`;
   try {
-    const boosted = await cachedBoost(`poly-tag:${tagSlug}`, async () => {
-      const rows = await fetchPolymarketMarketsByTagSlug(tagSlug, { limit: 120 });
+    const fromFull = sliceCachedBoost(fullKey, limit);
+    if (fromFull) {
+      for (const market of fromFull) existingIds.add(market.id);
+      return fromFull;
+    }
+    const cacheKey = limit >= 120 ? fullKey : `${fullKey}:L${limit}`;
+    const boosted = await cachedBoost(cacheKey, async () => {
+      const rows = await fetchPolymarketMarketsByTagSlug(tagSlug, { limit });
       // Trust Gamma's event tag filter — don't re-drop rows whose local tags omit the
       // chip slug (e.g. politics events tagged "Elections" but not "politics").
       return mapBoostedMarkets(rows, observedTs, new Set()).map((market) => ({
@@ -320,31 +351,36 @@ async function categoryPolymarketBoost(category, observedTs, existingIds) {
  * @param {string} observedTs
  * @param {Set<string>} existingIds
  */
-async function categoryKalshiBoost(category, observedTs, existingIds) {
+async function categoryKalshiBoost(category, observedTs, existingIds, boostLimit) {
   const kalshiCategories = kalshiSeriesCategoriesForWarRoom(category);
   if (!kalshiCategories.length) return [];
+  const limit = resolveBoostLimit(boostLimit, 100);
+  const fullKey = `kalshi-cat:${kalshiCategories.join(",")}`;
   try {
-    const boosted = await cachedBoost(`kalshi-cat:${kalshiCategories.join(",")}`, async () => {
-      const rows = await fetchKalshiLiveMarketsBySeriesCategories({
-        categories: kalshiCategories,
-        limit: 100,
-      });
-      /** @type {Array<Record<string, unknown>>} */
-      const out = [];
-      const seen = new Set();
-      for (const row of rows) {
-        const mapped = fromKalshiFeatured(row, observedTs);
-        if (!mapped?.market) continue;
-        if (seen.has(mapped.market.id)) continue;
-        seen.add(mapped.market.id);
-        out.push({
-          ...mapped.market,
-          category,
-          tags: [...new Set([...(mapped.market.tags || []), category, ...kalshiCategories].filter(Boolean))],
+    const fromFull = sliceCachedBoost(fullKey, limit);
+    const boosted =
+      fromFull ||
+      (await cachedBoost(limit >= 100 ? fullKey : `${fullKey}:L${limit}`, async () => {
+        const rows = await fetchKalshiLiveMarketsBySeriesCategories({
+          categories: kalshiCategories,
+          limit,
         });
-      }
-      return out;
-    });
+        /** @type {Array<Record<string, unknown>>} */
+        const out = [];
+        const seen = new Set();
+        for (const row of rows) {
+          const mapped = fromKalshiFeatured(row, observedTs);
+          if (!mapped?.market) continue;
+          if (seen.has(mapped.market.id)) continue;
+          seen.add(mapped.market.id);
+          out.push({
+            ...mapped.market,
+            category,
+            tags: [...new Set([...(mapped.market.tags || []), category, ...kalshiCategories].filter(Boolean))],
+          });
+        }
+        return out;
+      }));
     return boosted.filter((market) => {
       if (existingIds.has(market.id)) return false;
       existingIds.add(market.id);
@@ -355,24 +391,37 @@ async function categoryKalshiBoost(category, observedTs, existingIds) {
   }
 }
 
+function exploreFeedDefaultLimit(exploreFeed) {
+  if (exploreFeed === "tradable" || exploreFeed === "volume" || exploreFeed === "liquidity") {
+    return 220;
+  }
+  if (exploreFeed === "new" || exploreFeed === "trending" || exploreFeed === "competitive") {
+    return 160;
+  }
+  return 100;
+}
+
 /**
  * When an Explore feed chip is active, pull that Gamma ranking onto the globe.
  * War Room then re-sorts the rail/map by volume.
  * @param {string} exploreFeed
  * @param {string} observedTs
  * @param {Set<string>} existingIds
+ * @param {number} [boostLimit] Progressive tier — fewer Gamma pages before the full cap.
  */
-async function exploreFeedPolymarketBoost(exploreFeed, observedTs, existingIds) {
+async function exploreFeedPolymarketBoost(exploreFeed, observedTs, existingIds, boostLimit) {
   if (!exploreFeed) return [];
+  const defaultLimit = exploreFeedDefaultLimit(exploreFeed);
+  const limit = resolveBoostLimit(boostLimit, defaultLimit);
+  const fullKey = `poly-feed:${exploreFeed}`;
   try {
-    const boosted = await cachedBoost(`poly-feed:${exploreFeed}`, async () => {
-      // Tradable / volume feeds should fill the desktop point cap; others stay denser but lighter.
-      const limit =
-        exploreFeed === "tradable" || exploreFeed === "volume" || exploreFeed === "liquidity"
-          ? 220
-          : exploreFeed === "new" || exploreFeed === "trending" || exploreFeed === "competitive"
-            ? 160
-            : 100;
+    const fromFull = sliceCachedBoost(fullKey, limit);
+    if (fromFull) {
+      for (const market of fromFull) existingIds.add(market.id);
+      return fromFull;
+    }
+    const cacheKey = limit >= defaultLimit ? fullKey : `${fullKey}:L${limit}`;
+    const boosted = await cachedBoost(cacheKey, async () => {
       const rows = await fetchPolymarketMarketsByExploreFeed(exploreFeed, { limit });
       return mapBoostedMarkets(rows, observedTs, new Set());
     });
@@ -389,8 +438,9 @@ async function exploreFeedPolymarketBoost(exploreFeed, observedTs, existingIds) 
  * @param {string} exploreFeed
  * @param {string} observedTs
  * @param {Set<string>} existingIds
+ * @param {number} [boostLimit] Progressive tier — slice pool sooner when a fuller cache exists.
  */
-async function exploreFeedKalshiBoost(exploreFeed, observedTs, existingIds) {
+async function exploreFeedKalshiBoost(exploreFeed, observedTs, existingIds, boostLimit) {
   if (!exploreFeed) return [];
   // Featured / new / trending stay on the desk seed pool; tradable/volume need a real pull.
   if (
@@ -400,25 +450,27 @@ async function exploreFeedKalshiBoost(exploreFeed, observedTs, existingIds) {
   ) {
     return [];
   }
+  const defaultLimit = 220;
+  const limit = resolveBoostLimit(boostLimit, defaultLimit);
+  const fullKey = `kalshi-feed:${exploreFeed}`;
   try {
-    const boosted = await cachedBoost(`kalshi-feed:${exploreFeed}`, async () => {
-      const limit =
-        exploreFeed === "tradable" || exploreFeed === "volume" || exploreFeed === "liquidity"
-          ? 220
-          : 100;
-      const rows = await fetchKalshiLiveTradableMarkets({ limit });
-      /** @type {Array<Record<string, unknown>>} */
-      const out = [];
-      const seen = new Set();
-      for (const row of rows) {
-        const mapped = fromKalshiFeatured(row, observedTs);
-        if (!mapped?.market) continue;
-        if (seen.has(mapped.market.id)) continue;
-        seen.add(mapped.market.id);
-        out.push(mapped.market);
-      }
-      return out;
-    });
+    const fromFull = sliceCachedBoost(fullKey, limit);
+    const boosted =
+      fromFull ||
+      (await cachedBoost(limit >= defaultLimit ? fullKey : `${fullKey}:L${limit}`, async () => {
+        const rows = await fetchKalshiLiveTradableMarkets({ limit });
+        /** @type {Array<Record<string, unknown>>} */
+        const out = [];
+        const seen = new Set();
+        for (const row of rows) {
+          const mapped = fromKalshiFeatured(row, observedTs);
+          if (!mapped?.market) continue;
+          if (seen.has(mapped.market.id)) continue;
+          seen.add(mapped.market.id);
+          out.push(mapped.market);
+        }
+        return out;
+      }));
     return boosted.filter((market) => {
       if (existingIds.has(market.id)) return false;
       existingIds.add(market.id);
@@ -692,6 +744,7 @@ export async function getWarRoomPreview(opts = {}) {
  *   cursor?: string;
  *   forceFixture?: boolean;
  *   shell?: boolean; // Skip Gamma boosts — fast paint from cached desk bundle.
+ *   boostLimit?: number; // Progressive tier — cap venue boosts before the full desk.
  * }} [opts]
  */
 export async function getWarRoomSnapshot(opts = {}) {
@@ -703,21 +756,22 @@ export async function getWarRoomSnapshot(opts = {}) {
   const marketId = String(opts.market || "").trim();
   const existingIds = new Set(bundle.markets.map((market) => market.id));
   const shell = Boolean(opts.shell);
+  const boostLimit = shell ? undefined : opts.boostLimit;
 
   // Shell skips the Gamma / Kalshi tradable round-trips so the client can paint from the
-  // cached desk immediately, then replace with the boosted snapshot.
+  // cached desk immediately, then replace with progressive / full boosted snapshots.
   const [polyFeedBoosted, kalshiFeedBoosted] =
     !shell && exploreFeed
       ? await Promise.all([
-          exploreFeedPolymarketBoost(exploreFeed, bundle.asOf, existingIds),
-          exploreFeedKalshiBoost(exploreFeed, bundle.asOf, existingIds),
+          exploreFeedPolymarketBoost(exploreFeed, bundle.asOf, existingIds, boostLimit),
+          exploreFeedKalshiBoost(exploreFeed, bundle.asOf, existingIds, boostLimit),
         ])
       : [[], []];
   const feedBoosted = [...polyFeedBoosted, ...kalshiFeedBoosted];
   const [categoryPolyBoosted, categoryKalshiBoosted] = !shell && category
     ? await Promise.all([
-        categoryPolymarketBoost(category, bundle.asOf, existingIds),
-        categoryKalshiBoost(category, bundle.asOf, existingIds),
+        categoryPolymarketBoost(category, bundle.asOf, existingIds, boostLimit),
+        categoryKalshiBoost(category, bundle.asOf, existingIds, boostLimit),
       ])
     : [[], []];
   const categoryBoosted = [...categoryPolyBoosted, ...categoryKalshiBoosted];

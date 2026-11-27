@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { POLL_INTERVAL_MS } from "@/lib/warRoom/constants";
+import { BOOST_STREAM_LIMITS, POLL_INTERVAL_MS } from "@/lib/warRoom/constants";
 
 type Snapshot = {
   asOf: string;
@@ -46,6 +46,8 @@ async function fetchSnapshot(params: {
   mobile?: boolean;
   /** Fast desk-only shell (skips Gamma boosts). */
   shell?: boolean;
+  /** Progressive boost tier — paint pins/rails before the full desk cap. */
+  boostLimit?: number;
 }) {
   const res = await fetch(
     `/api/war-room/snapshot${qs({
@@ -56,6 +58,7 @@ async function fetchSnapshot(params: {
       fixture: params.fixture,
       mobile: params.mobile ? "1" : undefined,
       shell: params.shell ? "1" : undefined,
+      boostLimit: params.boostLimit != null ? String(params.boostLimit) : undefined,
     })}`,
     { credentials: "same-origin" },
   );
@@ -147,7 +150,8 @@ export function useWarRoomData({
       try {
         if (hiddenRef.current) return;
 
-        // Stream: paint a desk shell first when Gamma boosts are needed, then replace.
+        // Progressive paint: desk shell → mid boost tiers → full cap.
+        // Each applySnapshot fills globe pins + markets/activity rails as soon as ready.
         if (wantsBoost) {
           try {
             const shell = await fetchSnapshot({
@@ -161,7 +165,25 @@ export function useWarRoomData({
             });
             if (!cancelled) applySnapshot(shell, gen);
           } catch {
-            /* full fetch below still runs */
+            /* mid/full tiers below still run */
+          }
+
+          for (const boostLimit of BOOST_STREAM_LIMITS) {
+            if (cancelled || filterGenRef.current !== gen || selectOnlyRef.current) return;
+            try {
+              const partial = await fetchSnapshot({
+                desk,
+                market: marketRef.current,
+                category,
+                exploreFeed,
+                fixture,
+                mobile,
+                boostLimit,
+              });
+              if (!cancelled) applySnapshot(partial, gen);
+            } catch {
+              /* keep densest snapshot so far; continue toward full */
+            }
           }
         }
 

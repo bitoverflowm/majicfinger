@@ -1176,9 +1176,15 @@ export function WarRoomView({
       {!compact ? (
         <WarRoomLayersRail lockKind={embedded ? "pro" : "coming-soon"} />
       ) : null}
-      {/* Never overlay Agent Steps once the pick left panel is open — avoids “stuck 25s” over select-only. */}
-      {(coldStart || pickBusy) && !detailOpen ? (
-        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3">
+      {/* Cold/pick: centered. Progressive desk stream: docked so pins/rails stay visible. Never over open pick panel. */}
+      {(coldStart || pickBusy || (loading && !!snapshot && !selectOnly)) && !detailOpen ? (
+        <div
+          className={
+            coldStart || pickBusy
+              ? "pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3"
+              : "pointer-events-none absolute bottom-14 left-1/2 z-30 w-[min(22rem,calc(100%-1.5rem))] -translate-x-1/2"
+          }
+        >
           <WarRoomAgentStepsLoader tone={loadTone === "dark" ? "dark" : "default"} />
         </div>
       ) : null}
