@@ -453,29 +453,49 @@ async function exploreFeedKalshiBoost(exploreFeed, observedTs, existingIds, boos
   const defaultLimit = 220;
   const limit = resolveBoostLimit(boostLimit, defaultLimit);
   const fullKey = `kalshi-feed:${exploreFeed}`;
-  try {
-    const fromFull = sliceCachedBoost(fullKey, limit);
-    const boosted =
-      fromFull ||
-      (await cachedBoost(limit >= defaultLimit ? fullKey : `${fullKey}:L${limit}`, async () => {
-        const rows = await fetchKalshiLiveTradableMarkets({ limit });
-        /** @type {Array<Record<string, unknown>>} */
-        const out = [];
-        const seen = new Set();
-        for (const row of rows) {
-          const mapped = fromKalshiFeatured(row, observedTs);
-          if (!mapped?.market) continue;
-          if (seen.has(mapped.market.id)) continue;
-          seen.add(mapped.market.id);
-          out.push(mapped.market);
-        }
-        return out;
-      }));
-    return boosted.filter((market) => {
+  const mapRows = (rows) => {
+    /** @type {Array<Record<string, unknown>>} */
+    const out = [];
+    const seen = new Set();
+    for (const row of rows || []) {
+      const mapped = fromKalshiFeatured(row, observedTs);
+      if (!mapped?.market) continue;
+      if (seen.has(mapped.market.id)) continue;
+      seen.add(mapped.market.id);
+      out.push(mapped.market);
+    }
+    return out;
+  };
+  const take = (markets) =>
+    markets.filter((market) => {
       if (existingIds.has(market.id)) return false;
       existingIds.add(market.id);
       return true;
     });
+  try {
+    const fromFull = sliceCachedBoost(fullKey, limit);
+    if (fromFull) return take(fromFull);
+
+    // Mid progressive tiers: never block on the full ~80-series pull.
+    // Paint poly (+ any Kalshi partials) now; background fill warms the full cache.
+    if (limit < defaultLimit) {
+      const partialRows = await fetchKalshiLiveTradableMarkets({ limit, wait: false });
+      void fetchKalshiLiveTradableMarkets({ limit: defaultLimit, wait: true })
+        .then((fullRows) => {
+          const mapped = mapRows(fullRows);
+          if (mapped.length) {
+            boostMemo.set(fullKey, { at: Date.now(), markets: mapped, inflight: null });
+          }
+        })
+        .catch(() => {});
+      return take(mapRows(partialRows));
+    }
+
+    const boosted = await cachedBoost(fullKey, async () => {
+      const rows = await fetchKalshiLiveTradableMarkets({ limit, wait: true });
+      return mapRows(rows);
+    });
+    return take(boosted);
   } catch {
     return [];
   }
