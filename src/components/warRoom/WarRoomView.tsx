@@ -1012,31 +1012,31 @@ export function WarRoomView({
       <div
         role="tablist"
         aria-label="Markets to show"
-        className="flex max-w-full items-end gap-1 overflow-x-auto"
+        className="flex max-w-full items-center gap-1 overflow-x-auto"
       >
         {exploreFeedGroups.map((group) =>
           group.label ? (
-            <div key={group.label} role="group" aria-label={group.label} className="flex shrink-0 flex-col gap-0.5">
-              <span className="px-1 text-[9px] font-medium uppercase tracking-[0.12em] text-slate-500">
-                {group.label}
-              </span>
-              <div className="flex items-center gap-1">
-                {group.feeds.map((feed) => {
-                  const selected = !categoryId && exploreFeedId === feed.id;
-                  return (
-                    <button
-                      key={feed.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={selected}
-                      onClick={() => pickExploreFeed(feed.id)}
-                      className={chipClass(selected)}
-                    >
-                      {feed.label}
-                    </button>
-                  );
-                })}
-              </div>
+            <div
+              key={group.label}
+              role="group"
+              aria-label={group.label}
+              className="flex shrink-0 items-center gap-1"
+            >
+              {group.feeds.map((feed) => {
+                const selected = !categoryId && exploreFeedId === feed.id;
+                return (
+                  <button
+                    key={feed.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => pickExploreFeed(feed.id)}
+                    className={chipClass(selected)}
+                  >
+                    {feed.label}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             group.feeds.map((feed) => {
