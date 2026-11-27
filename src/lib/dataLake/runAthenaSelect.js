@@ -293,7 +293,7 @@ export async function startAthenaBoundedQuery({
     const sampleSizeParsed = parseRandomSampleSize(compose?.randomSample?.size, {
       maxSize: demo ? ATHENA_DEMO_ROW_LIMIT : undefined,
     });
-    // Demo embeds use a smaller cap so marketing visitors see a tiny sample only.
+    // Demo uses the subscriber row budget (full trade history for charts), not a teaser sample.
     const capRows = demo
       ? ATHENA_DEMO_ROW_LIMIT
       : typeof composeSqlCap === "number" && Number.isFinite(composeSqlCap)
@@ -309,10 +309,10 @@ export async function startAthenaBoundedQuery({
     if (sampleSizeParsed != null) {
       // Eligible population must not be pre-limited; sample LIMIT is applied by the wrapper.
       sqlLimit = null;
-    } else if (demo) {
-      sqlLimit = ATHENA_DEMO_ROW_LIMIT;
     } else if (explicitLimit != null) {
       sqlLimit = Math.min(capRows, explicitLimit);
+    } else if (demo) {
+      sqlLimit = ATHENA_DEMO_ROW_LIMIT;
     } else if (unlimitedComposeRows) {
       sqlLimit = null;
     } else {
@@ -397,6 +397,16 @@ export async function getAthenaQueryState(queryExecutionId) {
   return { state, reason, dataScannedBytes };
 }
 
+/** AWS GetQueryResults hard max (service-enforced; cannot raise). */
+export const ATHENA_GET_QUERY_RESULTS_MAX = 1000;
+
+/**
+ * How many Athena GetQueryResults pages the status API coalesces into one HTTP
+ * response. Each AWS call is still ≤1000 rows; batching cuts browser round-trips
+ * on large S3/lake pulls (e.g. Kalshi Historical trades).
+ */
+export const ATHENA_STATUS_PAGE_BATCH = 10;
+
 /**
  * Paginate GetQueryResults until rowLimit data rows (excluding header).
  * @param {string} queryExecutionId
@@ -418,7 +428,7 @@ export async function fetchAthenaQueryResultRows(queryExecutionId, rowLimit) {
       new GetQueryResultsCommand({
         QueryExecutionId: queryExecutionId,
         NextToken: nextToken,
-        MaxResults: 1000,
+        MaxResults: ATHENA_GET_QUERY_RESULTS_MAX,
       }),
     );
 
@@ -491,7 +501,7 @@ export async function fetchAthenaQueryResultNextPage(queryExecutionId, athenaNex
     new GetQueryResultsCommand({
       QueryExecutionId: queryExecutionId,
       NextToken: athenaNextToken || undefined,
-      MaxResults: 1000,
+      MaxResults: ATHENA_GET_QUERY_RESULTS_MAX,
     }),
   );
 
@@ -524,6 +534,52 @@ export async function fetchAthenaQueryResultNextPage(queryExecutionId, athenaNex
     rows: dataRows,
     athenaNextToken: page.NextToken,
     isFirstPage,
+  };
+}
+
+/**
+ * Fetch up to `maxPages` Athena GetQueryResults pages and return them as one chunk.
+ * Still respects the AWS 1000-row page cap per call; used so one status HTTP response
+ * can carry ~maxPages×1000 rows and cut client round-trips.
+ *
+ * @param {string} queryExecutionId
+ * @param {string | null | undefined} athenaNextToken
+ * @param {{ maxPages?: number }} [opts]
+ * @returns {Promise<{
+ *   columns: string[];
+ *   rows: string[][];
+ *   athenaNextToken: string | undefined;
+ *   isFirstPage: boolean;
+ *   athenaPagesFetched: number;
+ * }>}
+ */
+export async function fetchAthenaQueryResultPageBatch(queryExecutionId, athenaNextToken, opts = {}) {
+  const maxPages = Math.max(1, Math.min(50, Math.floor(Number(opts.maxPages) || ATHENA_STATUS_PAGE_BATCH)));
+  const columns = [];
+  const rows = [];
+  let token = athenaNextToken || undefined;
+  let isFirstPage = !token;
+  let pagesFetched = 0;
+
+  for (let i = 0; i < maxPages; i += 1) {
+    const page = await fetchAthenaQueryResultNextPage(queryExecutionId, token);
+    if (!columns.length && page.columns?.length) {
+      columns.push(...page.columns);
+    }
+    if (page.rows?.length) {
+      rows.push(...page.rows);
+    }
+    pagesFetched += 1;
+    token = page.athenaNextToken;
+    if (!token) break;
+  }
+
+  return {
+    columns,
+    rows,
+    athenaNextToken: token,
+    isFirstPage,
+    athenaPagesFetched: pagesFetched,
   };
 }
 

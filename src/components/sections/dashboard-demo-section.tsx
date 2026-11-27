@@ -321,7 +321,7 @@ function LandingDemoStage({
   const slot = (
     <div
       ref={slotRef}
-      className={cn("relative", flush && "h-full min-h-0")}
+      className={cn("relative", flush && "min-h-[max(32rem,min(88svh,58rem))] h-auto")}
       style={slotHeight != null ? { height: slotHeight } : undefined}
       onClickCapture={framed || flush ? undefined : activateOnClick}
       {...(exploreSurface ? { "data-landing-explore": "" } : {})}
@@ -334,13 +334,11 @@ function LandingDemoStage({
         style={stageStyle(phase, origin)}
         className={cn(
           "[transform:translateZ(0)] will-change-[opacity,transform]",
-          flush && "h-full min-h-0",
+          flush && "min-h-[max(32rem,min(88svh,58rem))] h-auto",
           staged && "border-transparent shadow-none ring-0",
         )}
         contentClassName={cn(
-          "overflow-hidden",
-          flush || staged ? "h-full min-h-0" : DEMO_CONTENT_HEIGHT_CLASS,
-          flush && !staged && "min-h-[32rem]",
+          flush || staged ? "min-h-[max(32rem,min(88svh,58rem))] h-auto overflow-visible" : cn("overflow-hidden", DEMO_CONTENT_HEIGHT_CLASS),
         )}
       >
         {children}
@@ -350,7 +348,10 @@ function LandingDemoStage({
   );
 
   return (
-    <section id={sectionId} className={cn(className, staged ? "z-50" : "z-30", flush && "h-full min-h-0")}>
+    <section
+      id={sectionId}
+      className={cn(className, staged ? "z-50" : "z-30", flush && "min-h-[max(32rem,min(88svh,58rem))] h-auto")}
+    >
       {framed && !flush ? (
         <DemoBackdrop className={cn(!staged && "cursor-pointer")} onClickCapture={activateOnClick}>
           {slot}

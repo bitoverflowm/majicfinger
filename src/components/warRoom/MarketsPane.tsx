@@ -5,7 +5,9 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import { formatAge, formatCents, formatMove, formatVolume, venueLabel } from "./format";
+import { formatAge, formatCents, formatMove, formatVolume } from "./format";
+import { useWarRoomTheme } from "./useWarRoomTheme";
+import { VenueTag } from "./VenueTag";
 
 export type MarketRow = {
   id: string;
@@ -22,25 +24,8 @@ export type MarketRow = {
   tokenIds?: string[];
   outcomes?: Array<{ id?: string; label?: string; tokenId?: string }>;
   quoteAt?: string | null;
+  geometry?: { type: string; coordinates: [number, number] } | null;
 };
-
-function VenueBadge({ venue }: { venue: string }) {
-  const v = String(venue || "").toLowerCase();
-  const kalshi = v === "kalshi";
-  const poly = v === "polymarket";
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide",
-        kalshi && "bg-[#28CC95]/20 text-[#28CC95]",
-        poly && "bg-[#2E5CFF]/20 text-[#8da4ff]",
-        !kalshi && !poly && "bg-white/10 text-slate-300",
-      )}
-    >
-      {venueLabel(venue)}
-    </span>
-  );
-}
 
 type Flash = "enter" | "up" | "down" | "rank-up" | "rank-down" | null;
 
@@ -55,6 +40,7 @@ export function MarketsPane({
   onSelect: (id: string) => void;
   emptyReason?: string | null;
 }) {
+  const { dark } = useWarRoomTheme();
   const prevRef = useRef<Map<string, { price: number | null; rank: number }>>(new Map());
   const [flash, setFlash] = useState<Record<string, Flash>>({});
 
@@ -82,7 +68,12 @@ export function MarketsPane({
 
   if (!rows.length) {
     return (
-      <div className="px-2.5 py-6 text-[11px] leading-snug text-slate-500">
+      <div
+        className={cn(
+          "px-2.5 py-6 text-[11px] leading-snug",
+          dark ? "text-slate-500" : "text-muted-foreground",
+        )}
+      >
         {emptyReason === "no_markets_in_desk"
           ? "Nothing in this desk right now."
           : emptyReason === "no_markets_in_category"
@@ -112,8 +103,15 @@ export function MarketsPane({
                 onClick={() => onSelect(row.id)}
                 aria-current={selected ? "true" : undefined}
                 className={cn(
-                  "flex w-full items-start gap-2 border-b border-white/[0.04] px-2.5 py-1.5 text-left transition duration-300",
-                  selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]",
+                  "flex w-full items-start gap-2 border-b px-2.5 py-1.5 text-left transition duration-300",
+                  dark ? "border-white/[0.04]" : "border-border/60",
+                  selected
+                    ? dark
+                      ? "bg-white/[0.08]"
+                      : "bg-muted"
+                    : dark
+                      ? "hover:bg-white/[0.04]"
+                      : "hover:bg-muted/60",
                   tone === "enter" && "animate-in fade-in slide-in-from-right-2 bg-sky-400/10",
                   tone === "up" && "bg-emerald-400/10",
                   tone === "down" && "bg-rose-400/10",
@@ -123,10 +121,22 @@ export function MarketsPane({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <VenueBadge venue={row.venue} />
-                    <span className="truncate text-[11px] leading-tight text-slate-200">{row.title}</span>
+                    <VenueTag venue={row.venue} dark={dark} />
+                    <span
+                      className={cn(
+                        "truncate text-[11px] font-medium leading-tight",
+                        dark ? "text-slate-200" : "text-foreground",
+                      )}
+                    >
+                      {row.title}
+                    </span>
                   </div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-slate-500">
+                  <div
+                    className={cn(
+                      "mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px]",
+                      dark ? "text-slate-500" : "text-muted-foreground",
+                    )}
+                  >
                     <span>{formatVolume(row.volume24h)}</span>
                     <span>·</span>
                     <span className="truncate">{row.region}</span>
@@ -134,16 +144,35 @@ export function MarketsPane({
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
-                  <div className="flex items-center justify-end gap-0.5 font-mono text-[11px] tabular-nums text-white">
-                    {rising ? <ArrowUp className="size-3 text-emerald-300" /> : null}
-                    {falling ? <ArrowDown className="size-3 text-rose-300" /> : null}
+                  <div
+                    className={cn(
+                      "flex items-center justify-end gap-0.5 font-mono text-[11px] tabular-nums",
+                      dark ? "text-white" : "text-foreground",
+                    )}
+                  >
+                    {rising ? (
+                      <ArrowUp className={cn("size-3", dark ? "text-emerald-300" : "text-emerald-600")} />
+                    ) : null}
+                    {falling ? (
+                      <ArrowDown className={cn("size-3", dark ? "text-rose-300" : "text-rose-600")} />
+                    ) : null}
                     {formatCents(row.price)}
                   </div>
                   {move ? (
                     <div
                       className={cn(
                         "font-mono text-[10px] tabular-nums",
-                        rising ? "text-emerald-300" : falling ? "text-rose-300" : "text-slate-400",
+                        rising
+                          ? dark
+                            ? "text-emerald-300"
+                            : "text-emerald-600"
+                          : falling
+                            ? dark
+                              ? "text-rose-300"
+                              : "text-rose-600"
+                            : dark
+                              ? "text-slate-400"
+                              : "text-muted-foreground",
                       )}
                     >
                       {move}

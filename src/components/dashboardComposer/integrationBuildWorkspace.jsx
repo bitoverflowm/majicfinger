@@ -3,19 +3,18 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { columnMissingFromRows } from "@/lib/integrations/columnPayload";
 import { LandingDemoMembersOnlyDialog } from "@/components/dashboardComposer/landingDemoMembersOnly";
+import { LandingDemoViewportOverlay } from "@/components/dashboardComposer/landingDemoViewportOverlay";
 import {
   AttributesFeatureTip,
   BUILD_TIP_IDS,
   ColumnsFeatureTip,
   ContinueFeatureTip,
-  DataLimitsFeatureTip,
   DataTypeFeatureTip,
   EnrichmentsFeatureTip,
   SaveRunFeatureTip,
-  SheetLimitFeatureTip,
+  SortLimitFeatureTip,
 } from "@/components/dashboardComposer/buildFeatureTips";
 import { dismissFeatureTip } from "@/components/ui/feature-tip";
-import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import { claimSheetId, displayMatrix, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
@@ -165,7 +164,7 @@ import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
 import { newBlankTabName, newStartTabId, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
-import { DEMO_RUN_SHEET_LIMIT, getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
+import { getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
 import { evaluateColumnFormula, FORMULA_FUNCTIONS, FORMULA_REFERENCE_NOTES, formulaSuggestions } from "@/lib/columnFormula";
 import { useUser } from "@/lib/hooks";
 import {
@@ -194,6 +193,7 @@ import { integrationProfile } from "@/components/dashboardComposer/integrationSo
 import { requestCardForSheet, stampRunSheets } from "@/components/dashboardComposer/integrationProvenance";
 import { attachJoinRegistry } from "@/components/dashboardComposer/replayTabQueries";
 import { cn } from "@/lib/utils";
+import { nodeContains } from "@/lib/domNode";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { sheetRecords } from "@/components/dashboardComposer/integrationRunSheets";
 import { assignSummaryInput, buildSummaryGrid, describeSummaryFormula, settleSummaryCells, SUMMARY_ROW_COUNT, summaryCellKey, summaryExamples } from "@/components/dashboardComposer/summarySheet";
@@ -656,7 +656,7 @@ function SheetTabBar({ tabs, active, onSelect }) {
   useEffect(() => {
     if (!open) return undefined;
     const close = (event) => {
-      if (!frameRef.current?.contains(event.target)) setOpen(false);
+      if (!nodeContains(frameRef.current, event.target)) setOpen(false);
     };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
@@ -2573,7 +2573,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const user = useUser();
   const canvas = useWorkspaceCanvas();
   const connect = useIntegrationConnect();
-  const planLimit = user === undefined ? null : getHistoricalPullRowLimit(user);
+  const demoPull = !!(ctx?.landingDemo || ctx?.isDemo);
+  const planLimit = user === undefined ? null : getHistoricalPullRowLimit(user, { isDemo: demoPull });
   const [tableId, setTableId] = useState(source?.defaultTable || tableIds[0]);
   const [groupId, setGroupId] = useState(source?.defaultGroup || "");
   const [pull, setPull] = useState(null);
@@ -2712,7 +2713,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const formulaCaretRef = useRef(0);
   const dataTypePickerRef = useRef(null);
   const columnsSectionRef = useRef(null);
-  const previewCountRef = useRef(null);
   const continueButtonRef = useRef(null);
   const [sheetTabs, setSheetTabs] = useState(null);
   const sheetTabsRef = useRef(null);
@@ -2723,6 +2723,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return {
       get current() {
         const el = columnsSectionRef.current?.parentElement?.querySelector('[data-section="attributes"]') || null;
+        if (!el) return null;
+        if (cached?.contextElement !== el) {
+          cached = { getBoundingClientRect: () => el.getBoundingClientRect(), contextElement: el };
+        }
+        return cached;
+      },
+    };
+  }, []);
+  const sortLimitSectionRef = useMemo(() => {
+    let cached = null;
+    return {
+      get current() {
+        const root = columnsSectionRef.current?.parentElement;
+        const el = root?.querySelector('[data-section="sort"]') || root?.querySelector('[data-section="limit"]') || null;
         if (!el) return null;
         if (cached?.contextElement !== el) {
           cached = { getBoundingClientRect: () => el.getBoundingClientRect(), contextElement: el };
@@ -4314,7 +4328,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit, join, integrationId, tableId, settledPreviewKey, previewSearchError]);
 
   const marketCap = getJoinMarketCap(user, { isDemo: !!ctx?.landingDemo });
-  const runSheetLimit = ctx?.landingDemo ? DEMO_RUN_SHEET_LIMIT : Infinity;
+  // Demo dashboard no longer caps how many sheets/charts one pull may place.
+  const runSheetLimit = Infinity;
   const traderJoinNames = useMemo(() => {
     if (!liveTraderList) return [];
     const source = Array.isArray(traderImportRows) ? traderImportRows : filteredRows;
@@ -4365,7 +4380,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         outcomes: previewOutcomeKey ? previewOutcomeKey.split("|") : [],
       },
       undefined,
-      { onPhase },
+      { onPhase, ...(demoPull ? { demo: true } : {}) },
     );
     if (!load) return undefined;
     setJoinTab(previewTicker);
@@ -4389,7 +4404,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [join, joinTarget, joinTradesTarget, previewOutcomeKey, previewTicker, previewTokenKey]);
+  }, [demoPull, join, joinTarget, joinTradesTarget, previewOutcomeKey, previewTicker, previewTokenKey]);
 
   useEffect(() => {
     if (!tradesQuery || joinTarget !== joinMarketsTarget) {
@@ -7199,7 +7214,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setRunning(true);
     const reporter = createRunReporter((feed) => canvas?.reportRun?.(feed));
     try {
-    const sheetCap = typeof planLimit === "number" && planLimit > 0 ? planLimit : getHistoricalPullRowLimit(user);
+    const sheetCap =
+      typeof planLimit === "number" && planLimit > 0 ? planLimit : getHistoricalPullRowLimit(user, { isDemo: demoPull });
     const sampling = enrichPicks.has("sample") && sampleSizeNumber > 0 && !sampleSizeError;
     const keepParentDataset = !sampling || sampleKeepRef.current !== "sample";
     const sampleConfig = sampling
@@ -7315,7 +7331,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (enrichPicks.has("summarize")) planned.push({ id: "summary", name: "summarize", status: "pending" });
     if (enrichPicks.has("function")) planned.push({ id: "functions", name: "function_columns", status: "pending" });
     planned.push({ id: "place", name: "place_sheets", status: "pending", args: { tab: sheetTitle } });
-    reporter.plan(planned, { title: `${venueLabel} · ${sheetTitle}`, firstPull: !pulls.length });
+    // Homepage `#demo` always celebrates the completed tip workflow (confetti → ⋮ export tour).
+    reporter.plan(planned, {
+      title: `${venueLabel} · ${sheetTitle}`,
+      firstPull: !!ctx?.landingDemo || !pulls.length,
+    });
     connect?.close?.();
     let marketRows = liveMatchedRows
       ? liveMatchedRows
@@ -7403,6 +7423,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const pullCompose = async (request) => {
         const pulled = await loadAthenaComposeRows(request, {
           onPhase: (info) => reporter.note("source", describeComposePhase(info, { table: sourceTable, limit: sheetCap })),
+          ...(demoPull ? { demo: true } : {}),
         });
         return pulled.rows || [];
       };
@@ -7457,6 +7478,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       try {
         const result = await join.loadMarkets(marketRows, {
           onPhase: (info) => reporter.note("join-markets", describeComposePhase(info, { table: marketTable })),
+          ...(demoPull ? { demo: true } : {}),
         });
         if (Array.isArray(result.rows)) joinedMarketRows = result.rows;
         if (result.request) joinedMarketRequest = result.request;
@@ -9193,83 +9215,97 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
       reporter.succeed("summary", { result: `Summary over ${runMarkets.rows.length.toLocaleString()} rows` });
     }
-    if (joinCommitted && tradePreview.columns.length) {
+    if (joinCommitted) {
       reporter.start("join-trades");
       const fromRun = joinMarketsFromRows(marketRows, marketCap);
       const list = fitJobs(fromRun.length ? fromRun : joinedMarkets.slice(0, marketCap));
-      runTickers = list.map((market) => market.ticker);
-      const tradeTable = `${lakeId}.trades`;
-      reporter.setChildren(
-        "join-trades",
-        list.map((market) => ({
-          id: market.ticker,
-          name: market.label || market.ticker,
-          status: "pending",
-          parallel: true,
-          args: { table: tradeTable, limit: sheetCap },
-        })),
-      );
-      reporter.note("join-trades", `Composing ${list.length.toLocaleString()} ${tradeTable} ${list.length === 1 ? "sheet" : "sheets"}`);
-      const stageTrades = (item) => {
-        const own = item.ticker === previewTicker;
-        const tradeFunctions = functionsForSheet("trades", own);
-        const shaped = tradeFunctions.length
-          ? applyFunctionColumns(item.columns, item.rows, tradeFunctions, formulaSheets, "trades", activeFunction?.id)
-          : { columns: item.columns, rows: item.rows };
-        if (!shaped.columns.length) return;
-        const id = `run-trades-${String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
-        const fullRows = shaped.rows || [];
-        const pull = { lake: lakeId, table: "trades", ticker: item.ticker, tokens: item.tokens, limit: sheetCap };
-        if (fullRows.length > 50) {
-          rememberTradeSheet(id, item.ticker, shaped.columns, displayMatrix(shaped.columns, fullRows), sheetCap, accountId);
-        }
-        stageSheet({
-          id,
-          title: `Trades · ${item.label || item.ticker}`,
-          columns: shaped.columns,
-          rows: fullRows,
-          rowCount: fullRows.length,
-          pull,
-          span: "half",
-          table: "trades",
-          summary: `${venueLabel} · trades · ${item.label || item.ticker}`,
-          composeRequest: item.request,
-        });
-      };
-      const pulled = await mapPool(list, 4, async (market) => {
-        const childName = market.label || market.ticker;
-        reporter.patchChild("join-trades", market.ticker, { status: "running", result: `Composing ${tradeTable}` });
-        let item;
-        try {
-          const onPhase = (info) =>
-            reporter.patchChild("join-trades", market.ticker, {
-              status: "running",
-              result: describeComposePhase(info, { table: `${tradeTable} · ${childName}`, limit: sheetCap }),
+      if (!list.length) {
+        reporter.fail("join-trades", "No markets to join trades for");
+      } else {
+        runTickers = list.map((market) => market.ticker);
+        const tradeTable = `${lakeId}.trades`;
+        reporter.setChildren(
+          "join-trades",
+          list.map((market) => ({
+            id: market.ticker,
+            name: market.label || market.ticker,
+            status: "pending",
+            parallel: true,
+            args: { table: tradeTable, limit: sheetCap },
+          })),
+        );
+        reporter.note("join-trades", `Composing ${list.length.toLocaleString()} ${tradeTable} ${list.length === 1 ? "sheet" : "sheets"}`);
+        const stageTrades = (item) => {
+          const own = item.ticker === previewTicker;
+          const tradeFunctions = functionsForSheet("trades", own);
+          const shaped = tradeFunctions.length
+            ? applyFunctionColumns(item.columns, item.rows, tradeFunctions, formulaSheets, "trades", activeFunction?.id)
+            : { columns: item.columns, rows: item.rows };
+          if (!shaped.columns.length) return;
+          const id = `run-trades-${String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
+          const fullRows = shaped.rows || [];
+          const pull = { lake: lakeId, table: "trades", ticker: item.ticker, tokens: item.tokens, limit: sheetCap };
+          if (fullRows.length > 50) {
+            rememberTradeSheet(id, item.ticker, shaped.columns, displayMatrix(shaped.columns, fullRows), sheetCap, accountId);
+          }
+          stageSheet({
+            id,
+            title: `Trades · ${item.label || item.ticker}`,
+            columns: shaped.columns,
+            rows: fullRows,
+            rowCount: fullRows.length,
+            pull,
+            span: "half",
+            table: "trades",
+            summary: `${venueLabel} · trades · ${item.label || item.ticker}`,
+            composeRequest: item.request,
+          });
+        };
+        const pulled = await mapPool(list, 4, async (market) => {
+          const childName = market.label || market.ticker;
+          reporter.patchChild("join-trades", market.ticker, { status: "running", result: `Composing ${tradeTable}` });
+          let item;
+          try {
+            const onPhase = (info) =>
+              reporter.patchChild("join-trades", market.ticker, {
+                status: "running",
+                result: describeComposePhase(info, { table: `${tradeTable} · ${childName}`, limit: sheetCap }),
+              });
+            const result = await join.loadTrades(market, sheetCap, {
+              onPhase,
+              ...(demoPull ? { demo: true } : {}),
             });
-          const result = await join.loadTrades(market, sheetCap, { onPhase });
-          const rows = result.rows || [];
-          reporter.patchChild("join-trades", market.ticker, {
-            status: "success",
-            result: `${rows.length.toLocaleString()} rows`,
+            const rows = result.rows || [];
+            reporter.patchChild("join-trades", market.ticker, {
+              status: "success",
+              result: `${rows.length.toLocaleString()} rows`,
+            });
+            item = {
+              ...market,
+              columns: result.columns?.length ? result.columns : tradePreview.columns,
+              rows,
+              request: result.request,
+            };
+          } catch (err) {
+            reporter.patchChild("join-trades", market.ticker, {
+              status: "error",
+              result: err instanceof Error ? err.message : "Trades compose failed",
+            });
+            item = { ...market, columns: tradePreview.columns, rows: [] };
+          }
+          stageTrades(item);
+          return item;
+        });
+        const tradeSheets = sheets.filter((sheet) => sheet.table === "trades").length;
+        const tradeRows = pulled.reduce((sum, item) => sum + (item.rows?.length || 0), 0);
+        if (!tradeSheets) {
+          reporter.fail("join-trades", "Trades join returned no sheets");
+        } else {
+          reporter.succeed("join-trades", {
+            result: `${tradeSheets.toLocaleString()} trade ${tradeSheets === 1 ? "sheet" : "sheets"} · ${tradeRows.toLocaleString()} rows from ${tradeTable}`,
           });
-          item = { ...market, columns: result.columns?.length ? result.columns : tradePreview.columns, rows, request: result.request };
-        } catch (err) {
-          reporter.patchChild("join-trades", market.ticker, {
-            status: "error",
-            result: err instanceof Error ? err.message : "Trades compose failed",
-          });
-          item = { ...market, columns: tradePreview.columns, rows: [] };
         }
-        stageTrades(item);
-        return item;
-      });
-      const tradeSheets = sheets.filter((sheet) => sheet.table === "trades").length;
-      const tradeRows = pulled.reduce((sum, item) => sum + (item.rows?.length || 0), 0);
-      reporter.succeed("join-trades", {
-        result: `${tradeSheets.toLocaleString()} trade ${tradeSheets === 1 ? "sheet" : "sheets"} · ${tradeRows.toLocaleString()} rows from ${tradeTable}`,
-      });
-    } else if (joinCommitted) {
-      reporter.succeed("join-trades", { result: "No trade preview to compose" });
+      }
     }
     if (enrichPicks.has("function")) reporter.start("functions");
     runColumns.forEach((entry) => {
@@ -9421,14 +9457,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       }
       return next;
     });
-    const capNote =
-      skippedSheets + stage.dropped() > 0 ? ` · Demo pulls stop at ${runSheetLimit.toLocaleString()} sheets. Upgrade for more.` : "";
     reporter.succeed("place", {
-      result: (placement.pageId
+      result: placement.pageId
         ? `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on a new tab`
         : placement.append
           ? `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} added on this tab`
-          : `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on this tab`) + capNote,
+          : `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on this tab`,
     });
     reporter.finish();
     } catch (err) {
@@ -10009,10 +10043,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }, 260);
   }
 
+  function revealSortLimit() {
+    setOpenQuerySection({ tableId, value: "sort" });
+    window.setTimeout(() => {
+      const section = sortLimitSectionRef.current?.contextElement;
+      const scroller = section?.closest(".overflow-y-auto");
+      if (!section || !scroller) return;
+      const top = scroller.scrollTop + section.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8;
+      scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }, 260);
+  }
+
   return (
     <div className="relative flex min-h-0 flex-1 bg-background">
       {functionHelp ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6" onClick={() => setFunctionHelp(false)}>
+        <LandingDemoViewportOverlay open zIndexClassName="z-[550]" onBackdropClick={() => setFunctionHelp(false)}>
           <div
             role="dialog"
             aria-labelledby="function-help-title"
@@ -10048,7 +10093,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               ))}
             </ul>
           </div>
-        </div>
+        </LandingDemoViewportOverlay>
       ) : null}
       <aside className="flex w-[340px] shrink-0 flex-col border-r border-border/70">
         {step === "enrich" && lockedQuery ? (
@@ -10102,7 +10147,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 setSampleSeed((current) => current || generateRandomSampleSeed());
               }
               if (id === "function") setHoverFunction(false);
-              if (id === "join") setHoverJoin(false);
+              if (id === "join") {
+                setHoverJoin(false);
+                // Historical markets/trades: commit the only join target so Save and run
+                // does not place a markets-only pull when Join is on but the target was never clicked.
+                if (marketsQuery && joinTradesTarget) setJoinTarget(joinTradesTarget);
+                else if (tradesQuery && joinMarketsTarget) setJoinTarget(joinMarketsTarget);
+              }
             }}
             joinTarget={joinTarget}
             traderJoinIds={traderJoinIds}
@@ -10218,7 +10269,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               );
             }}
             marketCap={marketCap}
-            demoSheetLimit={Number.isFinite(runSheetLimit) ? runSheetLimit : null}
+            demoSheetLimit={null}
             queryRows={
               polymarketJoinCatalog.length
                 ? polymarketJoinMarkets.length
@@ -10574,7 +10625,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </DropdownMenu>
             ) : null}
             </div>
-            {groups || visibleTableIds.length > 1 ? <DataTypeFeatureTip anchorRef={dataTypePickerRef} /> : null}
+            {groups || visibleTableIds.length > 1 ? (
+              <DataTypeFeatureTip anchorRef={dataTypePickerRef} integrationId={integrationId} />
+            ) : null}
             {pairStreamOn ? (
               <div className="mt-3">
                 <p className="text-[12px] font-medium text-foreground">Pairs</p>
@@ -10902,7 +10955,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ) : null}
           </Accordion>
           <ColumnsFeatureTip anchorRef={columnsSectionRef} onDone={hasAttributeSection ? revealAttributes : undefined} />
-          {hasAttributeSection ? <AttributesFeatureTip anchorRef={attributesSectionRef} /> : null}
+          {hasAttributeSection ? (
+            <AttributesFeatureTip anchorRef={attributesSectionRef} onDone={revealSortLimit} />
+          ) : null}
+          {hasAttributeSection ? <SortLimitFeatureTip anchorRef={sortLimitSectionRef} /> : null}
 
           {guidedFilters || liveMarketSearch || liveDirect || polymarketLive ? null : (
             <section>
@@ -10959,11 +11015,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </p>
             ) : null}
           </div>
-          <div ref={previewCountRef} className="flex min-w-0 flex-col items-end">
+          <div className="flex min-w-0 flex-col items-end">
             <p className="text-right text-[12px] text-muted-foreground">{paneLine}</p>
-            {ctx?.landingDemo ? (
-              <DataLimitsFeatureTip anchorRef={previewCountRef} onUpgrade={() => exitLandingDemoToSection("pricing")} />
-            ) : null}
             {typeof planLimit === "number" &&
             !(showJoinSheets && joinTab !== "markets") &&
             !showSummarizeExplainer &&
@@ -11091,15 +11144,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <ResultSheetTabs tabs={previewTabs} active={previewSheet} onSelect={showPreview} />
         )}
         </SheetTabsReportContext.Provider>
-        {ctx?.landingDemo && step === "enrich" && enrichPicks.has("join") && sheetTabs?.count > 1 ? (
-          <SheetLimitFeatureTip
-            anchorRef={sheetTabsRef}
-            sheets={sheetTabs.count - 1}
-            total={sheetTabs.count}
-            cap={runSheetLimit}
-            onUpgrade={() => exitLandingDemoToSection("pricing")}
-          />
-        ) : null}
         <div className="min-h-0 flex-1 p-4">
           {showSummarizeExplainer ? (
             <SummarizeExplainer measure={summaryMeasure} />
@@ -11800,7 +11844,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         </div>
       </section>
       {seriesBrowsePrompt ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
+        <LandingDemoViewportOverlay open zIndexClassName="z-[550]">
           <div
             role="dialog"
             aria-labelledby="series-browse-title"
@@ -11822,10 +11866,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </Button>
             </div>
           </div>
-        </div>
+        </LandingDemoViewportOverlay>
       ) : null}
       {sampleSavePrompt ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
+        <LandingDemoViewportOverlay open zIndexClassName="z-[550]">
           <div
             role="dialog"
             aria-labelledby="sample-save-title"
@@ -11849,12 +11893,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </Button>
             </div>
           </div>
-        </div>
+        </LandingDemoViewportOverlay>
       ) : null}
       {placementPrompt === "members" ? (
         <LandingDemoMembersOnlyDialog onBack={backFromMembersPrompt} onUpgrade={closePlacementPrompt} />
       ) : placementPrompt ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
+        <LandingDemoViewportOverlay open zIndexClassName="z-[550]">
           <div
             role="dialog"
             aria-labelledby="pull-destination-title"
@@ -11878,7 +11922,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </Button>
             </div>
           </div>
-        </div>
+        </LandingDemoViewportOverlay>
       ) : null}
     </div>
   );

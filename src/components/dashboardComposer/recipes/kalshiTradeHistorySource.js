@@ -446,7 +446,7 @@ export async function pullKalshiTradeHistory(meta, plan, { onProgress, onRows } 
   if (plan.kind === "v1") {
     const lake = await loadKalshiHistoricalTradesForTicker(ticker, cap, {
       recipe: RECIPE_TRADE_HISTORY,
-      // A full history downloads 1,000 rows per page, and a slow link can take over 20s for one.
+      // Status API coalesces ~10 Athena pages (~10k rows) per HTTP hop; slow links still need headroom.
       pageTimeoutMs: 90000,
       onPhase: (info) => onProgress?.(describeComposePhase(info, { table: "kalshi.trades", limit: cap })),
       onRows: (rows, columns) =>

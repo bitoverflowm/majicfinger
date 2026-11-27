@@ -5,6 +5,8 @@ export const siteConfig = {
   links: {
     twitter: "https://x.com/misterrpink1",
     github: "https://github.com/misterrpink1",
+    /** Lychee product presence (Kalshi vs Polymarket). */
+    linkedin: "https://www.linkedin.com/company/kalshi-vs-polymarket",
   },
 } as const;
 

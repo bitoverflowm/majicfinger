@@ -12,12 +12,15 @@ import { toast } from "sonner"
 
 import { Separator } from "@/components/ui/separator";
 import { loadWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
+import { clearGuestDemoDashboardStorage } from "@/lib/workspaceProjectScope";
+import { forgetOwnerSheetRecords } from "@/components/dashboardComposer/sheetRecordCache";
 
 import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
 import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { WorkspaceTabsLayer } from "@/components/dashboardComposer/blankDashboardEmpty";
 import { hideLandingExploreTabChrome } from "@/components/dashboardComposer/workspaceStartTabBar";
 import { IntegrationConnectLandingDemo } from "@/components/dashboardComposer/integrationConnectDialog";
+import { LandingExploreConnectBack } from "@/components/dashboardComposer/landingExploreConnectBack";
 import FigmaNavChrome from "./components/figmaNavChrome";
 import { cn } from "@/lib/utils";
 import { PROJECT_THUMBNAIL_ROOT } from "@/lib/projectThumbnail";
@@ -151,6 +154,14 @@ const DashBody = ({ user }) => {
     }, [freeRunStarting, runYourselfSessionActive]);
     const membershipLocked = !isDemo && !!user && dashboardAccessLocked && !freeRunStarting;
     const wasOnForkProjectRef = useRef(false);
+
+    // Homepage `#demo` guests: wipe prior anonymous canvas before the workspace hydrates.
+    useLayoutEffect(() => {
+      if (!contextStateV2?.landingDemo) return undefined;
+      clearGuestDemoDashboardStorage("local");
+      void forgetOwnerSheetRecords("local");
+      return undefined;
+    }, [contextStateV2?.landingDemo]);
 
     useEffect(() => {
       if (isDemo || typeof window === "undefined") return;
@@ -467,7 +478,11 @@ const DashBody = ({ user }) => {
         <div
           {...{ [PROJECT_THUMBNAIL_ROOT]: "" }}
           className={cn(
-            "relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1",
+            "relative z-0 flex min-w-0 flex-col py-1",
+            // Homepage `#demo` explore: grow with WorkspaceCanvas sheets instead of a clipped flex child.
+            contextStateV2?.landingDemo && isLandingExploreSurface(contextStateV2?.landingDemoSurface)
+              ? "min-h-[max(32rem,min(88svh,58rem))] h-auto w-full"
+              : "min-h-0 flex-1",
             hideLandingExploreTabChrome(contextStateV2)
               ? "[--dashboard-tab-clearance:0px]"
               : "[--dashboard-tab-clearance:2.75rem]",
@@ -576,22 +591,25 @@ const DashBody = ({ user }) => {
                 </div>}
         </div>
         {contextStateV2?.landingDemo && (
-          <IntegrationConnectLandingDemo
-            active={
-              !!contextStateV2?.landingDemoActive &&
-              !isLandingExploreSurface(contextStateV2?.landingDemoSurface)
-            }
-            initialIntegrationId={contextStateV2?.landingDemoIntegration}
-            onSelectIntegration={(integrationId) => {
-              // Explore tabs stay inline in `#demo`; framed guide demos still expand.
-              if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
-              contextStateV2?.activateLandingDemo?.({ integrationId });
-            }}
-            onOpenRecipe={(recipeId) => {
-              if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
-              contextStateV2?.activateLandingDemo?.({ recipeId });
-            }}
-          />
+          <>
+            <LandingExploreConnectBack />
+            <IntegrationConnectLandingDemo
+              active={
+                !!contextStateV2?.landingDemoActive &&
+                !isLandingExploreSurface(contextStateV2?.landingDemoSurface)
+              }
+              initialIntegrationId={contextStateV2?.landingDemoIntegration}
+              onSelectIntegration={(integrationId) => {
+                // Explore tabs stay inline in `#demo`; framed guide demos still expand.
+                if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
+                contextStateV2?.activateLandingDemo?.({ integrationId });
+              }}
+              onOpenRecipe={(recipeId) => {
+                if (isLandingExploreSurface(contextStateV2?.landingDemoSurface)) return;
+                contextStateV2?.activateLandingDemo?.({ recipeId });
+              }}
+            />
+          </>
         )}
       </WorkspaceComposerDockProvider>
     );
@@ -601,7 +619,16 @@ const DashBody = ({ user }) => {
     }
 
     return isDemo ? (
-      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col",
+          contextStateV2?.landingDemo && isLandingExploreSurface(contextStateV2?.landingDemoSurface)
+            ? "min-h-[max(32rem,min(88svh,58rem))] h-auto"
+            : "h-full min-h-0",
+        )}
+      >
+        {content}
+      </div>
     ) : (
       <div className="relative flex min-h-svh min-w-0 flex-col bg-[#f5f5f5] dark:bg-[#1e1e1e]">
         <div

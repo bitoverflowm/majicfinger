@@ -39,9 +39,9 @@ export function DemoWindowMockup({
       style={style}
       data-demo-mockup={dataDemoMockup}
       className={cn(
-        "relative isolate w-full overflow-hidden",
-        // Flush homepage stages must chain wheel scroll to the page at inner edges.
-        flush ? "overscroll-y-auto bg-transparent" : "overscroll-none bg-background",
+        "relative isolate w-full",
+        // Flush explore stages grow with canvas content; framed cards keep a clipped window.
+        flush ? "overflow-visible overscroll-y-auto bg-transparent" : "overflow-hidden overscroll-none bg-background",
         flush
           ? "rounded-none border-0 shadow-none ring-0"
           : "rounded-2xl border border-border shadow-xl ring-1 ring-border/60",

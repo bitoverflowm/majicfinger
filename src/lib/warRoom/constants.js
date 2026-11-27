@@ -28,6 +28,11 @@ export const MAP_UPDATE_CADENCE_MS = 350;
 /** Map density — enough for a busy globe without melting mobile. */
 export const MOBILE_POINT_CAP = 90;
 export const DESKTOP_POINT_CAP = 220;
+/**
+ * Progressive Gamma/Kalshi boost sizes after the desk shell.
+ * Client applies each tier as it lands so pins + rails paint before the full cap.
+ */
+export const BOOST_STREAM_LIMITS = Object.freeze([48, 120]);
 export const PREVIEW_STORY_CAP = 3;
 /** Cap headlines shown as map pings + activity rows (newest keep the slots). */
 export const NEWS_ACTIVITY_CAP = 36;

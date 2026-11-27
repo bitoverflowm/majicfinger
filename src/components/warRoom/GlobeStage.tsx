@@ -27,11 +27,17 @@ function hasWebGL() {
 type GlobeStageProps = WarRoomGlobeProps & {
   /** Homepage: wait until after first paint and only on eligible desktops. */
   enhance?: "auto" | "always" | "never";
+  /**
+   * When enhance is `auto`, allow MapLibre on compact screens too (homepage mobile
+   * War Room: live globe + pings). Desktop `/war-room` compact still uses `never`.
+   */
+  allowCompact?: boolean;
   onTapPoster?: () => void;
 };
 
 export function GlobeStage({
   enhance = "auto",
+  allowCompact = false,
   onTapPoster,
   className,
   pings,
@@ -55,11 +61,11 @@ export function GlobeStage({
     if (typeof window === "undefined") return;
     const compact = isCompactScreen();
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (compact || reduced || !hasWebGL()) return;
+    if ((compact && !allowCompact) || reduced || !hasWebGL()) return;
 
     const timeoutId = window.setTimeout(() => setReady(true), 250);
     return () => window.clearTimeout(timeoutId);
-  }, [enhance]);
+  }, [enhance, allowCompact]);
 
   const onFail = useCallback(() => setFailed(true), []);
 

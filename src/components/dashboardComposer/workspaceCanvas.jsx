@@ -3,8 +3,7 @@
 import { createContext, memo, startTransition, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { BarChart3, Copy, Database, Download, Lock, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
-import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
+import { BarChart3, Copy, Database, Download, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
 import { retryImport } from "@/lib/retryImport";
 import { toast } from "sonner";
 import {
@@ -35,6 +34,11 @@ import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/lan
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
+  isLandingConnectExploreSurface,
+  isLandingExploreSurface,
+  isLandingTerminalExploreSurface,
+} from "@/lib/landingDemoExplore";
+import {
   WELCOME_START_TAB_ID,
   defaultStartTab,
   duplicateTabName,
@@ -44,7 +48,7 @@ import {
   updateWorkspaceTab,
 } from "@/lib/workspaceStartTabs";
 import { defaultMarginsForTab, resolveTabMargins, sameTabMargins, sanitizeTabMargins } from "@/lib/workspaceTabMargins";
-import { scopedLocalOwner, workspaceProjectScope } from "@/lib/workspaceProjectScope";
+import { clearGuestDemoDashboardStorage, scopedLocalOwner, workspaceProjectScope } from "@/lib/workspaceProjectScope";
 import { useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { ActivityRichTableView } from "@/components/dashboardComposer/activityRichTableView";
@@ -99,6 +103,7 @@ import {
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
 import {
   estimateBlocksBytes,
+  forgetOwnerSheetRecords,
   forgetSheetRecords,
   rememberSheetRecords,
   restoreSheetRecords,
@@ -534,6 +539,15 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
   useEffect(() => {
     if (publishedDoc || !owner) return undefined;
     if (owner === "local") {
+      // Homepage `#demo` guests must not revive prior anonymous WorkspaceCanvas widgets.
+      // DashBody also clears guest storage on mount; skip the localStorage read here either way.
+      if (ctx?.landingDemo) {
+        clearGuestDemoDashboardStorage(owner);
+        void forgetOwnerSheetRecords(owner);
+        setBlocksByPage((prev) => ((prev[pageId] || []).length ? prev : { ...prev, [pageId]: [] }));
+        setReady(true);
+        return undefined;
+      }
       const loaded = readCanvasBlocks(storageKey);
       setBlocksByPage((prev) => ((prev[pageId] || []).length ? prev : { ...prev, [pageId]: loaded }));
       setReady(true);
@@ -846,7 +860,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
   // A write still waiting when the tab changes or the page closes goes out first.
   const localWriteRef = useRef(null);
   useEffect(() => {
-    if (readOnly || !ready || !storageKey) return undefined;
+    // Guest demo stays in-memory only so a later #demo visit cannot load old Trades widgets.
+    if (readOnly || !ready || !storageKey || ctx?.landingDemo) return undefined;
     const previous = localWriteRef.current;
     if (previous && previous.key !== storageKey) previous.run();
     const write = {
@@ -871,15 +886,16 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
       window.clearTimeout(timer);
       cancelIdle?.();
     };
-  }, [blocks, owner, pageId, readOnly, ready, storageKey]);
+  }, [blocks, ctx?.landingDemo, owner, pageId, readOnly, ready, storageKey]);
   useEffect(() => {
+    if (ctx?.landingDemo) return undefined;
     const flush = () => localWriteRef.current?.run();
     window.addEventListener("pagehide", flush);
     return () => {
       window.removeEventListener("pagehide", flush);
       flush();
     };
-  }, []);
+  }, [ctx?.landingDemo]);
 
   // Full rows come back only for the tab on screen; a tab loaded in the background keeps its saved rows until opened.
   const restoredRef = useRef(new Set());
@@ -934,7 +950,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
 
   useEffect(() => {
     if (!ready || user === undefined) return undefined;
-    const cap = getHistoricalPullRowLimit(user);
+    const cap = getHistoricalPullRowLimit(user, { isDemo: !!(ctx?.landingDemo || ctx?.isDemo) });
     for (const block of blocks) {
       if (!repullsTradeSheet(block) || !block.columns?.length) continue;
       const ticker = tradeTickerFromBlock(block);
@@ -956,7 +972,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
       });
     }
     return undefined;
-  }, [blocks, pageId, ready, user]);
+  }, [blocks, ctx?.isDemo, ctx?.landingDemo, pageId, ready, user]);
 
   useEffect(() => {
     if (readOnly) return undefined;
@@ -1156,6 +1172,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
 
   const addBlock = useCallback(
     (type) => {
+      // Homepage explore: no freeform Add sheet / Chart / Text on the guest canvas.
+      if (ctx?.landingDemo && isLandingExploreSurface(ctx?.landingDemoSurface)) return;
       const size = BLOCK_SIZE[type] || BLOCK_SIZE.text;
       const copy = BLOCK_COPY[type] || BLOCK_COPY.text;
       const id = newId();
@@ -1184,7 +1202,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
         setRevealNonce((nonce) => nonce + 1);
       }
     },
-    [pageId],
+    [ctx?.landingDemo, ctx?.landingDemoSurface, pageId],
   );
 
   /** A fitted terminal panel's content changed height: resize it and move what's below with it. */
@@ -1272,6 +1290,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
 
   const createChartFromBlock = useCallback(
     (id, forcedView) => {
+      // Homepage explore: recipe-placed charts only — no freeform Create chart.
+      if (ctx?.landingDemo && isLandingExploreSurface(ctx?.landingDemoSurface)) return;
       const sheet = blocks.find((block) => block.id === id && block.type === "sheet");
       if (!sheet) return;
       const base = String(sheet.title || "Sheet").replace(/\s+chart$/, "").trim() || "Sheet";
@@ -1299,7 +1319,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
       setSelectedId(chartId);
       setTool("select");
     },
-    [blocks, pageId],
+    [blocks, ctx?.landingDemo, ctx?.landingDemoSurface, pageId],
   );
 
   const chartRunLock = useRef(false);
@@ -1521,7 +1541,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
     const reporter = createRunReporter((feed) => {
       setRunFeed(feed);
     });
-    const planLimit = getHistoricalPullRowLimit(user);
+    const planLimit = getHistoricalPullRowLimit(user, { isDemo: !!(ctx?.landingDemo || ctx?.isDemo) });
     void replayTabSheets(blocksByPageRef.current[page] || [], {
       planLimit,
       reporter,
@@ -1579,7 +1599,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly: readOnlyProp = false
         });
       },
     });
-  }, [readOnly, user]);
+  }, [ctx?.isDemo, ctx?.landingDemo, readOnly, user]);
 
   const revealBlock = useCallback((id, nextPageId) => {
     if (!id) return;
@@ -2320,7 +2340,13 @@ const feedTipsShown = new Set();
 const feedsStarted = new Set();
 const FEED_TIP_MS = 6000;
 
-function RealtimeToggle({ block }) {
+/** Bring a tip / ⋮ target into the user's viewport (page + nested scrollers). */
+function scrollTargetIntoView(el) {
+  if (!(el instanceof HTMLElement)) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+}
+
+function RealtimeToggle({ block, onMembersOnly }) {
   const canvas = useWorkspaceCanvas();
   const match = realtimeSheetForBlock(block, canvas?.blocks || []);
   const session = match ? liveSession(canvas, match.sheet.id) : null;
@@ -2361,6 +2387,11 @@ function RealtimeToggle({ block }) {
       onClick={(event) => {
         event.stopPropagation();
         setTip(false);
+        // Homepage `#demo`: Realtime is members-only — show upgrade instead of starting the feed.
+        if (onMembersOnly) {
+          onMembersOnly();
+          return;
+        }
         if (running) canvas?.stopSheetRealtime?.(match.sheet.id);
         else canvas?.startSheetRealtime?.(match.sheet.id);
       }}
@@ -2396,8 +2427,9 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const canvas = useWorkspaceCanvas();
   const ctxDemo = useMyStateV2();
   const landingDemo = !!ctxDemo?.landingDemo;
-  const exploreHolderDemo =
-    landingDemo && (ctxDemo?.landingDemoSurface === "markets" || ctxDemo?.landingDemoSurface === "holders");
+  const exploreDemo = landingDemo && isLandingExploreSurface(ctxDemo?.landingDemoSurface);
+  const exploreConnectDemo = landingDemo && isLandingConnectExploreSurface(ctxDemo?.landingDemoSurface);
+  const exploreHolderDemo = landingDemo && isLandingTerminalExploreSurface(ctxDemo?.landingDemoSurface);
   /** Markets / Holders demo: search is just the bar — no card chrome. */
   const framelessSearch = exploreHolderDemo && block.panel === "search";
   const readOnly = !!canvas?.readOnly || locked;
@@ -2477,7 +2509,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     }
   };
 
-  const [exportLocked, setExportLocked] = useState(false);
+  /** Shared Members only gate for Export / Realtime / Duplicate on `#demo`. */
+  const [membersFeature, setMembersFeature] = useState(null);
   const touring = exportTour && !!exportFormats && !readOnly;
   const [exportItem, setExportItem] = useState(null);
   const exportItemRef = useMemo(() => ({ current: exportItem }), [exportItem]);
@@ -2494,6 +2527,18 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     const timer = window.setTimeout(() => setExportTipReady(true), 220);
     return () => window.clearTimeout(timer);
   }, [touring, menuOpen, exportItem]);
+  // Keep the Export ⋮ target (and tip) in view — landing page scroll often leaves them below the fold.
+  useEffect(() => {
+    if (!touring) return undefined;
+    const menu = rootRef.current?.querySelector("[data-block-menu]");
+    scrollTargetIntoView(menu);
+    return undefined;
+  }, [touring]);
+  useEffect(() => {
+    if (!exportTipReady || !exportItem) return undefined;
+    const frame = window.requestAnimationFrame(() => scrollTargetIntoView(exportItem));
+    return () => window.cancelAnimationFrame(frame);
+  }, [exportTipReady, exportItem]);
   const endExportTour = () => {
     setMenuOpen(false);
     onExportTourDone?.();
@@ -2712,14 +2757,17 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
           : "overflow-hidden rounded-xl border bg-background shadow-sm",
         locked ? "pointer-events-none select-none blur-[6px] saturate-[0.85]" : "pointer-events-auto",
         block.arrive && (block.branch ? "lychee-sheet-branch" : "lychee-sheet-arrive"),
-        !framelessSearch && (calmBorder ? "border-border/70" : "group/block"),
+        // Homepage `#demo` keeps a quiet border but still needs `group/block` so the ⋮ menu
+        // reveals on hover like the full dashboard (conversion CTAs come later).
+        !framelessSearch && (readOnly ? "border-border/70" : "group/block"),
         !framelessSearch &&
-          !calmBorder &&
-          (spotlight
-            ? "border-emerald-500 ring-2 ring-emerald-400/80"
-            : selected
-              ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
-              : "border-border/70 hover:border-[#0d99ff]"),
+          (calmBorder
+            ? "border-border/70"
+            : spotlight
+              ? "border-emerald-500 ring-2 ring-emerald-400/80"
+              : selected
+                ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
+                : "border-border/70 hover:border-[#0d99ff]"),
         panelClassName(block),
       )}
       style={{
@@ -2731,7 +2779,12 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
         transition: resizing ? "none" : "left 480ms cubic-bezier(0.22, 1, 0.36, 1), top 480ms cubic-bezier(0.22, 1, 0.36, 1), width 480ms cubic-bezier(0.22, 1, 0.36, 1), height 480ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
-      {readOnly || framelessSearch ? null : <RealtimeToggle block={block} />}
+      {readOnly || framelessSearch ? null : (
+        <RealtimeToggle
+          block={block}
+          onMembersOnly={landingDemo ? () => setMembersFeature("Realtime") : undefined}
+        />
+      )}
       {readOnly || framelessSearch ? null : (
       <DropdownMenu
         open={menuOpen}
@@ -2749,6 +2802,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
             className={cn(
               "absolute right-1.5 top-1.5 z-10 inline-flex size-5 translate-x-1 items-center justify-center rounded-sm bg-background/80 text-muted-foreground opacity-0 transition-[opacity,transform] duration-200 ease-out hover:bg-muted hover:text-foreground",
               "pointer-events-none group-hover/block:pointer-events-auto group-hover/block:translate-x-0 group-hover/block:opacity-100 group-focus-within/block:pointer-events-auto group-focus-within/block:translate-x-0 group-focus-within/block:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:translate-x-0 data-[state=open]:opacity-100",
+              // Historical / Present demo: keep ⋮ visible while the post-pull export tour is active.
+              exploreConnectDemo && touring && "pointer-events-auto translate-x-0 opacity-100",
             )}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
@@ -2779,13 +2834,15 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
           ) : null}
           {block.type === "sheet" ? (
             <>
-              <DropdownMenuItem
-                className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
-                onSelect={() => canvas?.createChartFromBlock?.(block.id)}
-              >
-                <BarChart3 className="size-4 text-muted-foreground" />
-                {createLabel}
-              </DropdownMenuItem>
+              {exploreDemo ? null : (
+                <DropdownMenuItem
+                  className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
+                  onSelect={() => canvas?.createChartFromBlock?.(block.id)}
+                >
+                  <BarChart3 className="size-4 text-muted-foreground" />
+                  {createLabel}
+                </DropdownMenuItem>
+              )}
               {hasVisualTable(sheetDataset) ? (
                 block.visualReady ? (
                   <div
@@ -2844,7 +2901,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                 "gap-2.5 rounded-md px-2 py-2 text-[13px]",
                 touring && "bg-[#0d99ff]/10 text-[#0b6fc2] ring-1 ring-[#0d99ff]/40 dark:text-[#5cb8ff]",
               )}
-              onSelect={() => setExportLocked(true)}
+              onSelect={() => setMembersFeature("Exporting")}
             >
               <Download className={cn("size-4 text-muted-foreground", touring && "text-[#0d99ff]")} />
               Export
@@ -2885,7 +2942,13 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
             <>
               <DropdownMenuItem
                 className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
-                onSelect={() => canvas?.duplicateBlock?.(block.id)}
+                onSelect={() => {
+                  if (landingDemo) {
+                    setMembersFeature("Duplicate");
+                    return;
+                  }
+                  canvas?.duplicateBlock?.(block.id);
+                }}
               >
                 <Copy className="size-4 text-muted-foreground" />
                 Duplicate
@@ -2912,7 +2975,13 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       </DropdownMenu>
       )}
       {touring && exportItem ? <ExportFeatureTip anchorRef={exportItemRef} open={exportTipReady} onDone={endExportTour} /> : null}
-      {landingDemo ? <LandingDemoMembersOnlyPortal open={exportLocked} feature="Exporting" onClose={() => setExportLocked(false)} /> : null}
+      {landingDemo ? (
+        <LandingDemoMembersOnlyPortal
+          open={!!membersFeature}
+          feature={membersFeature || "This feature"}
+          onClose={() => setMembersFeature(null)}
+        />
+      ) : null}
       {fullscreen && block.type === "sheet" && !readOnly ? (
         <SheetFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} />
       ) : fullscreen && block.type === "chart" && !readOnly ? (
@@ -2970,70 +3039,6 @@ function blocksTopToBottom(blocks) {
   return (blocks || []).slice().sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
 }
 
-const DEMO_OPEN_SHEETS = 3;
-
-/** Landing demo: the first sheets stay open with their charts; everything else is behind the upgrade. */
-function demoLockedIds(blocks) {
-  const ordered = blocksTopToBottom(blocks);
-  const open = new Set(ordered.filter((block) => block.type === "sheet").slice(0, DEMO_OPEN_SHEETS).map((block) => block.id));
-  if (!open.size) return new Set();
-  return new Set(
-    ordered.filter((block) => !open.has(block.id) && !(block.type === "chart" && open.has(block.sourceSheetId))).map((block) => block.id),
-  );
-}
-
-/** Where the paywall starts: under the last open block, so the card never covers what the demo shows. */
-function paywallTop(blocks, lockedIds) {
-  const bottom = (block) => (block.y || 0) + (block.h || 0);
-  const locked = blocks.filter((block) => lockedIds.has(block.id));
-  const open = blocks.filter((block) => !lockedIds.has(block.id));
-  const firstLocked = Math.min(...locked.map((block) => block.y || 0));
-  const openBottom = open.length ? Math.max(...open.map(bottom)) + 16 : 0;
-  const lastLocked = Math.max(...locked.map(bottom));
-  return Math.max(0, Math.min(Math.max(firstLocked - 8, openBottom), lastLocked - 260));
-}
-
-function lockedSummary(blocks) {
-  const sheets = blocks.filter((block) => block.type === "sheet").length;
-  const charts = blocks.filter((block) => block.type === "chart").length;
-  const parts = [];
-  if (sheets) parts.push(`${sheets} more ${sheets === 1 ? "sheet" : "sheets"}`);
-  if (charts) parts.push(`${charts}${sheets ? "" : " more"} ${charts === 1 ? "chart" : "charts"}`);
-  if (!parts.length) return "More of your dashboard is waiting.";
-  return `${parts.join(" and ")} ${sheets + charts === 1 ? "is" : "are"} waiting.`;
-}
-
-function DemoPaywall({ top, locked }) {
-  return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 px-6" style={{ top }}>
-      <div className="sticky top-24 mx-auto mt-16 w-full max-w-[420px]">
-        <div
-          role="region"
-          aria-labelledby="demo-paywall-title"
-          className="pointer-events-auto rounded-xl border border-border/70 bg-background p-6 text-center shadow-lg"
-        >
-          <span className="mx-auto grid size-10 place-items-center rounded-full bg-[#e5f4ff] text-[#0d99ff] dark:bg-[#1f3347]">
-            <Lock className="size-4" strokeWidth={2.25} aria-hidden />
-          </span>
-          <h2 id="demo-paywall-title" className="mt-3 text-[15px] font-semibold text-foreground">
-            Unlock your full dashboard
-          </h2>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-            {lockedSummary(locked)} Continue your work by upgrading.
-          </p>
-          <button
-            type="button"
-            onClick={() => exitLandingDemoToSection("pricing")}
-            className="mt-5 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[#0d99ff] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0b87e0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0d99ff]/40"
-          >
-            Upgrade
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /** Freeform blocks for the dashboard currently on screen. */
 export function WorkspaceCanvas() {
   const canvas = useWorkspaceCanvas();
@@ -3048,13 +3053,8 @@ export function WorkspaceCanvas() {
 
   const pageTabId = tabIdFromPage(canvas?.pageId);
   const pageTab = ((canvas?.readOnly ? canvas?.previewTabs : ctx?.workspaceStartTabs) || []).find((tab) => tab?.id === pageTabId) || null;
-  // The demo shows everything a terminal tab opens; saving it is what takes a membership.
-  const demoPaywalled = !!ctx?.landingDemo && !canvas?.runFeed && !pageTab?.terminal;
   const exploreHolderCanvas =
-    !!ctx?.landingDemo &&
-    (ctx?.landingDemoSurface === "markets" || ctx?.landingDemoSurface === "holders");
-  const lockedIds = useMemo(() => (demoPaywalled ? demoLockedIds(blocks) : new Set()), [blocks, demoPaywalled]);
-  const lockedBlocks = blocks.filter((block) => lockedIds.has(block.id));
+    !!ctx?.landingDemo && isLandingTerminalExploreSurface(ctx?.landingDemoSurface);
   // A preview keeps the layouts it works out here, since it saves nothing.
   const [previewLayouts, setPreviewLayouts] = useState({});
   const previewLayout = canvas?.readOnly && pageTab ? previewLayouts[pageTab.id] : null;
@@ -3089,11 +3089,9 @@ export function WorkspaceCanvas() {
   const dismissExportTip = exportTip.dismiss;
   const [exportTourId, setExportTourId] = useState("");
   const tipBlockId = useMemo(
-    () =>
-      blocksTopToBottom(blocks).find((block) => (block.type === "sheet" || block.type === "chart") && !lockedIds.has(block.id))?.id ||
-      "",
-    [blocks, lockedIds],
-  );
+    () => blocksTopToBottom(blocks).find((block) => block.type === "sheet" || block.type === "chart")?.id || "",
+    [blocks],
+  )
   const recipeTourOn = !!canvas?.tour && !!canvas?.ready && !canvas?.runFeed && !canvas?.readOnly;
   const exportTourDue =
     !!tipBlockId &&
@@ -3111,15 +3109,14 @@ export function WorkspaceCanvas() {
     }
     if (exportTourId) return undefined;
     const timers = [];
-    // After the run card closes: let the dashboard settle, scroll up to the block, then open its menu.
+    // After the run card closes: let the dashboard settle, bring the sheet into the page
+    // viewport (landing `#demo` often scrolls the stage off-screen), then open its ⋮ menu.
     timers.push(
       window.setTimeout(() => {
-        const scroller = scrollerRef.current;
-        const el = scroller?.querySelector(`[data-block-id="${CSS.escape(tipBlockId)}"]`);
-        if (scroller && el instanceof HTMLElement) {
-          const top = scroller.scrollTop + el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24;
-          scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-        }
+        const el =
+          scrollerRef.current?.querySelector(`[data-block-id="${CSS.escape(tipBlockId)}"]`) ||
+          document.querySelector(`[data-block-id="${CSS.escape(tipBlockId)}"]`);
+        scrollTargetIntoView(el);
         timers.push(window.setTimeout(() => setExportTourId(tipBlockId), 650));
       }, 900),
     );
@@ -3487,7 +3484,6 @@ export function WorkspaceCanvas() {
       key={block.id}
       block={block}
       booting={bootingIds.has(block.id)}
-      locked={lockedIds.has(block.id)}
       exportTour={exportTourId === block.id}
       onExportTourDone={endExportTour}
       selected={canvas.selectedId === block.id}
@@ -3497,27 +3493,41 @@ export function WorkspaceCanvas() {
     />
   ));
 
+  const contentHeight = blocks.reduce(
+    (max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + gridMetrics.bottom),
+    0,
+  );
+  const contentWidth = Math.max(
+    gridMetrics.width,
+    blocks.reduce((max, block) => Math.max(max, (block.x || 0) + (block.w || 0) + 32), 0),
+  );
+  // Homepage `#demo` explore: size to content so the outer stage can grow; do not clip in a short absolute frame.
+  const exploreGrow = landingDemo && isLandingExploreSurface(ctx?.landingDemoSurface);
+
   return (
     <>
     <div
       ref={scrollerRef}
       className={cn(
-        "pointer-events-auto absolute inset-0 z-20 overflow-auto",
+        "pointer-events-auto z-20",
+        exploreGrow
+          ? "relative w-full overflow-visible overscroll-y-auto"
+          : "absolute inset-0 overflow-auto",
         // Landing explore demos chain to the page at edges; real dashboard keeps contain.
-        landingDemo ? "overscroll-y-auto" : "overscroll-contain",
+        !exploreGrow && (landingDemo ? "overscroll-y-auto" : "overscroll-contain"),
         // Markets / Holders demos: slight canvas tint vs the stage background.
         exploreHolderCanvas && "bg-zinc-100 dark:bg-zinc-900",
       )}
-      style={canvas?.tool === "hand" ? { cursor: canvas.handDown ? "grabbing" : "grab" } : undefined}
+      style={{
+        ...(canvas?.tool === "hand" ? { cursor: canvas.handDown ? "grabbing" : "grab" } : null),
+        ...(exploreGrow ? { minHeight: "100%", height: Math.max(contentHeight, 1) } : null),
+      }}
     >
       <div
-        className="relative min-h-full min-w-full"
+        className={cn("relative min-w-full", exploreGrow ? "" : "min-h-full")}
         style={{
-          height: blocks.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + gridMetrics.bottom), 0),
-          width: Math.max(
-            gridMetrics.width,
-            blocks.reduce((max, block) => Math.max(max, (block.x || 0) + (block.w || 0) + 32), 0),
-          ),
+          height: contentHeight,
+          width: contentWidth,
         }}
       >
       <div
@@ -3553,7 +3563,6 @@ export function WorkspaceCanvas() {
       ) : (
         blockElements
       )}
-      {lockedBlocks.length ? <DemoPaywall top={paywallTop(blocks, lockedIds)} locked={lockedBlocks} /> : null}
       {editTip === "resize" && tipBlock ? (
         <div
           aria-hidden="true"

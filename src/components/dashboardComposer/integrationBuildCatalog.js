@@ -669,6 +669,7 @@ export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_
       orderBy: [{ alias: "created_time", direction: "desc" }],
     },
     ...(options.recipe ? { recipe: options.recipe } : {}),
+    ...(options.demo ? { demo: true } : {}),
   };
   const maxWaitMs = rowLimit > PREVIEW_ROW_CAP ? 600000 : 180000;
   return fetchAthenaLakeSample(request, {
@@ -718,6 +719,7 @@ export async function loadKalshiHistoricalMarketsForTickers(tickers, options = {
         groupByAliases: [],
         orderBy: [{ alias: "volume", direction: "desc" }],
       },
+      ...(options.demo ? { demo: true } : {}),
     };
     const result = await fetchAthenaLakeSample(request, {
       maxWaitMs: unique.length > chunkSize ? 600000 : 180000,
@@ -756,7 +758,9 @@ export async function loadKalshiHistoricalMarketsForTickers(tickers, options = {
 export function loadAthenaComposeRows(request, options = {}) {
   const rowLimit = Number(request?.limit);
   const cap = Number.isFinite(rowLimit) && rowLimit > 0 ? Math.floor(rowLimit) : undefined;
-  return fetchAthenaLakeSample(cap ? { ...request, limit: cap } : request, {
+  const body = cap ? { ...request, limit: cap } : { ...request };
+  if (options.demo) body.demo = true;
+  return fetchAthenaLakeSample(body, {
     maxWaitMs: 600000,
     pollIntervalMs: 800,
     onPhase: options.onPhase,
@@ -859,6 +863,7 @@ export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_
       orderBy: [{ alias: "block_number", direction: "desc" }],
     },
     ...(options.recipe ? { recipe: options.recipe } : {}),
+    ...(options.demo ? { demo: true } : {}),
   };
   const outcomes = marketOutcomes(options.outcomes);
   const maxWaitMs = rowLimit > PREVIEW_ROW_CAP ? 600000 : 180000;
@@ -912,6 +917,7 @@ export async function loadPolymarketHistoricalMarketsForTokens(tokens, options =
         groupByAliases: [],
         orderBy: [{ alias: "volume", direction: "desc" }],
       },
+      ...(options.demo ? { demo: true } : {}),
     };
     const result = await fetchAthenaLakeSample(request, {
       maxWaitMs: unique.length > chunkSize ? 600000 : 180000,

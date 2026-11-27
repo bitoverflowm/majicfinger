@@ -4,14 +4,16 @@
  * GET ?queryExecutionId=…&limit=…&includeRows=0|1|page
  *   includeRows=0   — state only (fast poll while query runs)
  *   includeRows=1   — fetch all rows in one response (small pulls only; may hit 4MB API cap)
- *   includeRows=page  — one Athena page per request (use athenaPageToken to continue)
+ *   includeRows=page  — up to ATHENA_STATUS_PAGE_BATCH Athena pages (~10k rows) per request
+ *                       (use athenaPageToken to continue; each AWS call still ≤1000 rows)
  *   athenaPageToken — continuation token from prior page response (includeRows=page only)
  *   limit           — row cap (default 100), or "all" for full result
  */
 import {
   getAthenaQueryState,
   fetchAthenaQueryResultRows,
-  fetchAthenaQueryResultNextPage,
+  fetchAthenaQueryResultPageBatch,
+  ATHENA_STATUS_PAGE_BATCH,
 } from "../../../../lib/dataLake/runAthenaSelect";
 
 /** Athena returns UUID-style ids (36 chars with hyphens). */
@@ -100,7 +102,11 @@ export default async function handler(req, res) {
       const tokenRaw = Array.isArray(rawToken) ? rawToken[0] : rawToken;
       const athenaPageToken = tokenRaw ? String(tokenRaw).trim() : undefined;
 
-      const page = await fetchAthenaQueryResultNextPage(qeid, athenaPageToken);
+      // Coalesce several Athena GetQueryResults pages (AWS max 1000 each) into one
+      // HTTP response so large lake pulls need fewer browser round-trips.
+      const page = await fetchAthenaQueryResultPageBatch(qeid, athenaPageToken, {
+        maxPages: ATHENA_STATUS_PAGE_BATCH,
+      });
 
       return res.status(200).json({
         state: "SUCCEEDED",
@@ -109,6 +115,7 @@ export default async function handler(req, res) {
         columns: page.columns,
         rows: page.rows,
         pageRowCount: page.rows.length,
+        athenaPagesFetched: page.athenaPagesFetched,
         athenaNextToken: page.athenaNextToken || null,
         hasMore: !!page.athenaNextToken,
       });

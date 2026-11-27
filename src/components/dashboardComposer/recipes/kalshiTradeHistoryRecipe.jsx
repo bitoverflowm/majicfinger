@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { useUser } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import {
@@ -226,6 +227,7 @@ export function KalshiTradeHistoryRecipe({ onBack, Title = "h2", Description = "
   const connect = useIntegrationConnect();
   const canvas = useWorkspaceCanvas();
   const user = useUser();
+  const ctx = useMyStateV2();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -331,6 +333,7 @@ export function KalshiTradeHistoryRecipe({ onBack, Title = "h2", Description = "
       canvas,
       close: () => connect?.close?.(),
       accountId: user?.userId || "",
+      firstPull: !!ctx?.landingDemo,
     });
   };
 

@@ -335,7 +335,22 @@ export function validateAthenaLakeQueryBody(body, access) {
   let limClamped;
   if (queryType === "compose") {
     const limitProvided = body.limit != null && body.limit !== "";
-    if (!limitProvided) {
+    if (demo) {
+      // Demo is not free-sample capped — allow the full demo budget (subscriber ceiling).
+      if (!limitProvided) {
+        limClamped = ATHENA_DEMO_ROW_LIMIT;
+      } else {
+        const n = Number(body.limit);
+        if (!Number.isFinite(n)) {
+          throw new AthenaLakeRequestError("Invalid limit", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        limClamped = Math.min(
+          ATHENA_DEMO_ROW_LIMIT,
+          COMPOSE_SQL_LIMIT_ABSOLUTE_MAX,
+          Math.max(1, Math.floor(n)),
+        );
+      }
+    } else if (!limitProvided) {
       limClamped = unlimitedComposeRows ? null : maxComposeRowsCap;
     } else {
       const n = Number(body.limit);
@@ -344,12 +359,17 @@ export function validateAthenaLakeQueryBody(body, access) {
       }
       limClamped = Math.min(maxComposeRowsCap, maxSelectRows, Math.max(1, Math.floor(n)));
     }
-    if (demo) limClamped = Math.min(limClamped ?? ATHENA_DEMO_ROW_LIMIT, ATHENA_DEMO_ROW_LIMIT);
   } else {
     const base =
       body.limit != null && body.limit !== "" ? Number(body.limit) : 100;
-    limClamped = Math.min(maxSelectRows, Math.max(1, Math.floor(Number.isFinite(base) ? base : 100)));
-    if (demo) limClamped = Math.min(limClamped, ATHENA_DEMO_ROW_LIMIT);
+    if (demo) {
+      limClamped = Math.min(
+        ATHENA_DEMO_ROW_LIMIT,
+        Math.max(1, Math.floor(Number.isFinite(base) ? base : ATHENA_DEMO_ROW_LIMIT)),
+      );
+    } else {
+      limClamped = Math.min(maxSelectRows, Math.max(1, Math.floor(Number.isFinite(base) ? base : 100)));
+    }
   }
 
   /** @type {{ size: number } | null} */

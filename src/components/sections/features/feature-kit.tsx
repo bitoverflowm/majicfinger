@@ -89,11 +89,11 @@ export function FeatureWindow({
   return (
     <div
       className={cn(
-        "flex flex-col overflow-hidden rounded-xl border border-black/10 bg-background shadow-[0_24px_60px_-20px_rgba(15,23,42,0.45)] dark:border-white/10",
+        "flex flex-col overflow-hidden rounded-xl border border-black/10 bg-background shadow-[0_24px_60px_-20px_rgba(15,23,42,0.45)] dark:border-white/10 dark:bg-[#16171c] dark:shadow-[0_24px_60px_-20px_rgba(0,0,0,0.65)]",
         className,
       )}
     >
-      <div className="relative flex h-9 shrink-0 items-center border-b border-border bg-muted px-3.5">
+      <div className="relative flex h-9 shrink-0 items-center border-b border-border bg-muted px-3.5 dark:border-white/10 dark:bg-[#1c1d22]">
         <div className="flex gap-1.5" aria-hidden>
           <span className="size-2.5 rounded-full bg-neutral-300 dark:bg-neutral-600" />
           <span className="size-2.5 rounded-full bg-neutral-300 dark:bg-neutral-600" />

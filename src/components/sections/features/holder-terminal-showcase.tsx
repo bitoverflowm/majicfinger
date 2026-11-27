@@ -63,7 +63,7 @@ const STILL_ACTION = ACTIONS.findIndex((action) => action.scenes.includes("holde
 function DemoPlaceholder() {
   return (
     <div
-      className="w-full rounded-xl border border-black/10 bg-background/80 shadow-[0_30px_80px_-30px_rgba(15,23,42,0.5)]"
+      className="w-full rounded-xl border border-black/10 bg-background/80 shadow-[0_30px_80px_-30px_rgba(15,23,42,0.5)] dark:border-white/10 dark:bg-background/90 dark:shadow-[0_30px_80px_-30px_rgba(0,0,0,0.65)]"
       style={{ aspectRatio: DESIGN_RATIO }}
     />
   );

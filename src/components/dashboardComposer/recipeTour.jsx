@@ -7,11 +7,39 @@ import { tabIdFromPage } from "@/lib/workspaceDashboardDocument";
 /** Clears the tab strip that floats over the top of the canvas. */
 const SCROLL_PAD = 76;
 const SETTLE_MS = 520;
+/** Extra settle after a tab switch so the new page's blocks mount before the tip opens. */
+const TAB_SWITCH_SETTLE_MS = 800;
 const MISSING_MS = 2500;
 const WIDE_SHARE = 0.6;
 const HEADER_STRIP = 56;
 const ROOM_ABOVE = 210;
 const HOLE_PAD = 6;
+
+function queryTourTargetElements(scroller, idsKey) {
+  return idsKey
+    .split("|")
+    .filter(Boolean)
+    .map((id) => scroller?.querySelector(`[data-block-id="${CSS.escape(id)}"]`))
+    .filter((element) => element instanceof HTMLElement);
+}
+
+/**
+ * Bring tour targets into the real viewport. Prefer element.scrollIntoView so nested
+ * and page scroll ancestors move (landing explore stages are often overflow-visible;
+ * scroller-only scrollTo leaves the tip/card off-screen after a tab switch).
+ */
+function scrollTourTargetsIntoView(scroller, idsKey, rect) {
+  const elements = queryTourTargetElements(scroller, idsKey);
+  if (elements[0]) {
+    elements[0].scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    return true;
+  }
+  if (scroller && rect) {
+    scroller.scrollTo({ top: Math.max(0, rect.top - SCROLL_PAD), behavior: "smooth" });
+    return true;
+  }
+  return false;
+}
 
 /**
  * Blocks a step points at. A target is a sheet id plus which part to show: the sheet, the charts
@@ -64,6 +92,8 @@ export function RecipeTourLayer({ canvas, tour, scrollerRef }) {
   blocksRef.current = blocks;
   const arrivedRef = useRef(-1);
   const requestedRef = useRef(-1);
+  /** Step index that requested a tab change — scrollIntoView after that step's tip opens. */
+  const tabSwitchStepRef = useRef(-1);
   const { endTour, setTourStep, requestTab } = canvas;
 
   const finish = () => {
@@ -93,6 +123,7 @@ export function RecipeTourLayer({ canvas, tour, scrollerRef }) {
     }
     if (requestedRef.current === index) return;
     requestedRef.current = index;
+    tabSwitchStepRef.current = index;
     requestTab(tabIdFromPage(step.pageId));
   }, [dismiss, dismissed, endTour, index, pageId, requestTab, step]);
 
@@ -106,12 +137,50 @@ export function RecipeTourLayer({ canvas, tour, scrollerRef }) {
     const wanted = new Set(idsKey.split("|"));
     const rect = unionOf(blocksRef.current.filter((block) => wanted.has(block.id)).map(blockRect));
     const scroller = scrollerRef.current;
-    if (scroller && rect) scroller.scrollTo({ top: Math.max(0, rect.top - SCROLL_PAD), behavior: "smooth" });
-    const timer = window.setTimeout(() => setTourStep(index, { shown: index }), SETTLE_MS);
-    return () => window.clearTimeout(timer);
+    const switchedTab = tabSwitchStepRef.current === index;
+    let attempts = 0;
+    let frame = 0;
+    const tryScroll = () => {
+      const ok = scrollTourTargetsIntoView(scroller, idsKey, rect);
+      attempts += 1;
+      // Tab switches need a few frames for the new page's [data-block-id] nodes to mount.
+      if (!ok && switchedTab && attempts < 30) {
+        frame = window.requestAnimationFrame(tryScroll);
+      }
+    };
+    tryScroll();
+    const settle = switchedTab ? TAB_SWITCH_SETTLE_MS : SETTLE_MS;
+    const timer = window.setTimeout(() => setTourStep(index, { shown: index }), settle);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
   }, [dismissed, idsKey, index, onPage, scrollerRef, setTourStep, shown]);
 
   const visible = dismissed === false && onPage && shown && ids.length > 0;
+
+  // After a tab-changing step opens its FeatureTip, re-center target + tip so neither stays off-screen.
+  useEffect(() => {
+    if (!visible || !idsKey) return undefined;
+    if (tabSwitchStepRef.current !== index) return undefined;
+    const scroller = scrollerRef.current;
+    const tipSelector = tour.id ? `[aria-labelledby="feature-tip-${CSS.escape(tour.id)}-title"]` : null;
+    let tipFrame = 0;
+    const frame = window.requestAnimationFrame(() => {
+      scrollTourTargetsIntoView(scroller, idsKey, null);
+      tipFrame = window.requestAnimationFrame(() => {
+        const tip = tipSelector ? document.querySelector(tipSelector) : null;
+        if (tip instanceof HTMLElement) {
+          tip.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+        }
+        tabSwitchStepRef.current = -1;
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(tipFrame);
+    };
+  }, [visible, idsKey, index, scrollerRef, tour.id]);
   const holes = visible ? blocks.filter((block) => ids.includes(block.id)).map(blockRect) : [];
   const highlight = unionOf(holes);
   const scrollerWidth = scrollerRef.current?.clientWidth || 0;

@@ -10,6 +10,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
 import { NewsNavDropdown } from "@/components/nav/news-nav-dropdown";
 import { JarvisNavSearch } from "@/components/nav/jarvis-nav-search";
+import { NavMoreMenu, NavMoreMenuInline } from "@/components/nav/nav-more-menu";
 import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { useUser } from "@/lib/hooks";
 import { WORKSPACE_ENTRY_PATH } from "@/lib/workspaceEntry";
@@ -43,7 +44,8 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-background">
-      <div className="relative mx-auto flex h-14 w-full max-w-[min(100%,88rem)] items-center px-3 sm:px-5">
+      {/* Full-bleed: logo flush left, controls flush right — modest gutter only (no max-width). */}
+      <div className="relative flex h-14 w-full items-center px-3 sm:px-4">
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <Link href="/" className="flex shrink-0 items-center gap-2 pr-2">
             <Image
@@ -79,7 +81,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
         <div className="hidden min-w-0 flex-1 lg:block" aria-hidden />
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <div className="hidden items-center gap-4 lg:flex">
+          <div className="hidden items-center gap-3 lg:flex">
             <Link href={pricingHref} className="text-sm font-medium text-primary/70 hover:text-primary">
               Pricing
             </Link>
@@ -95,6 +97,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                 Dashboard
               </Link>
             )}
+            <NavMoreMenu />
           </div>
           <button
             className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border lg:hidden"
@@ -186,6 +189,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                     </button>
                   </>
                 )}
+                <NavMoreMenuInline />
               </div>
             </motion.div>
           </>

@@ -600,14 +600,17 @@ export async function fetchKalshiLiveTradableMarkets(opts = {}) {
     1,
     Math.min(TRADABLE_LIMIT_MAX, Math.floor(Number(opts.limit) || TRADABLE_LIMIT_DEFAULT)),
   );
-  const pool = await getTradablePool();
+  // wait:false → return cached/partial immediately (progressive mid-tiers); still kicks a fill.
+  const pool = await getTradablePool({ wait: opts.wait !== false });
   return pool.slice(0, limit);
 }
 
 /**
+ * @param {{ wait?: boolean }} [opts]
  * @returns {Promise<FeaturedKalshiMarket[]>}
  */
-async function getTradablePool() {
+async function getTradablePool(opts = {}) {
+  const wait = opts.wait !== false;
   const now = Date.now();
   if (
     tradableCache &&
@@ -618,6 +621,7 @@ async function getTradablePool() {
   }
   if (tradableInflight) {
     if (tradableCache?.markets?.length) return tradableCache.markets;
+    if (!wait) return [];
     return tradableInflight;
   }
   const previous = tradableCache?.markets?.length ? tradableCache.markets : null;
@@ -636,6 +640,7 @@ async function getTradablePool() {
       tradableInflight = null;
     });
   if (previous?.length) return previous;
+  if (!wait) return [];
   return tradableInflight;
 }
 
@@ -711,6 +716,14 @@ async function loadTradablePool() {
         }
       }),
     );
+    if (out.length) {
+      // Publish mid-pull so progressive tiers / polls can paint before all series finish.
+      tradableCache = {
+        at: Date.now(),
+        v: TRADABLE_CACHE_VERSION,
+        markets: out.slice().sort((a, b) => (Number(b.volume24h) || 0) - (Number(a.volume24h) || 0)),
+      };
+    }
   }
 
   return out.sort((a, b) => (Number(b.volume24h) || 0) - (Number(a.volume24h) || 0));

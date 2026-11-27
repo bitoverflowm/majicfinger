@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { X } from "lucide-react";
+import { nodeContains } from "@/lib/domNode";
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { SearchFeatureTip } from "@/components/dashboardComposer/buildFeatureTips";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,7 +31,7 @@ export function PolymarketLiveBuildSearch({
         className="relative"
         onFocusCapture={() => setSearching(true)}
         onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) setSearching(false);
+          if (!nodeContains(event.currentTarget, event.relatedTarget)) setSearching(false);
         }}
       >
         {required ? (

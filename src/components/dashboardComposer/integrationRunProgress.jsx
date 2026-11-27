@@ -2,8 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AgentSteps, formatElapsed } from "@/components/dashboardComposer/agentSteps";
-import { FIRST_PULL_TIP_ID, FirstPullFeatureTip } from "@/components/dashboardComposer/buildFeatureTips";
-import { dismissFeatureTip } from "@/components/ui/feature-tip";
+import {
+  EXPORT_TIP_ID,
+  FIRST_PULL_TIP_ID,
+  FirstPullFeatureTip,
+} from "@/components/dashboardComposer/buildFeatureTips";
+import { dismissFeatureTip, isFeatureTipDismissed, resetFeatureTip } from "@/components/ui/feature-tip";
+import { useMyStateV2 } from "@/context/stateContextV2";
+import { isLandingConnectExploreSurface } from "@/lib/landingDemoExplore";
 import { cn } from "@/lib/utils";
 
 function runSucceeded(feed) {
@@ -16,19 +22,35 @@ function runSucceeded(feed) {
 }
 
 export function RunProgressCard({ feed, onDismiss, onReplay }) {
+  const ctx = useMyStateV2();
+  const demoConnect = !!ctx?.landingDemo && isLandingConnectExploreSurface(ctx?.landingDemoSurface);
   const [now, setNow] = useState(() => Date.now());
   const viewButtonRef = useRef(null);
+  const armedCelebrateRef = useRef(null);
   const live = feed?.status === "running";
   useEffect(() => {
     if (!live) return undefined;
     const timer = window.setInterval(() => setNow(Date.now()), 200);
     return () => window.clearInterval(timer);
   }, [live]);
+  // Each successful `#demo` Historical / Present pull re-arms confetti + export ⋮ tour
+  // (Kalshi and Polymarket recipes share tip ids — without reset, a second pull skips celebration).
+  useEffect(() => {
+    if (!demoConnect || !feed?.id || feed.status !== "done") return;
+    if (!runSucceeded(feed)) return;
+    if (armedCelebrateRef.current === feed.id) return;
+    armedCelebrateRef.current = feed.id;
+    resetFeatureTip(FIRST_PULL_TIP_ID);
+    resetFeatureTip(EXPORT_TIP_ID);
+  }, [demoConnect, feed]);
   if (!feed?.steps?.length) return null;
   const elapsed = formatElapsed((feed.completedAt || now) - (feed.startedAt || now));
   const succeeded = runSucceeded(feed);
+  // Homepage Historical / Present: celebrate tip-workflow completion even when recipe runs omit `firstPull`.
+  const celebrate =
+    !!feed.firstPull || (demoConnect && succeeded && !isFeatureTipDismissed(FIRST_PULL_TIP_ID));
   const close = () => {
-    if (succeeded && feed.firstPull) dismissFeatureTip(FIRST_PULL_TIP_ID);
+    if (succeeded && celebrate) dismissFeatureTip(FIRST_PULL_TIP_ID);
     onDismiss?.();
   };
   const docked = feed.dock === "side";
@@ -80,17 +102,22 @@ export function RunProgressCard({ feed, onDismiss, onReplay }) {
         </div>
         {succeeded ? (
           <footer className="shrink-0 border-t border-border/70 px-4 py-3">
-            <p className="text-[13px] font-semibold text-foreground">Your dashboard is ready</p>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{feed.readyDetail || "The sheets are on the canvas behind this card."}</p>
+            <p className="text-[13px] font-semibold text-foreground">
+              {demoConnect ? "Your pull is ready" : "Your dashboard is ready"}
+            </p>
+            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+              {feed.readyDetail ||
+                (demoConnect ? "Your sheet is on the canvas behind this card." : "The sheets are on the canvas behind this card.")}
+            </p>
             <button
               ref={viewButtonRef}
               type="button"
               onClick={close}
               className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-foreground px-3 py-2 text-[13px] font-medium text-background hover:opacity-90"
             >
-              {feed.viewLabel || "View dashboard"}
+              {feed.viewLabel || (demoConnect ? "View results" : "View dashboard")}
             </button>
-            {feed.firstPull ? <FirstPullFeatureTip anchorRef={viewButtonRef} runId={feed.id} /> : null}
+            {celebrate ? <FirstPullFeatureTip anchorRef={viewButtonRef} runId={feed.id} /> : null}
           </footer>
         ) : null}
       </section>

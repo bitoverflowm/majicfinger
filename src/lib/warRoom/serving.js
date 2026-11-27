@@ -135,6 +135,29 @@ async function cachedBoost(key, loader) {
   return current?.inflight || [];
 }
 
+/** Clamp an optional progressive boostLimit to the venue default max. */
+function resolveBoostLimit(requested, defaultLimit) {
+  const def = Math.max(1, Math.floor(Number(defaultLimit) || DESKTOP_POINT_CAP));
+  const raw = Number(requested);
+  if (!Number.isFinite(raw) || raw <= 0) return def;
+  return Math.max(1, Math.min(def, Math.floor(raw)));
+}
+
+/**
+ * Prefer a warmer/fuller cache entry when a progressive tier asks for fewer rows.
+ * @param {string} fullKey
+ * @param {number} limit
+ */
+function sliceCachedBoost(fullKey, limit) {
+  const now = Date.now();
+  const hit = boostMemo.get(fullKey);
+  if (!hit || hit.inflight || !Array.isArray(hit.markets) || now - hit.at >= BOOST_CACHE_TTL_MS) {
+    return null;
+  }
+  if (!hit.markets.length) return null;
+  return hit.markets.slice(0, Math.max(1, limit));
+}
+
 function nowIso(ms = Date.now()) {
   return new Date(ms).toISOString();
 }
@@ -165,7 +188,33 @@ function normalizeBundle(raw, { fixture = false, stale = false } = {}) {
   };
 }
 
-async function loadLiveBundle() {
+/** Cold live-bundle wait cap — progressive shell/mid-tiers must not sit empty for ~120s. */
+const LIVE_BUNDLE_WAIT_MS = 2_500;
+
+function emptyLiveBundle(error) {
+  return normalizeBundle({
+    asOf: nowIso(),
+    fixture: false,
+    freshness: {
+      kalshi: { asOf: nowIso(), status: "error", ageMs: 0, error: error ? String(error) : "pending" },
+      polymarket: { asOf: nowIso(), status: "missing", ageMs: 0 },
+      nws: { asOf: nowIso(), status: "missing", ageMs: 0 },
+      news: { asOf: nowIso(), status: "idle", ageMs: 0 },
+    },
+    markets: [],
+    signals: [],
+    links: [],
+    activity: [],
+    featuredMarketId: null,
+  });
+}
+
+/**
+ * @param {{ wait?: boolean }} [opts]
+ * @returns {Promise<ReturnType<typeof normalizeBundle> | null>}
+ */
+async function loadLiveBundle(opts = {}) {
+  const wait = opts.wait !== false;
   const now = Date.now();
   if (liveMemo.bundle && now - liveMemo.at < SNAPSHOT_CACHE_TTL_MS) {
     return liveMemo.bundle;
@@ -201,19 +250,49 @@ async function loadLiveBundle() {
   // lookups and homepage polls don't stall the Next server for ~12s.
   const stale = liveMemo.bundle || lastGoodLive;
   if (stale) return stale;
-  return liveMemo.inflight;
+  // Progressive shell/mid-tiers: kick the fill but do not await a cold ~120s pull.
+  if (!wait) return null;
+  try {
+    return await withTimeout(liveMemo.inflight, LIVE_BUNDLE_WAIT_MS, "live-bundle");
+  } catch {
+    return null;
+  }
 }
 
 /**
- * @param {{ forceFixture?: boolean }} [opts]
+ * @param {{ forceFixture?: boolean; shell?: boolean; boostLimit?: number }} [opts]
  */
 export async function loadWarRoomBundle(opts = {}) {
   if (opts.forceFixture || isWarRoomFixtureForced()) {
     return normalizeBundle(buildFixtureBundle(), { fixture: true });
   }
 
+  // Shell + progressive mid boostLimit must paint in seconds, not wait on cold live sources.
+  const boostLimit = Number(opts.boostLimit);
+  const progressiveFast =
+    Boolean(opts.shell) ||
+    (Number.isFinite(boostLimit) && boostLimit > 0 && boostLimit < DESKTOP_POINT_CAP);
+
   try {
-    return await loadLiveBundle();
+    if (progressiveFast) {
+      const warm = await loadLiveBundle({ wait: false });
+      if (warm) return warm;
+      // Ensure a background fill is running for later tiers / polls.
+      void loadLiveBundle({ wait: true }).catch(() => {});
+      if (allowFixtureFallback()) {
+        return normalizeBundle(buildFixtureBundle(), { fixture: true, stale: true });
+      }
+      return emptyLiveBundle("pending");
+    }
+
+    const bundle = await loadLiveBundle({ wait: true });
+    if (bundle) return bundle;
+    // Cold wait timed out — fall through to fixture/empty while inflight continues.
+    if (lastGoodLive) return { ...lastGoodLive, stale: true };
+    if (allowFixtureFallback()) {
+      return normalizeBundle(buildFixtureBundle(), { fixture: true, stale: true });
+    }
+    return emptyLiveBundle("timeout");
   } catch (err) {
     if (lastGoodLive) {
       return {
@@ -230,22 +309,10 @@ export async function loadWarRoomBundle(opts = {}) {
     if (allowFixtureFallback()) {
       return normalizeBundle(buildFixtureBundle(), { fixture: true });
     }
-    return normalizeBundle({
-      asOf: nowIso(),
-      fixture: false,
-      freshness: {
-        kalshi: { asOf: nowIso(), status: "error", ageMs: 0, error: String(err?.message || err) },
-        polymarket: { asOf: nowIso(), status: "missing", ageMs: 0 },
-        nws: { asOf: nowIso(), status: "missing", ageMs: 0 },
-        news: { asOf: nowIso(), status: "idle", ageMs: 0 },
-      },
-      markets: [],
-      signals: [],
-      links: [],
-      featuredMarketId: null,
-    });
+    return emptyLiveBundle(err instanceof Error ? err.message : err);
   }
 }
+
 
 function marketDesk(market) {
   if (market?.category === "weather" || market?.desk === "weather") return "weather";
@@ -290,14 +357,22 @@ function mapBoostedMarkets(rows, observedTs, existingIds, accept) {
  * @param {string} observedTs
  * @param {Set<string>} existingIds
  */
-async function categoryPolymarketBoost(category, observedTs, existingIds) {
+async function categoryPolymarketBoost(category, observedTs, existingIds, boostLimit) {
   const definition = CATEGORIES.find((row) => row.id === category);
   if (!definition) return [];
   const tagSlug = definition.tags[0];
   if (!tagSlug) return [];
+  const limit = resolveBoostLimit(boostLimit, 120);
+  const fullKey = `poly-tag:${tagSlug}`;
   try {
-    const boosted = await cachedBoost(`poly-tag:${tagSlug}`, async () => {
-      const rows = await fetchPolymarketMarketsByTagSlug(tagSlug, { limit: 120 });
+    const fromFull = sliceCachedBoost(fullKey, limit);
+    if (fromFull) {
+      for (const market of fromFull) existingIds.add(market.id);
+      return fromFull;
+    }
+    const cacheKey = limit >= 120 ? fullKey : `${fullKey}:L${limit}`;
+    const boosted = await cachedBoost(cacheKey, async () => {
+      const rows = await fetchPolymarketMarketsByTagSlug(tagSlug, { limit });
       // Trust Gamma's event tag filter — don't re-drop rows whose local tags omit the
       // chip slug (e.g. politics events tagged "Elections" but not "politics").
       return mapBoostedMarkets(rows, observedTs, new Set()).map((market) => ({
@@ -320,31 +395,36 @@ async function categoryPolymarketBoost(category, observedTs, existingIds) {
  * @param {string} observedTs
  * @param {Set<string>} existingIds
  */
-async function categoryKalshiBoost(category, observedTs, existingIds) {
+async function categoryKalshiBoost(category, observedTs, existingIds, boostLimit) {
   const kalshiCategories = kalshiSeriesCategoriesForWarRoom(category);
   if (!kalshiCategories.length) return [];
+  const limit = resolveBoostLimit(boostLimit, 100);
+  const fullKey = `kalshi-cat:${kalshiCategories.join(",")}`;
   try {
-    const boosted = await cachedBoost(`kalshi-cat:${kalshiCategories.join(",")}`, async () => {
-      const rows = await fetchKalshiLiveMarketsBySeriesCategories({
-        categories: kalshiCategories,
-        limit: 100,
-      });
-      /** @type {Array<Record<string, unknown>>} */
-      const out = [];
-      const seen = new Set();
-      for (const row of rows) {
-        const mapped = fromKalshiFeatured(row, observedTs);
-        if (!mapped?.market) continue;
-        if (seen.has(mapped.market.id)) continue;
-        seen.add(mapped.market.id);
-        out.push({
-          ...mapped.market,
-          category,
-          tags: [...new Set([...(mapped.market.tags || []), category, ...kalshiCategories].filter(Boolean))],
+    const fromFull = sliceCachedBoost(fullKey, limit);
+    const boosted =
+      fromFull ||
+      (await cachedBoost(limit >= 100 ? fullKey : `${fullKey}:L${limit}`, async () => {
+        const rows = await fetchKalshiLiveMarketsBySeriesCategories({
+          categories: kalshiCategories,
+          limit,
         });
-      }
-      return out;
-    });
+        /** @type {Array<Record<string, unknown>>} */
+        const out = [];
+        const seen = new Set();
+        for (const row of rows) {
+          const mapped = fromKalshiFeatured(row, observedTs);
+          if (!mapped?.market) continue;
+          if (seen.has(mapped.market.id)) continue;
+          seen.add(mapped.market.id);
+          out.push({
+            ...mapped.market,
+            category,
+            tags: [...new Set([...(mapped.market.tags || []), category, ...kalshiCategories].filter(Boolean))],
+          });
+        }
+        return out;
+      }));
     return boosted.filter((market) => {
       if (existingIds.has(market.id)) return false;
       existingIds.add(market.id);
@@ -355,24 +435,37 @@ async function categoryKalshiBoost(category, observedTs, existingIds) {
   }
 }
 
+function exploreFeedDefaultLimit(exploreFeed) {
+  if (exploreFeed === "tradable" || exploreFeed === "volume" || exploreFeed === "liquidity") {
+    return 220;
+  }
+  if (exploreFeed === "new" || exploreFeed === "trending" || exploreFeed === "competitive") {
+    return 160;
+  }
+  return 100;
+}
+
 /**
  * When an Explore feed chip is active, pull that Gamma ranking onto the globe.
  * War Room then re-sorts the rail/map by volume.
  * @param {string} exploreFeed
  * @param {string} observedTs
  * @param {Set<string>} existingIds
+ * @param {number} [boostLimit] Progressive tier — fewer Gamma pages before the full cap.
  */
-async function exploreFeedPolymarketBoost(exploreFeed, observedTs, existingIds) {
+async function exploreFeedPolymarketBoost(exploreFeed, observedTs, existingIds, boostLimit) {
   if (!exploreFeed) return [];
+  const defaultLimit = exploreFeedDefaultLimit(exploreFeed);
+  const limit = resolveBoostLimit(boostLimit, defaultLimit);
+  const fullKey = `poly-feed:${exploreFeed}`;
   try {
-    const boosted = await cachedBoost(`poly-feed:${exploreFeed}`, async () => {
-      // Tradable / volume feeds should fill the desktop point cap; others stay denser but lighter.
-      const limit =
-        exploreFeed === "tradable" || exploreFeed === "volume" || exploreFeed === "liquidity"
-          ? 220
-          : exploreFeed === "new" || exploreFeed === "trending" || exploreFeed === "competitive"
-            ? 160
-            : 100;
+    const fromFull = sliceCachedBoost(fullKey, limit);
+    if (fromFull) {
+      for (const market of fromFull) existingIds.add(market.id);
+      return fromFull;
+    }
+    const cacheKey = limit >= defaultLimit ? fullKey : `${fullKey}:L${limit}`;
+    const boosted = await cachedBoost(cacheKey, async () => {
       const rows = await fetchPolymarketMarketsByExploreFeed(exploreFeed, { limit });
       return mapBoostedMarkets(rows, observedTs, new Set());
     });
@@ -389,8 +482,9 @@ async function exploreFeedPolymarketBoost(exploreFeed, observedTs, existingIds) 
  * @param {string} exploreFeed
  * @param {string} observedTs
  * @param {Set<string>} existingIds
+ * @param {number} [boostLimit] Progressive tier — slice pool sooner when a fuller cache exists.
  */
-async function exploreFeedKalshiBoost(exploreFeed, observedTs, existingIds) {
+async function exploreFeedKalshiBoost(exploreFeed, observedTs, existingIds, boostLimit) {
   if (!exploreFeed) return [];
   // Featured / new / trending stay on the desk seed pool; tradable/volume need a real pull.
   if (
@@ -400,30 +494,52 @@ async function exploreFeedKalshiBoost(exploreFeed, observedTs, existingIds) {
   ) {
     return [];
   }
-  try {
-    const boosted = await cachedBoost(`kalshi-feed:${exploreFeed}`, async () => {
-      const limit =
-        exploreFeed === "tradable" || exploreFeed === "volume" || exploreFeed === "liquidity"
-          ? 220
-          : 100;
-      const rows = await fetchKalshiLiveTradableMarkets({ limit });
-      /** @type {Array<Record<string, unknown>>} */
-      const out = [];
-      const seen = new Set();
-      for (const row of rows) {
-        const mapped = fromKalshiFeatured(row, observedTs);
-        if (!mapped?.market) continue;
-        if (seen.has(mapped.market.id)) continue;
-        seen.add(mapped.market.id);
-        out.push(mapped.market);
-      }
-      return out;
-    });
-    return boosted.filter((market) => {
+  const defaultLimit = 220;
+  const limit = resolveBoostLimit(boostLimit, defaultLimit);
+  const fullKey = `kalshi-feed:${exploreFeed}`;
+  const mapRows = (rows) => {
+    /** @type {Array<Record<string, unknown>>} */
+    const out = [];
+    const seen = new Set();
+    for (const row of rows || []) {
+      const mapped = fromKalshiFeatured(row, observedTs);
+      if (!mapped?.market) continue;
+      if (seen.has(mapped.market.id)) continue;
+      seen.add(mapped.market.id);
+      out.push(mapped.market);
+    }
+    return out;
+  };
+  const take = (markets) =>
+    markets.filter((market) => {
       if (existingIds.has(market.id)) return false;
       existingIds.add(market.id);
       return true;
     });
+  try {
+    const fromFull = sliceCachedBoost(fullKey, limit);
+    if (fromFull) return take(fromFull);
+
+    // Mid progressive tiers: never block on the full ~80-series pull.
+    // Paint poly (+ any Kalshi partials) now; background fill warms the full cache.
+    if (limit < defaultLimit) {
+      const partialRows = await fetchKalshiLiveTradableMarkets({ limit, wait: false });
+      void fetchKalshiLiveTradableMarkets({ limit: defaultLimit, wait: true })
+        .then((fullRows) => {
+          const mapped = mapRows(fullRows);
+          if (mapped.length) {
+            boostMemo.set(fullKey, { at: Date.now(), markets: mapped, inflight: null });
+          }
+        })
+        .catch(() => {});
+      return take(mapRows(partialRows));
+    }
+
+    const boosted = await cachedBoost(fullKey, async () => {
+      const rows = await fetchKalshiLiveTradableMarkets({ limit, wait: true });
+      return mapRows(rows);
+    });
+    return take(boosted);
   } catch {
     return [];
   }
@@ -575,6 +691,8 @@ function feedRow(bundle, market) {
     signalSummary: signal?.summary || null,
     signalKind: signal?.kind || null,
     href: warRoomHref({ desk: marketDesk(market) === "global" ? "all" : marketDesk(market), market: market.id }),
+    // Point for nav pick → globe focus when the market isn't already in `features`.
+    geometry: market.geometry?.type === "Point" ? market.geometry : null,
   };
 }
 
@@ -690,6 +808,7 @@ export async function getWarRoomPreview(opts = {}) {
  *   cursor?: string;
  *   forceFixture?: boolean;
  *   shell?: boolean; // Skip Gamma boosts — fast paint from cached desk bundle.
+ *   boostLimit?: number; // Progressive tier — cap venue boosts before the full desk.
  * }} [opts]
  */
 export async function getWarRoomSnapshot(opts = {}) {
@@ -701,21 +820,22 @@ export async function getWarRoomSnapshot(opts = {}) {
   const marketId = String(opts.market || "").trim();
   const existingIds = new Set(bundle.markets.map((market) => market.id));
   const shell = Boolean(opts.shell);
+  const boostLimit = shell ? undefined : opts.boostLimit;
 
   // Shell skips the Gamma / Kalshi tradable round-trips so the client can paint from the
-  // cached desk immediately, then replace with the boosted snapshot.
+  // cached desk immediately, then replace with progressive / full boosted snapshots.
   const [polyFeedBoosted, kalshiFeedBoosted] =
     !shell && exploreFeed
       ? await Promise.all([
-          exploreFeedPolymarketBoost(exploreFeed, bundle.asOf, existingIds),
-          exploreFeedKalshiBoost(exploreFeed, bundle.asOf, existingIds),
+          exploreFeedPolymarketBoost(exploreFeed, bundle.asOf, existingIds, boostLimit),
+          exploreFeedKalshiBoost(exploreFeed, bundle.asOf, existingIds, boostLimit),
         ])
       : [[], []];
   const feedBoosted = [...polyFeedBoosted, ...kalshiFeedBoosted];
   const [categoryPolyBoosted, categoryKalshiBoosted] = !shell && category
     ? await Promise.all([
-        categoryPolymarketBoost(category, bundle.asOf, existingIds),
-        categoryKalshiBoost(category, bundle.asOf, existingIds),
+        categoryPolymarketBoost(category, bundle.asOf, existingIds, boostLimit),
+        categoryKalshiBoost(category, bundle.asOf, existingIds, boostLimit),
       ])
     : [[], []];
   const categoryBoosted = [...categoryPolyBoosted, ...categoryKalshiBoosted];
@@ -760,13 +880,13 @@ export async function getWarRoomSnapshot(opts = {}) {
   const ranked = rankMarketsForDesk(filtered, cap, exploreFeed);
   const marketById = new Map(pool.map((market) => [market.id, market]));
   const filteredIds = new Set(ranked.map((market) => market.id));
-  const features = ranked.map(featureFromMarket).filter(Boolean).slice(0, cap);
+  let features = ranked.map(featureFromMarket).filter(Boolean).slice(0, cap);
   // Full map index (globe can show more points than the right-rail list).
-  const mapMarkets = ranked.slice(0, cap).map((market) => feedRow(bundle, market));
+  let mapMarkets = ranked.slice(0, cap).map((market) => feedRow(bundle, market));
   // Rail: keep volume order, but for dual-venue tradable reserve slots so a
   // Kalshi-only filter still has a real list (not ~3 survivors of mixed top-48).
   const feedRanked = rankMarketsForDesk(filtered, FEED_ROW_CAP, exploreFeed);
-  const feed = feedRanked.slice(0, FEED_ROW_CAP).map((market) => feedRow(bundle, market));
+  let feed = feedRanked.slice(0, FEED_ROW_CAP).map((market) => feedRow(bundle, market));
   const activity = activityRows(bundle).filter((row) => {
     if (category) return activityMatchesCategory(row, category, marketById);
     // All tradable: keep the full activity stream.
@@ -796,7 +916,7 @@ export async function getWarRoomSnapshot(opts = {}) {
         marker: "news",
       },
     }));
-  const selected = marketId
+  let selected = marketId
     ? ranked.find((m) => m.id === marketId) ||
       pool.find(
         (m) =>
@@ -805,6 +925,51 @@ export async function getWarRoomSnapshot(opts = {}) {
           (!category || matchesCategory(m, category)),
       )
     : null;
+
+  // Nav / deep-link picks often aren't in the tradable top-N. Look the contract up
+  // and inject it so the client can pin, zoom, and open detail immediately.
+  if (marketId && !selected) {
+    const parsed = parseWarRoomMarketId(marketId);
+    let found = findKnownMarket(marketId, bundle) || null;
+    if (!found && parsed && !shell) {
+      found = await lookupVenueMarket(parsed);
+    }
+    if (found) {
+      rememberMarkets([found]);
+      selected = found;
+      marketById.set(found.id, found);
+      const row = feedRow(bundle, found);
+      let feat = featureFromMarket(found);
+      // Nav picks must always land a map pin — synthesize geometry if lookup had none.
+      if (!feat && found.id) {
+        const fallback = found.geometry?.type === "Point"
+          ? found.geometry
+          : { type: "Point", coordinates: [-77.0365, 38.8977] };
+        feat = {
+          type: "Feature",
+          id: found.id,
+          geometry: fallback,
+          properties: {
+            id: found.id,
+            title: found.title || found.id,
+            venue: found.venue || "",
+            price: found.quote?.price ?? null,
+          },
+        };
+        if (!found.geometry) found.geometry = fallback;
+      }
+      if (feat && !features.some((f) => String(f?.properties?.id || f?.id) === found.id)) {
+        features = [feat, ...features].slice(0, cap + 1);
+      }
+      if (!mapMarkets.some((m) => m.id === found.id)) {
+        mapMarkets = [row, ...mapMarkets];
+      }
+      if (!feed.some((m) => m.id === found.id)) {
+        feed = [row, ...feed].slice(0, FEED_ROW_CAP + 1);
+      }
+    }
+  }
+
   const selectedValid = selected ? selected : marketId ? null : ranked[0] || null;
   const invalidMarket = Boolean(marketId && parseWarRoomMarketId(marketId) && !selectedValid);
   const missingMarket = Boolean(marketId && !parseWarRoomMarketId(marketId));
@@ -840,7 +1005,7 @@ export async function getWarRoomSnapshot(opts = {}) {
         ? "invalid_market"
         : null,
     globalCount: pool.filter((m) => marketDesk(m) === "global").length,
-    status: filtered.length ? (bundle.stale ? "stale" : "ok") : "empty",
+    status: filtered.length || selectedValid ? (bundle.stale ? "stale" : "ok") : "empty",
   };
 }
 

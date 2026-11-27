@@ -11,6 +11,7 @@ import { parseWarRoomMarketId } from "@/lib/warRoom/ids";
 
 import { formatCents } from "./format";
 import type { MarketRow } from "./MarketsPane";
+import { useWarRoomTheme } from "./useWarRoomTheme";
 
 type LivePoint = { time: number; value: number };
 
@@ -150,10 +151,17 @@ export function WarRoomRelatedMarketsChart({
   markets: MarketRow[];
   className?: string;
 }) {
+  const { dark, chartTheme } = useWarRoomTheme();
   const [series, setSeries] = useState<SeriesRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [windowSecs, setWindowSecs] = useState(DEFAULT_WINDOW_SECS);
   const [fullscreen, setFullscreen] = useState(false);
+  const chartSurface = dark
+    ? "border-white/10 bg-black/40"
+    : "border-border/70 bg-white";
+  const iconBtn = dark
+    ? "border-white/10 bg-black/40 text-slate-300 hover:bg-black/70 hover:text-white"
+    : "border-border/70 bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground";
 
   const chartable = useMemo(() => {
     return markets
@@ -248,7 +256,12 @@ export function WarRoomRelatedMarketsChart({
 
   if (!chartable.length) {
     return (
-      <p className="rounded-md border border-dashed border-white/10 px-2 py-2 text-[11px] text-slate-500">
+      <p
+        className={cn(
+          "rounded-md border border-dashed px-2 py-2 text-[11px]",
+          dark ? "border-white/10 text-slate-500" : "border-border/70 text-muted-foreground",
+        )}
+      >
         Related market prices will show here once contracts are linked.
       </p>
     );
@@ -265,8 +278,8 @@ export function WarRoomRelatedMarketsChart({
         color: row.color,
         label: row.label,
       }))}
-      theme="dark"
-      color={primary?.color || "#60a5fa"}
+      theme={chartTheme}
+      color={primary?.color || (dark ? "#60a5fa" : "#2563eb")}
       momentum
       showValue
       valueMomentumColor
@@ -288,15 +301,24 @@ export function WarRoomRelatedMarketsChart({
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <p
+          className={cn(
+            "text-[9px] font-semibold uppercase tracking-[0.14em]",
+            dark ? "text-slate-500" : "text-muted-foreground",
+          )}
+        >
           Related prices
         </p>
         <div className="flex items-center gap-2">
-          {loading ? <span className="text-[10px] text-slate-500">Loading…</span> : null}
+          {loading ? (
+            <span className={cn("text-[10px]", dark ? "text-slate-500" : "text-muted-foreground")}>
+              Loading…
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={() => setFullscreen(true)}
-            className="inline-flex size-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-slate-300 hover:bg-black/70 hover:text-white"
+            className={cn("inline-flex size-7 items-center justify-center rounded-md border", iconBtn)}
             aria-label="Open related chart fullscreen"
             title="Fullscreen"
           >
@@ -304,37 +326,81 @@ export function WarRoomRelatedMarketsChart({
           </button>
         </div>
       </div>
-      <div className="relative h-[11.5rem] overflow-hidden rounded-md border border-white/10 bg-black/40">
+      <div className={cn("relative h-[11.5rem] overflow-hidden rounded-md border", chartSurface)}>
         {chartBody}
       </div>
       {series.length ? (
         <ul className="flex flex-wrap gap-x-3 gap-y-1">
           {series.map((row) => (
-            <li key={row.id} className="flex min-w-0 items-center gap-1.5 text-[10px] text-slate-400">
+            <li
+              key={row.id}
+              className={cn(
+                "flex min-w-0 items-center gap-1.5 text-[10px]",
+                dark ? "text-slate-400" : "text-muted-foreground",
+              )}
+            >
               <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
               <span className="truncate">{row.label}</span>
-              <span className="shrink-0 font-mono tabular-nums text-slate-200">{formatCents(row.value)}</span>
+              <span
+                className={cn(
+                  "shrink-0 font-mono tabular-nums",
+                  dark ? "text-slate-200" : "text-foreground",
+                )}
+              >
+                {formatCents(row.value)}
+              </span>
             </li>
           ))}
         </ul>
       ) : null}
 
       <Dialog open={fullscreen} onOpenChange={setFullscreen}>
-        <DialogContent className="flex h-[min(92svh,52rem)] w-[min(96vw,72rem)] max-w-none flex-col gap-3 overflow-hidden border-white/10 bg-[#07090f] p-3 pt-10 text-slate-100 sm:rounded-xl">
+        <DialogContent
+          className={cn(
+            "flex h-[min(92svh,52rem)] w-[min(96vw,72rem)] max-w-none flex-col gap-3 overflow-hidden p-3 pt-10 sm:rounded-xl",
+            dark
+              ? "border-white/10 bg-[#07090f] text-slate-100"
+              : "border-border bg-background text-foreground",
+          )}
+        >
           <div className="min-w-0 pr-8">
-            <DialogTitle className="text-[14px] font-medium text-slate-50">Related prices</DialogTitle>
-            <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-slate-500">Focus mode</p>
+            <DialogTitle
+              className={cn("text-[14px] font-medium", dark ? "text-slate-50" : "text-foreground")}
+            >
+              Related prices
+            </DialogTitle>
+            <p
+              className={cn(
+                "mt-0.5 text-[10px] uppercase tracking-[0.12em]",
+                dark ? "text-slate-500" : "text-muted-foreground",
+              )}
+            >
+              Focus mode
+            </p>
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/40">
+          <div className={cn("min-h-0 flex-1 overflow-hidden rounded-md border", chartSurface)}>
             {chartBody}
           </div>
           {series.length ? (
             <ul className="flex flex-wrap gap-x-3 gap-y-1">
               {series.map((row) => (
-                <li key={row.id} className="flex min-w-0 items-center gap-1.5 text-[10px] text-slate-400">
+                <li
+                  key={row.id}
+                  className={cn(
+                    "flex min-w-0 items-center gap-1.5 text-[10px]",
+                    dark ? "text-slate-400" : "text-muted-foreground",
+                  )}
+                >
                   <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
                   <span className="truncate">{row.label}</span>
-                  <span className="shrink-0 font-mono tabular-nums text-slate-200">{formatCents(row.value)}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 font-mono tabular-nums",
+                      dark ? "text-slate-200" : "text-foreground",
+                    )}
+                  >
+                    {formatCents(row.value)}
+                  </span>
                 </li>
               ))}
             </ul>

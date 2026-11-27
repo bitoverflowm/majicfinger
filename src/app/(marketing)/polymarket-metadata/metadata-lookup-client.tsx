@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { nodeContains } from "@/lib/domNode";
 import { kalshiVsPolymarketCompareHref } from "@/lib/kalshiVsPolymarketLanding";
 import {
   buildMostNeededView,
@@ -403,7 +404,7 @@ export function MetadataLookupClient() {
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      if (rootRef.current && !nodeContains(rootRef.current, e.target)) {
         setSuggestOpen(false);
       }
     }

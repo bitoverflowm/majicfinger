@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { nodeContains } from "@/lib/domNode";
 
 function resolveAnalyzeScrollLockMin(scrollRoot) {
   if (!scrollRoot) return 0;
@@ -68,7 +69,7 @@ export function useConnectHomeAnalyzeScrollLock({ scrollRef, hubRef, enabled }) 
 
     const onWheel = (e) => {
       if (isBypassed()) return;
-      if (composeEl?.contains(e.target)) return;
+      if (nodeContains(composeEl, e.target)) return;
       const min = refreshMinScroll();
       if (root.scrollTop <= min + 2 && e.deltaY < 0) {
         e.preventDefault();
@@ -81,7 +82,7 @@ export function useConnectHomeAnalyzeScrollLock({ scrollRef, hubRef, enabled }) 
     };
     const onTouchMove = (e) => {
       if (isBypassed()) return;
-      if (composeEl?.contains(e.target)) return;
+      if (nodeContains(composeEl, e.target)) return;
       const min = refreshMinScroll();
       const y = e.touches?.[0]?.clientY ?? 0;
       if (root.scrollTop <= min + 2 && y > touchStartY + 4) {

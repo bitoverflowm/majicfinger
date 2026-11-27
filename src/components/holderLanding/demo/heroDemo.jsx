@@ -209,7 +209,7 @@ function tabLabel(view, pairs) {
 
 function TabBar({ tabs, active, pairs }) {
   return (
-    <div className="relative z-10 flex h-11 shrink-0 items-center gap-3 border-b border-border bg-muted px-3.5">
+    <div className="relative z-10 flex h-11 shrink-0 items-center gap-3 border-b border-border bg-muted px-3.5 dark:border-white/10 dark:bg-[#1c1d22]">
       <div className="flex gap-1.5" aria-hidden>
         <span className="size-2.5 rounded-full bg-[#ff5f57]" />
         <span className="size-2.5 rounded-full bg-[#febc2e]" />
@@ -430,7 +430,7 @@ export default function HeroDemo({ clock, paused, onPause, reduced, onReady }) {
   return (
     <div
       ref={frameRef}
-      className="relative w-full overflow-hidden rounded-2xl border border-black/10 bg-background shadow-[0_40px_100px_-30px_rgba(15,23,42,0.55)]"
+      className="relative w-full overflow-hidden rounded-2xl border border-black/10 bg-background shadow-[0_40px_100px_-30px_rgba(15,23,42,0.55)] dark:border-white/10 dark:shadow-[0_40px_100px_-30px_rgba(0,0,0,0.65)]"
       style={{ aspectRatio: `${DESIGN_W} / ${DESIGN_H}` }}
       onPointerEnter={() => onPause(true)}
       onPointerLeave={() => {
@@ -441,11 +441,18 @@ export default function HeroDemo({ clock, paused, onPause, reduced, onReady }) {
     >
       <style dangerouslySetInnerHTML={{ __html: DEMO_CSS }} />
       {zoom ? (
-        <div ref={stageRef} className="relative flex flex-col bg-[#eef1f5]" style={{ width: DESIGN_W, height: DESIGN_H, zoom }}>
+        <div
+          ref={stageRef}
+          className="relative flex flex-col bg-[#eef1f5] dark:bg-[#16171c]"
+          style={{ width: DESIGN_W, height: DESIGN_H, zoom }}
+        >
           <TabBar tabs={shown === "home" ? [...tabs, "home"] : tabs} active={shown} pairs={pairs} />
           <div
             ref={scrollerRef}
-            className={cn("hero-demo-canvas relative min-h-0 flex-1 bg-[#eef1f5] p-4 [scrollbar-width:none]", paused ? "overflow-y-auto overscroll-contain" : "overflow-hidden")}
+            className={cn(
+              "hero-demo-canvas relative min-h-0 flex-1 bg-[#eef1f5] p-4 [scrollbar-width:none] dark:bg-[#16171c]",
+              paused ? "overflow-y-auto overscroll-contain" : "overflow-hidden",
+            )}
           >
             <div ref={contentRef}>
               {!ready ? (

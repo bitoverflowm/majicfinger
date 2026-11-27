@@ -121,7 +121,7 @@ const TITLE_GEO = [
   { re: /\bhouston\b/i, point: SERIES_GEO.KXHIGHHOU },
   { re: /\bboston\b/i, point: SERIES_GEO.KXHIGHBOS },
   { re: /\bphiladelphia|philly\b/i, point: SERIES_GEO.KXHIGHPHL },
-  { re: /\bwashington|white house|capitol|congress|senate|fomc|\bfed\b/i, point: SERIES_GEO.KXFED },
+  { re: /\bwashington|white house|capitol|congress|senate|fomc|\bfed\b|trump|impeach|potus|president\b/i, point: SERIES_GEO.KXFED },
   { re: /\blas vegas\b/i, point: SERIES_GEO.KXHIGHLAS },
   { re: /\bminneapolis|twin cities\b/i, point: SERIES_GEO.KXHIGHMSP },
   { re: /\bdetroit\b/i, point: SERIES_GEO.KXHIGHDTW },

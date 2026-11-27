@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
 import { LandingDemoScrollManager } from "./landing-demo-scroll";
 import { DemoScrollLink } from "./demo-scroll-link";
 import { HomepageExploreTabs } from "./homepage-explore-tabs";
@@ -36,10 +37,17 @@ export function WarRoomHeroSection({ fixture = false }: { fixture?: boolean }) {
             See plans
             <span aria-hidden>→</span>
           </Link>
-          <p className="text-sm font-medium text-muted-foreground">10K+ users</p>
         </div>
       </div>
       <HomepageExploreTabs fixture={fixture} />
+      {/* Mobile-only: same newsletter form as the War Room interrupt, for dismissers. lg+ unchanged. */}
+      <div className="w-full lg:hidden">
+        <NewsletterInline
+          band
+          title="Stay in the Lychee loop."
+          description="Kalshi and Polymarket research, guides, and product updates — plus subscriber offers."
+        />
+      </div>
     </section>
   );
 }

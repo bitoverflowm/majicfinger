@@ -76,8 +76,12 @@ export const CHART_RENDER_ROW_CAP = 20000;
 /** AG Grid shows this many rows per page; full dataset stays in sheet state for charts and transforms. */
 export const SHEET_GRID_PAGE_SIZE = 100;
 
-/** Row cap for embedded demo (`body.demo` / `isDemo`) — Polymarket & Kalshi historical pulls only (landing + guided hubs). */
-export const ATHENA_DEMO_ROW_LIMIT = 10;
+/**
+ * Row budget for embedded demo (`body.demo` / `isDemo`) — Polymarket & Kalshi historical pulls
+ * (landing `#demo` + guided hubs). Same ceiling as paid subscriber pulls so trade-history
+ * charts are full; there is no teaser 10/100-row demo cap.
+ */
+export const ATHENA_DEMO_ROW_LIMIT = ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT;
 
 /**
  * @typedef {"polymarket" | "kalshi"} DataLakeDataset

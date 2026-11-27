@@ -3,3 +3,22 @@
 [data-war-room-globe] .maplibregl-ctrl-logo {
   display: none !important;
 }
+
+/*
+ * Light theme: soft Magic UI–like atmosphere vignette around the globe limb.
+ * pointer-events none so zoom/pan/pins stay fully interactive.
+ */
+[data-war-room-globe-theme="light"]::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(
+      ellipse 72% 68% at 50% 48%,
+      rgba(255, 255, 255, 0) 42%,
+      rgba(255, 255, 255, 0.28) 68%,
+      rgba(244, 245, 247, 0.72) 100%
+    );
+}

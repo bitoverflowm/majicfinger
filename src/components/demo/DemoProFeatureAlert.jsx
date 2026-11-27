@@ -1,46 +1,29 @@
 "use client";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { scrollToPricingSection } from "@/lib/scrollToPricing";
+import { MembersOnlyUpgradeDialog } from "@/components/dashboardComposer/landingDemoMembersOnly";
 
 /**
- * Demo / free-tier gate — copy aligned with dashboard Pro gating.
+ * Demo / free-tier Pro gate — same Members only dialog as homepage `#demo` Export / locked integrations.
  */
 export function DemoProFeatureAlert({
   open,
   onOpenChange,
   featureLabel = "this feature",
-  title,
-  description,
+  // Kept for call-site compat; shared dialog uses the feature list instead of custom short copy.
+  title: _title,
+  description: _description,
 }) {
-  const dialogTitle = title ?? `${featureLabel} is a Pro feature`;
-  const dialogDescription =
-    description ??
-    `Only Pro users have access to ${featureLabel}. Would you like to view pricing?`;
+  if (!open) return null;
+
+  const close = () => onOpenChange?.(false);
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{dialogTitle}</AlertDialogTitle>
-          <AlertDialogDescription>{dialogDescription}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Not now</AlertDialogCancel>
-          <AlertDialogAction onClick={() => scrollToPricingSection()}>
-            View pricing
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <MembersOnlyUpgradeDialog
+      feature={featureLabel}
+      onBack={close}
+      onUpgrade={close}
+      className="z-[560]"
+      exitDemo={false}
+    />
   );
 }

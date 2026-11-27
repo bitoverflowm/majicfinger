@@ -98,6 +98,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MetaAddOperationDialog } from "./MetaAddOperationDialog";
+import { MembersOnlyUpgradePortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   applyConnectHomeSheetNameToActiveSheet,
@@ -593,8 +594,8 @@ export default function DataLakeParquetPanel({
   const setGuidedWorkflowPullRequested = ctx?.setGuidedWorkflowPullRequested;
   /**
    * All demo embeds (landing dashboard + Polymarket/Kalshi Historical guided hubs)
-   * must pass `demo: true` so Athena caps at ATHENA_DEMO_ROW_LIMIT (10).
-   * Do not gate this on guidedWorkflowPull — that was letting guided demos pull 100 rows.
+   * must pass `demo: true` so Athena uses the demo row budget (subscriber ceiling, no teaser cap).
+   * Do not gate this on guidedWorkflowPull — guided demos share the same demo budget.
    */
   const demoPullMode = isDemo;
   /** Free-play demo only: clear WHERE so visitors aren't stuck on empty filters. Guided demos keep draft WHERE. */
@@ -3508,7 +3509,7 @@ export default function DataLakeParquetPanel({
         if (composeAthenaRowLimit != null) {
           composeAthenaRowLimit = Math.min(composeAthenaRowLimit, ATHENA_DEMO_ROW_LIMIT);
         } else if (!randomSampleEnabled) {
-          // Always send the demo cap so guided Historical hubs cannot fall through to the 100-row sample default.
+          // Demo budget matches subscriber ceiling (no teaser sample default).
           composeAthenaRowLimit = ATHENA_DEMO_ROW_LIMIT;
         }
       }
@@ -5972,26 +5973,11 @@ export default function DataLakeParquetPanel({
         onComplete={handleMetaAddOperationComplete}
       />
 
-      <Dialog open={demoUpgradeDialogOpen} onOpenChange={setDemoUpgradeDialogOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Upgrade required</DialogTitle>
-            <DialogDescription>
-              Upgrade to use {demoUpgradeFeature}.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <DialogClose asChild>
-              <Button variant="ghost">Cancel</Button>
-            </DialogClose>
-            <DialogClose asChild>
-              <Button asChild>
-                <a href="/#pricing">See options</a>
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MembersOnlyUpgradePortal
+        open={demoUpgradeDialogOpen}
+        feature={demoUpgradeFeature}
+        onClose={() => setDemoUpgradeDialogOpen(false)}
+      />
 
       <AlertDialog open={newRequestDialogOpen} onOpenChange={setNewRequestDialogOpen}>
         <AlertDialogContent>

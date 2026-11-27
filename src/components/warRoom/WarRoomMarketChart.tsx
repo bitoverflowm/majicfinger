@@ -10,15 +10,18 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 import { formatAge, formatCents } from "./format";
+import {
+  annotateTradeIntents,
+  intentLabel,
+  mapKalshiTradeRow,
+  mapLivePolymarketTrade,
+  mapPolymarketTradeRow,
+  unwrapPolymarketTradeRows,
+  type TradeRow,
+} from "./tradesFeedModel";
+import { useWarRoomTheme } from "./useWarRoomTheme";
 
 type LivePoint = { time: number; value: number };
-type TradeRow = {
-  id: string;
-  price: number;
-  size?: number | null;
-  side?: string | null;
-  at: number;
-};
 
 /** Seed enough history that “All” can show the full line we fetched. */
 const FULL_HISTORY_SECS = 90 * 24 * 3600;
@@ -42,6 +45,46 @@ const LIVELINE_WINDOWS = [
   { label: "7d", secs: 7 * 24 * 3600 },
   { label: "All", secs: ALL_WINDOW_SECS },
 ];
+
+/**
+ * Liveline always anchors the right edge to wall-clock now. A fixed 90d “All” window
+ * leaves short-lived markets as a stub on the right while hover still reads older prints.
+ * Size All to the span of available points (same idea as hub full-history Liveline windows).
+ */
+function windowForData(requestedSecs: number, data: readonly LivePoint[]): number {
+  if (requestedSecs !== ALL_WINDOW_SECS || data.length < 2) return requestedSecs;
+  let oldest = Number.POSITIVE_INFINITY;
+  let newest = Number.NEGATIVE_INFINITY;
+  for (const point of data) {
+    if (!Number.isFinite(point.time)) continue;
+    if (point.time < oldest) oldest = point.time;
+    if (point.time > newest) newest = point.time;
+  }
+  if (!Number.isFinite(oldest) || !Number.isFinite(newest)) return requestedSecs;
+  const now = Date.now() / 1000;
+  // Cover from first print through now; pad for Liveline’s ~5% right buffer so the
+  // oldest point lands near the left edge instead of floating mid-canvas.
+  const coverOldest = Math.max(60, now - oldest);
+  const spanSecs = Math.max(60, newest - oldest);
+  const padded = Math.ceil(Math.max(spanSecs, coverOldest) * 1.08) + 12;
+  return Math.min(ALL_WINDOW_SECS, Math.max(MOVE_WINDOW_SECS, padded));
+}
+
+/** Default Liveline time format is always HH:MM:SS — day ticks become “00:00:00”. */
+function formatAxisTime(t: number, windowSecs: number) {
+  const d = new Date(t * 1000);
+  if (!Number.isFinite(d.getTime())) return "—";
+  if (windowSecs >= 7 * 24 * 3600) {
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  if (windowSecs >= 24 * 3600) {
+    return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+  const h = d.getHours().toString().padStart(2, "0");
+  const m = d.getMinutes().toString().padStart(2, "0");
+  const s = d.getSeconds().toString().padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
 
 /** Polymarket/Kalshi prices as 0–1. Rejects garbage that would read as 800¢. */
 function asProb(raw: unknown): number | null {
@@ -71,7 +114,8 @@ async function seedPolymarketHistory(tokenId: string, signal: AbortSignal): Prom
         value,
       };
     })
-    .filter(Boolean) as LivePoint[];
+    .filter(Boolean)
+    .sort((a: LivePoint, b: LivePoint) => a.time - b.time) as LivePoint[];
 }
 
 /** Hourly candles across the full seed window (same stitch as Connect trade history). */
@@ -122,22 +166,10 @@ async function fetchKalshiRecentTrades(ticker: string, signal: AbortSignal): Pro
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return [];
   const rows = Array.isArray(body?.trades) ? body.trades : [];
-  return rows
-    .map((row: Record<string, unknown>, index: number) => {
-      const price = asProb(row.yes_price_dollars ?? row.yes_price);
-      const at = Date.parse(String(row.created_time || "")) || Date.now() - index * 1000;
-      const id = String(row.trade_id || row.id || `${ticker}-${at}`);
-      if (price == null) return null;
-      return {
-        id,
-        price,
-        size: Number(row.count ?? row.count_fp) || null,
-        side: String(row.taker_side || "") || null,
-        at,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.at - a.at) as TradeRow[];
+  const mapped = rows
+    .map((row: Record<string, unknown>, index: number) => mapKalshiTradeRow(row, index, ticker))
+    .filter(Boolean) as TradeRow[];
+  return annotateTradeIntents(mapped.sort((a, b) => b.at - a.at));
 }
 
 async function fetchPolymarketRecentTrades(
@@ -159,35 +191,11 @@ async function fetchPolymarketRecentTrades(
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) return [];
-  const rows = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.trades)
-      ? payload.trades
-      : [];
-  return rows
-    .map((row: Record<string, unknown>, index: number) => {
-      if (!row || typeof row !== "object") return null;
-      const asset = String(row.asset || row.asset_id || "").trim();
-      if (asset && tokenId && asset !== tokenId) return null;
-      const price = asProb(row.price);
-      if (price == null) return null;
-      const rawTs = Number(row.timestamp ?? row.createdAt ?? row.match_time);
-      const at = Number.isFinite(rawTs)
-        ? rawTs < 1e12
-          ? rawTs * 1000
-          : rawTs
-        : Date.now() - index * 1000;
-      const id = String(row.transactionHash || row.id || `${conditionId}-${at}-${price}`);
-      return {
-        id,
-        price,
-        size: Number(row.size) || null,
-        side: String(row.side || row.type || "") || null,
-        at,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.at - a.at) as TradeRow[];
+  const rows = unwrapPolymarketTradeRows(payload);
+  const mapped = rows
+    .map((row, index) => mapPolymarketTradeRow(row, index, conditionId, tokenId))
+    .filter(Boolean) as TradeRow[];
+  return annotateTradeIntents(mapped.sort((a, b) => b.at - a.at));
 }
 
 function mergeSeedWithTrades(seed: LivePoint[], trades: TradeRow[]): LivePoint[] {
@@ -204,7 +212,7 @@ function mergeSeedWithTrades(seed: LivePoint[], trades: TradeRow[]): LivePoint[]
 
 function prependLiveTrade(prev: TradeRow[], next: TradeRow): TradeRow[] {
   if (prev.some((row) => row.id === next.id)) return prev;
-  return [next, ...prev].slice(0, 80);
+  return annotateTradeIntents([next, ...prev].slice(0, 80));
 }
 
 function TradesFeed({
@@ -216,40 +224,116 @@ function TradesFeed({
   tall?: boolean;
   loading?: boolean;
 }) {
+  const { dark } = useWarRoomTheme();
   if (!trades.length) {
     return (
-      <p className="py-2 text-[11px] text-slate-500">
-        {loading ? "Loading trade history…" : "No trades yet — waiting for the next print…"}
+      <p className={cn("py-2 text-[11px]", dark ? "text-slate-500" : "text-muted-foreground")}>
+        {loading ? "Loading trade history…" : "No trades yet — waiting for the next fill…"}
       </p>
     );
   }
   return (
     <ul className={cn("overflow-y-auto", tall ? "max-h-[14rem]" : "max-h-[7rem]")}>
       {trades.slice(0, 40).map((trade) => {
-        const side = String(trade.side || "").toUpperCase();
-        const buy = side.includes("BUY");
-        const sell = side.includes("SELL");
+        const buy = trade.action === "buy";
+        const sell = trade.action === "sell";
+        const outcome =
+          trade.outcome === "yes" ? "YES" : trade.outcome === "no" ? "NO" : null;
+        const intent = intentLabel(trade.intent);
+        const who = trade.traderLabel || null;
         return (
           <li
             key={trade.id}
-            className="flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11px] last:border-b-0"
+            className={cn(
+              "border-b py-1.5 text-[11px] last:border-b-0",
+              dark ? "border-white/[0.04]" : "border-border/60",
+            )}
           >
-            <span
-              className={cn(
-                "w-9 shrink-0 font-semibold uppercase",
-                buy && "text-emerald-300",
-                sell && "text-rose-300",
-                !buy && !sell && "text-slate-500",
-              )}
-            >
-              {buy ? "Buy" : sell ? "Sell" : "Print"}
-            </span>
-            <span className="font-mono tabular-nums text-slate-100">{formatCents(trade.price)}</span>
-            <span className="ml-auto text-slate-500">
-              {trade.size != null ? Math.round(trade.size) : "—"}
-              <span className="mx-1 text-slate-600">·</span>
-              {formatAge(new Date(trade.at).toISOString())}
-            </span>
+            <div className="flex min-w-0 items-center gap-1.5">
+              {buy || sell ? (
+                <span
+                  className={cn(
+                    "w-8 shrink-0 font-semibold",
+                    buy && (dark ? "text-emerald-300" : "text-emerald-600"),
+                    sell && (dark ? "text-rose-300" : "text-rose-600"),
+                  )}
+                >
+                  {buy ? "Buy" : "Sell"}
+                </span>
+              ) : null}
+              {outcome ? (
+                <span
+                  className={cn(
+                    "shrink-0 font-semibold tracking-wide",
+                    trade.outcome === "yes"
+                      ? dark
+                        ? "text-sky-300"
+                        : "text-sky-700"
+                      : dark
+                        ? "text-amber-300"
+                        : "text-amber-700",
+                  )}
+                >
+                  {outcome}
+                </span>
+              ) : null}
+              <span
+                className={cn(
+                  "font-mono tabular-nums",
+                  dark ? "text-slate-100" : "text-foreground",
+                )}
+              >
+                {formatCents(trade.fillPrice ?? trade.price)}
+              </span>
+              {trade.big ? (
+                <span
+                  className={cn(
+                    "shrink-0 rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide",
+                    dark
+                      ? "bg-amber-400/15 text-amber-200"
+                      : "bg-amber-100 text-amber-800",
+                  )}
+                  title={
+                    trade.blockTrade
+                      ? "Kalshi block trade"
+                      : "Notional ≥ $2,500"
+                  }
+                >
+                  {trade.blockTrade ? "Block" : "BIG"}
+                </span>
+              ) : null}
+              <span
+                className={cn(
+                  "ml-auto shrink-0 tabular-nums",
+                  dark ? "text-slate-500" : "text-muted-foreground",
+                )}
+              >
+                {trade.size != null ? Math.round(trade.size) : "—"}
+                <span className={cn("mx-1", dark ? "text-slate-600" : "text-muted-foreground/70")}>
+                  ·
+                </span>
+                {formatAge(new Date(trade.at).toISOString())}
+              </span>
+            </div>
+            {who || intent ? (
+              <div
+                className={cn(
+                  "mt-0.5 flex min-w-0 items-center gap-1.5 truncate pl-0 text-[10px]",
+                  buy || sell ? "pl-8" : "",
+                  dark ? "text-slate-500" : "text-muted-foreground",
+                )}
+              >
+                {who ? (
+                  <span className="truncate font-medium" title={trade.traderId || who}>
+                    {who}
+                  </span>
+                ) : null}
+                {who && intent ? (
+                  <span className={dark ? "text-slate-600" : "text-muted-foreground/70"}>·</span>
+                ) : null}
+                {intent ? <span className="shrink-0 italic">{intent}</span> : null}
+              </div>
+            ) : null}
           </li>
         );
       })}
@@ -266,12 +350,14 @@ function WindowPills({
   onChange: (secs: number) => void;
   className?: string;
 }) {
+  const { dark } = useWarRoomTheme();
   return (
     <div
       role="tablist"
       aria-label="Chart range"
       className={cn(
-        "inline-flex rounded-full bg-white/[0.03] p-0.5 text-[11px]",
+        "inline-flex rounded-full p-0.5 text-[11px]",
+        dark ? "bg-white/[0.03]" : "bg-muted",
         className,
       )}
     >
@@ -286,7 +372,13 @@ function WindowPills({
             onClick={() => onChange(option.secs)}
             className={cn(
               "rounded-full px-2.5 py-1 font-medium transition-colors",
-              active ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300",
+              active
+                ? dark
+                  ? "bg-white/[0.08] text-white"
+                  : "bg-background text-foreground shadow-sm"
+                : dark
+                  ? "text-slate-500 hover:text-slate-300"
+                  : "text-muted-foreground hover:text-foreground",
             )}
           >
             {option.label}
@@ -310,21 +402,29 @@ function ChartCanvas({
   loading?: boolean;
   className?: string;
 }) {
+  const { dark, chartTheme } = useWarRoomTheme();
+  const viewWindow = windowForData(windowSecs, data);
+  const chartData = useMemo(() => {
+    if (data.length < 2) return data;
+    return [...data].sort((a, b) => a.time - b.time);
+  }, [data]);
   return (
     <Liveline
-      data={data}
+      data={chartData}
       value={value}
-      theme="dark"
-      color="#60a5fa"
+      theme={chartTheme}
+      /* Stronger blue on light so the line reads on a pale canvas. */
+      color={dark ? "#60a5fa" : "#2563eb"}
       momentum
       /* Controlled window only — no `windows` / `showValue` (those sit above height:100% canvas and clip). */
-      window={windowSecs}
+      window={viewWindow}
       scrub
       badge
       badgeVariant="default"
       loading={loading}
       emptyText="Loading price history…"
       formatValue={formatProb}
+      formatTime={(t) => formatAxisTime(t, viewWindow)}
       /* No exaggerate — tight Y margin lets momentum overshoot the plot. */
       padding={{ top: 20, right: 48, bottom: 28, left: 10 }}
       className={cn("h-full min-h-0 w-full", className)}
@@ -461,13 +561,18 @@ export function WarRoomMarketChart({
               setPoints(capped);
               setLivePrice(price);
               setTrades((prev) =>
-                prependLiveTrade(prev, {
-                  id: `${trade.asset_id || tokenId}-${at}-${price}`,
-                  price,
-                  size: Number(trade.size) || null,
-                  side: trade.side || null,
-                  at: at > 1e12 ? at : at * 1000,
-                }),
+                prependLiveTrade(
+                  prev,
+                  mapLivePolymarketTrade({
+                    id: `${trade.asset_id || tokenId}-${at}-${price}`,
+                    price,
+                    size: Number(trade.size) || null,
+                    side: trade.side || null,
+                    at: at > 1e12 ? at : at * 1000,
+                    // Chart socket is subscribed to the YES token only.
+                    outcome: "yes",
+                  }),
+                ),
               );
             },
             onQuote: (quote: { mid?: number; price?: number }) => {
@@ -540,11 +645,18 @@ export function WarRoomMarketChart({
     return () => abort.abort();
   }, [venue, tokenId, ticker, conditionId, reportMove]);
 
+  const { dark } = useWarRoomTheme();
   const liveData = useMemo(() => points, [points]);
   const value = livePrice ?? liveData[liveData.length - 1]?.value ?? 0;
   const chartTitle = String(title || ticker || "Market").trim() || "Market";
   const chartBoxClass = tall ? CHART_H_TALL : CHART_H_COMPACT;
   const tradesBoxClass = tall ? TRADES_H_TALL : TRADES_H_COMPACT;
+  const chartSurface = dark
+    ? "border-white/10 bg-black/40"
+    : "border-border/70 bg-white";
+  const iconBtn = dark
+    ? "border-white/10 bg-black/40 text-slate-300 hover:bg-black/60 hover:text-white"
+    : "border-border/70 bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground";
 
   return (
     <div className={cn("flex min-h-0 flex-col gap-2", className)}>
@@ -553,7 +665,7 @@ export function WarRoomMarketChart({
         <button
           type="button"
           onClick={() => setFullscreen(true)}
-          className="ml-auto inline-flex size-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-slate-300 hover:bg-black/60 hover:text-white"
+          className={cn("ml-auto inline-flex size-7 items-center justify-center rounded-md border", iconBtn)}
           aria-label="Open chart fullscreen"
           title="Fullscreen"
         >
@@ -562,7 +674,8 @@ export function WarRoomMarketChart({
       </div>
       <div
         className={cn(
-          "relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40",
+          "relative shrink-0 overflow-hidden rounded-md border",
+          chartSurface,
           chartBoxClass,
           chartClassName,
         )}
@@ -575,29 +688,56 @@ export function WarRoomMarketChart({
         />
       </div>
       <div className={cn("min-h-0 min-w-0 flex-1 overflow-hidden", tradesBoxClass)}>
-        <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <p
+          className={cn(
+            "mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em]",
+            dark ? "text-slate-500" : "text-muted-foreground",
+          )}
+        >
           Trades
         </p>
         <TradesFeed trades={trades} tall={tall} loading={tradesLoading || historyLoading} />
       </div>
 
       <Dialog open={fullscreen} onOpenChange={setFullscreen}>
-        <DialogContent className="flex h-[min(92svh,52rem)] w-[min(96vw,72rem)] max-w-none flex-col gap-3 overflow-hidden border-white/10 bg-[#07090f] p-3 pt-10 text-slate-100 sm:rounded-xl">
+        <DialogContent
+          className={cn(
+            "flex h-[min(92svh,52rem)] w-[min(96vw,72rem)] max-w-none flex-col gap-3 overflow-hidden p-3 pt-10 sm:rounded-xl",
+            dark
+              ? "border-white/10 bg-[#07090f] text-slate-100"
+              : "border-border bg-background text-foreground",
+          )}
+        >
           <div className="flex min-w-0 items-start justify-between gap-3 pr-8">
             <div className="min-w-0">
-              <DialogTitle className="truncate text-[14px] font-medium text-slate-50">
+              <DialogTitle
+                className={cn(
+                  "truncate text-[14px] font-medium",
+                  dark ? "text-slate-50" : "text-foreground",
+                )}
+              >
                 {chartTitle}
               </DialogTitle>
-              <p className="mt-0.5 font-mono text-[12px] tabular-nums text-slate-400">
+              <p
+                className={cn(
+                  "mt-0.5 font-mono text-[12px] tabular-nums",
+                  dark ? "text-slate-400" : "text-muted-foreground",
+                )}
+              >
                 {formatProb(value)}
-                <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                <span
+                  className={cn(
+                    "ml-2 text-[10px] uppercase tracking-[0.12em]",
+                    dark ? "text-slate-500" : "text-muted-foreground",
+                  )}
+                >
                   Focus mode
                 </span>
               </p>
             </div>
             <WindowPills value={windowSecs} onChange={setWindowSecs} />
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/40">
+          <div className={cn("min-h-0 flex-1 overflow-hidden rounded-md border", chartSurface)}>
             <ChartCanvas
               data={liveData}
               value={value}
@@ -606,7 +746,12 @@ export function WarRoomMarketChart({
             />
           </div>
           <div className="max-h-[10rem] shrink-0 overflow-hidden">
-            <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <p
+              className={cn(
+                "mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em]",
+                dark ? "text-slate-500" : "text-muted-foreground",
+              )}
+            >
               Trades
             </p>
             <TradesFeed trades={trades} tall loading={tradesLoading || historyLoading} />

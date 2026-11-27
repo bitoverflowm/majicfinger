@@ -5,6 +5,7 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { X } from "lucide-react";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { isLandingExploreSurface } from "@/lib/landingDemoExplore";
 import { useUser } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
@@ -123,6 +124,23 @@ const dismissers = new Map();
 
 export function dismissFeatureTip(id) {
   dismissers.get(id)?.forEach((dismiss) => dismiss());
+}
+
+/**
+ * Clear a tip's dismissed state (session + storage) so it can show again.
+ * Used on `#demo` Historical / Present so each completed pull can re-run
+ * confetti → first-pull tip → export ⋮ tour (Kalshi and Polymarket).
+ */
+export function resetFeatureTip(id, userId) {
+  if (!id || typeof window === "undefined") return;
+  const key = storageKey(id, userId);
+  sessionDismissed.delete(key);
+  broadcastDismissed(key, false);
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Private mode — in-memory reset is enough for this page load.
+  }
 }
 
 /** Tips that are on screen, or about to be. Lets a tip wait for another (`after`) across components. */
@@ -296,8 +314,10 @@ export function FeatureTip({
 }) {
   const { dismissed, dismiss } = useFeatureTipDismissal(id, { persist });
   const demoCtx = useMyStateV2();
-  // An embedded demo holds its tips until the visitor opens it to the full viewport.
-  const demoIdle = !!demoCtx?.landingDemo && !demoCtx?.landingDemoActive;
+  // Framed homepage demo holds tips until the visitor opens it full-viewport. Explore
+  // surfaces (Historical / Present / …) stay inline and are already interactive, so tips show.
+  const exploreSurface = isLandingExploreSurface(demoCtx?.landingDemoSurface);
+  const demoIdle = !!demoCtx?.landingDemo && !demoCtx?.landingDemoActive && !exploreSurface;
   const pending = dismissed !== true;
   const waiting = useAnyTipPending(after);
   const shown = dismissed === false && (open ?? true) && !waiting && !demoIdle;
