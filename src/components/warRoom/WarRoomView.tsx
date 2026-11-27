@@ -12,6 +12,7 @@ import {
   exploreActivityLabel,
   exploreMarketsByVolumeLabel,
 } from "@/lib/markets/exploreCategories";
+import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
 
 import { ActivityPane, type ActivityRow } from "./ActivityPane";
@@ -128,17 +129,29 @@ function formatCount(n: number) {
   return String(Math.round(n));
 }
 
-type VenueFilter = "both" | "kalshi" | "polymarket";
+type VenueId = "kalshi" | "polymarket";
 
-const VENUE_FILTERS: Array<{ id: VenueFilter; label: string }> = [
-  { id: "both", label: "Both" },
+type VenueToggles = Record<VenueId, boolean>;
+
+const VENUE_OPTIONS: Array<{ id: VenueId; label: string }> = [
   { id: "kalshi", label: "Kalshi" },
   { id: "polymarket", label: "Polymarket" },
 ];
 
-function venueMatches(filter: VenueFilter, venue: string | null | undefined) {
-  if (filter === "both") return true;
-  return String(venue || "").toLowerCase() === filter;
+/**
+ * Empty selection (none on) matches prior BOTH — show every venue.
+ * Both on also shows every venue; a single on filters to that venue.
+ */
+function showsBothVenues(toggles: VenueToggles) {
+  return (!toggles.kalshi && !toggles.polymarket) || (toggles.kalshi && toggles.polymarket);
+}
+
+function venueMatches(toggles: VenueToggles, venue: string | null | undefined) {
+  if (showsBothVenues(toggles)) return true;
+  const v = String(venue || "").toLowerCase();
+  if (toggles.kalshi) return v === "kalshi";
+  if (toggles.polymarket) return v === "polymarket";
+  return true;
 }
 
 type FocusTarget = {
@@ -218,7 +231,10 @@ export function WarRoomView({
   const pendingNewsPickRef = useRef<{ query: string; title?: string } | null>(null);
   const [categoryId, setCategoryId] = useState("");
   const [exploreFeedId, setExploreFeedId] = useState("tradable");
-  const [venueFilter, setVenueFilter] = useState<VenueFilter>("both");
+  const [venueToggles, setVenueToggles] = useState<VenueToggles>({
+    kalshi: true,
+    polymarket: true,
+  });
   const [mapResetNonce, setMapResetNonce] = useState(0);
   const [sessionTrades, setSessionTrades] = useState(0);
   const [sessionTraders, setSessionTraders] = useState(0);
@@ -396,18 +412,17 @@ export function WarRoomView({
       };
     }
 
-    const base =
-      venueFilter === "both"
-        ? allFeatures
-        : {
-            type: "FeatureCollection" as const,
-            features: allFeatures.features.filter((f) =>
-              venueMatches(
-                venueFilter,
-                String((f as { properties?: { venue?: string } }).properties?.venue || ""),
-              ),
+    const base = showsBothVenues(venueToggles)
+      ? allFeatures
+      : {
+          type: "FeatureCollection" as const,
+          features: allFeatures.features.filter((f) =>
+            venueMatches(
+              venueToggles,
+              String((f as { properties?: { venue?: string } }).properties?.venue || ""),
             ),
-          };
+          ),
+        };
     if (!pickId || !pickCenter) return base;
     const already = base.features.some(
       (f) => String((f as { properties?: { id?: string } }).properties?.id) === pickId,
@@ -432,7 +447,7 @@ export function WarRoomView({
     };
   }, [
     allFeatures,
-    venueFilter,
+    venueToggles,
     market,
     focusTarget?.center,
     selectOnly,
@@ -446,36 +461,35 @@ export function WarRoomView({
       const hit = allMarkets.find((row) => row.id === id) || allMapMarkets.find((row) => row.id === id);
       return hit ? [hit] : [];
     }
-    if (venueFilter === "both") return allMarkets;
+    if (showsBothVenues(venueToggles)) return allMarkets;
     // Venue filter: prefer the denser map index so Kalshi/Poly-only isn't stuck
     // on whatever survived the mixed top-N rail slice.
     const source = allMapMarkets.length ? allMapMarkets : allMarkets;
-    return source.filter((row) => venueMatches(venueFilter, row.venue));
-  }, [allMarkets, allMapMarkets, venueFilter, selectOnly, pickRow, market]);
+    return source.filter((row) => venueMatches(venueToggles, row.venue));
+  }, [allMarkets, allMapMarkets, venueToggles, selectOnly, pickRow, market]);
   const mapMarkets = useMemo(() => {
     if (selectOnly) return markets;
-    return venueFilter === "both"
+    return showsBothVenues(venueToggles)
       ? allMapMarkets
-      : allMapMarkets.filter((row) => venueMatches(venueFilter, row.venue));
-  }, [allMapMarkets, venueFilter, selectOnly, markets]);
+      : allMapMarkets.filter((row) => venueMatches(venueToggles, row.venue));
+  }, [allMapMarkets, venueToggles, selectOnly, markets]);
   const activity = useMemo(() => {
     if (selectOnly) return [] as ActivityRow[];
-    const base =
-      venueFilter === "both"
-        ? allActivity
-        : allActivity.filter((row) => row.kind === "headline" || venueMatches(venueFilter, row.venue));
+    const base = showsBothVenues(venueToggles)
+      ? allActivity
+      : allActivity.filter((row) => row.kind === "headline" || venueMatches(venueToggles, row.venue));
     if (!newsPickRow) return base;
     if (base.some((row) => row.id === newsPickRow.id)) return base;
     return [newsPickRow, ...base];
-  }, [allActivity, venueFilter, selectOnly, newsPickRow]);
+  }, [allActivity, venueToggles, selectOnly, newsPickRow]);
 
   const selectedId = useMemo(() => {
     const id = market || snapshot?.selectedMarketId || null;
-    if (!id || venueFilter === "both") return id;
+    if (!id || showsBothVenues(venueToggles)) return id;
     const row = allMapMarkets.find((item) => item.id === id);
-    if (row && !venueMatches(venueFilter, row.venue)) return null;
+    if (row && !venueMatches(venueToggles, row.venue)) return null;
     return id;
-  }, [market, snapshot?.selectedMarketId, venueFilter, allMapMarkets]);
+  }, [market, snapshot?.selectedMarketId, venueToggles, allMapMarkets]);
 
   // Count fills (and unique traders) that arrive after the first snapshot while viewing.
   useEffect(() => {
@@ -540,10 +554,10 @@ export function WarRoomView({
 
   // Drop selection when it falls outside the active venue filter.
   useEffect(() => {
-    if (venueFilter === "both" || !selectedId) return;
+    if (showsBothVenues(venueToggles) || !selectedId) return;
     const row = marketById.get(selectedId);
-    if (row && !venueMatches(venueFilter, row.venue)) clearSelectionChrome();
-  }, [venueFilter, selectedId, marketById, clearSelectionChrome]);
+    if (row && !venueMatches(venueToggles, row.venue)) clearSelectionChrome();
+  }, [venueToggles, selectedId, marketById, clearSelectionChrome]);
 
   // Keep open market detail in sync with polled feed quotes.
   const liveDetail = useMemo(() => {
@@ -989,6 +1003,21 @@ export function WarRoomView({
           : "text-slate-600 hover:bg-black/[0.06] hover:text-slate-900",
     );
 
+  /** Compact strip Toggle — same density as the feed chips above. */
+  const stripToggleClass = (selected: boolean) =>
+    cn(
+      "h-auto min-h-0 shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium shadow-none ring-offset-0",
+      "hover:bg-transparent focus-visible:ring-1 focus-visible:ring-offset-0",
+      "data-[state=on]:bg-transparent",
+      selected
+        ? dark
+          ? "bg-white text-slate-950 hover:bg-white hover:text-slate-950 data-[state=on]:bg-white data-[state=on]:text-slate-950"
+          : "bg-slate-900 text-white hover:bg-slate-900 hover:text-white data-[state=on]:bg-slate-900 data-[state=on]:text-white"
+        : dark
+          ? "text-slate-300 hover:bg-white/10 hover:text-white"
+          : "text-slate-600 hover:bg-black/[0.06] hover:text-slate-900",
+    );
+
   const exploreFeedGroups = useMemo(() => {
     const groups: Array<{ label: string; feeds: typeof EXPLORE_FEEDS }> = [];
     for (const item of EXPLORE_FEEDS) {
@@ -1059,62 +1088,43 @@ export function WarRoomView({
       </div>
       <div
         className={cn(
-          "flex max-w-full items-center gap-2 overflow-x-auto border-t pt-1",
+          "flex max-w-full items-center gap-1 overflow-x-auto border-t pt-1",
           dark ? "border-white/10" : "border-black/10",
         )}
       >
-        <div
-          role="tablist"
-          aria-label="Categories"
-          className="flex min-w-0 flex-1 items-center gap-1"
-        >
-          {CATEGORIES.map((category) => (
-            <button
-              key={category.id}
-              type="button"
-              role="tab"
-              aria-selected={categoryId === category.id}
-              onClick={() => pickCategory(categoryId === category.id ? "" : category.id)}
-              className={chipClass(categoryId === category.id)}
-            >
-              {category.label}
-            </button>
-          ))}
-        </div>
-        <div
-          role="radiogroup"
-          aria-label="Venues"
-          className={cn(
-            "flex shrink-0 items-center rounded-full border p-0.5",
-            dark ? "border-white/10 bg-black/50" : "border-black/10 bg-white/70",
-          )}
-        >
-          {VENUE_FILTERS.map((option) => {
-            const selected = venueFilter === option.id;
+        <div aria-label="Venues" className="flex shrink-0 items-center gap-1">
+          {VENUE_OPTIONS.map((option) => {
+            const selected = venueToggles[option.id];
             return (
-              <button
+              <Toggle
                 key={option.id}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => setVenueFilter(option.id)}
-                className={cn(
-                  "rounded-full px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] transition-colors",
-                  selected
-                    ? option.id === "kalshi"
-                      ? "bg-[#28CC95] text-slate-950"
-                      : option.id === "polymarket"
-                        ? "bg-[#2E5CFF] text-white"
-                        : dark
-                          ? "bg-white text-slate-950"
-                          : "bg-slate-900 text-white"
-                    : dark
-                      ? "text-slate-400 hover:text-white"
-                      : "text-slate-500 hover:text-slate-900",
-                )}
+                size="sm"
+                pressed={selected}
+                aria-label={option.label}
+                onPressedChange={(next) =>
+                  setVenueToggles((prev) => ({ ...prev, [option.id]: next }))
+                }
+                className={stripToggleClass(selected)}
               >
                 {option.label}
-              </button>
+              </Toggle>
+            );
+          })}
+        </div>
+        <div aria-label="Categories" className="flex min-w-0 flex-1 items-center gap-1">
+          {CATEGORIES.map((category) => {
+            const selected = categoryId === category.id;
+            return (
+              <Toggle
+                key={category.id}
+                size="sm"
+                pressed={selected}
+                aria-label={category.label}
+                onPressedChange={(next) => pickCategory(next ? category.id : "")}
+                className={stripToggleClass(selected)}
+              >
+                {category.label}
+              </Toggle>
             );
           })}
         </div>
