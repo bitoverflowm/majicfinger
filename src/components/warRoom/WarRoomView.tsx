@@ -182,8 +182,16 @@ export function WarRoomView({
   className?: string;
 }) {
   const compactScreen = useCompactScreen();
+  /**
+   * Lock the first known compact value so hydration (`null` → bool) cannot flip
+   * `mobile` in useWarRoomData's filterKey and restart progressive load mid-stream.
+   */
+  const compactLockedRef = useRef<boolean | null>(null);
+  if (compactLockedRef.current == null && compactScreen != null) {
+    compactLockedRef.current = compactScreen;
+  }
   /** Until the breakpoint is known, treat as desktop so we don't thrash mobile snapshot fetches. */
-  const compact = compactScreen === true;
+  const compact = (compactLockedRef.current ?? false) === true;
   const { dark, loadTone } = useWarRoomTheme();
   const [localMarket, setLocalMarket] = useState("");
   const [mobileView, setMobileView] = useState<"globe" | "feed" | "detail">("globe");

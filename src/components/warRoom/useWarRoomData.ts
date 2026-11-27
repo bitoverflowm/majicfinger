@@ -148,25 +148,47 @@ export function useWarRoomData({
 
     (async () => {
       try {
-        if (hiddenRef.current) return;
-
         // Progressive paint: desk shell → mid boost tiers → full cap.
         // Each applySnapshot fills globe pins + markets/activity rails as soon as ready.
+        // Do not gate the whole load on document.hidden — homepage #demo still needs
+        // shell/mid-tiers while the stage scrolls into view.
         if (wantsBoost) {
-          try {
-            const shell = await fetchSnapshot({
-              desk,
-              market: marketRef.current,
-              category,
-              exploreFeed,
-              fixture,
-              mobile,
-              shell: true,
-            });
-            if (!cancelled) applySnapshot(shell, gen);
-          } catch {
-            /* mid/full tiers below still run */
-          }
+          // Never let a late/sparse shell clobber a denser mid-tier that already painted.
+          let bestCount = -1;
+          const paint = (body: Snapshot) => {
+            if (cancelled || filterGenRef.current !== gen || selectOnlyRef.current) return false;
+            const n =
+              (body.features?.features?.length ?? 0) ||
+              (body.mapMarkets?.length ?? 0) ||
+              (body.feed?.length ?? 0);
+            if (n < bestCount) return false;
+            bestCount = n;
+            applySnapshot(body, gen);
+            return true;
+          };
+
+          // Race shell against a short budget so a hung/cold shell cannot block mid-tiers.
+          const shellP = fetchSnapshot({
+            desk,
+            market: marketRef.current,
+            category,
+            exploreFeed,
+            fixture,
+            mobile,
+            shell: true,
+          })
+            .then((shell) => {
+              paint(shell);
+              return shell;
+            })
+            .catch(() => null);
+
+          await Promise.race([
+            shellP,
+            new Promise<null>((resolve) => {
+              window.setTimeout(() => resolve(null), 2_500);
+            }),
+          ]);
 
           for (const boostLimit of BOOST_STREAM_LIMITS) {
             if (cancelled || filterGenRef.current !== gen || selectOnlyRef.current) return;
@@ -180,14 +202,20 @@ export function useWarRoomData({
                 mobile,
                 boostLimit,
               });
-              if (!cancelled) applySnapshot(partial, gen);
+              paint(partial);
             } catch {
               /* keep densest snapshot so far; continue toward full */
             }
           }
+          // Allow a late shell to paint only if nothing denser landed.
+          await shellP;
         }
 
         if (cancelled || filterGenRef.current !== gen || selectOnlyRef.current) return;
+        if (hiddenRef.current) {
+          // Tab hidden after progressive paint — skip the expensive full hydrate for now.
+          return;
+        }
 
         const body = await fetchSnapshot({
           desk,

@@ -188,7 +188,33 @@ function normalizeBundle(raw, { fixture = false, stale = false } = {}) {
   };
 }
 
-async function loadLiveBundle() {
+/** Cold live-bundle wait cap — progressive shell/mid-tiers must not sit empty for ~120s. */
+const LIVE_BUNDLE_WAIT_MS = 2_500;
+
+function emptyLiveBundle(error) {
+  return normalizeBundle({
+    asOf: nowIso(),
+    fixture: false,
+    freshness: {
+      kalshi: { asOf: nowIso(), status: "error", ageMs: 0, error: error ? String(error) : "pending" },
+      polymarket: { asOf: nowIso(), status: "missing", ageMs: 0 },
+      nws: { asOf: nowIso(), status: "missing", ageMs: 0 },
+      news: { asOf: nowIso(), status: "idle", ageMs: 0 },
+    },
+    markets: [],
+    signals: [],
+    links: [],
+    activity: [],
+    featuredMarketId: null,
+  });
+}
+
+/**
+ * @param {{ wait?: boolean }} [opts]
+ * @returns {Promise<ReturnType<typeof normalizeBundle> | null>}
+ */
+async function loadLiveBundle(opts = {}) {
+  const wait = opts.wait !== false;
   const now = Date.now();
   if (liveMemo.bundle && now - liveMemo.at < SNAPSHOT_CACHE_TTL_MS) {
     return liveMemo.bundle;
@@ -224,19 +250,49 @@ async function loadLiveBundle() {
   // lookups and homepage polls don't stall the Next server for ~12s.
   const stale = liveMemo.bundle || lastGoodLive;
   if (stale) return stale;
-  return liveMemo.inflight;
+  // Progressive shell/mid-tiers: kick the fill but do not await a cold ~120s pull.
+  if (!wait) return null;
+  try {
+    return await withTimeout(liveMemo.inflight, LIVE_BUNDLE_WAIT_MS, "live-bundle");
+  } catch {
+    return null;
+  }
 }
 
 /**
- * @param {{ forceFixture?: boolean }} [opts]
+ * @param {{ forceFixture?: boolean; shell?: boolean; boostLimit?: number }} [opts]
  */
 export async function loadWarRoomBundle(opts = {}) {
   if (opts.forceFixture || isWarRoomFixtureForced()) {
     return normalizeBundle(buildFixtureBundle(), { fixture: true });
   }
 
+  // Shell + progressive mid boostLimit must paint in seconds, not wait on cold live sources.
+  const boostLimit = Number(opts.boostLimit);
+  const progressiveFast =
+    Boolean(opts.shell) ||
+    (Number.isFinite(boostLimit) && boostLimit > 0 && boostLimit < DESKTOP_POINT_CAP);
+
   try {
-    return await loadLiveBundle();
+    if (progressiveFast) {
+      const warm = await loadLiveBundle({ wait: false });
+      if (warm) return warm;
+      // Ensure a background fill is running for later tiers / polls.
+      void loadLiveBundle({ wait: true }).catch(() => {});
+      if (allowFixtureFallback()) {
+        return normalizeBundle(buildFixtureBundle(), { fixture: true, stale: true });
+      }
+      return emptyLiveBundle("pending");
+    }
+
+    const bundle = await loadLiveBundle({ wait: true });
+    if (bundle) return bundle;
+    // Cold wait timed out — fall through to fixture/empty while inflight continues.
+    if (lastGoodLive) return { ...lastGoodLive, stale: true };
+    if (allowFixtureFallback()) {
+      return normalizeBundle(buildFixtureBundle(), { fixture: true, stale: true });
+    }
+    return emptyLiveBundle("timeout");
   } catch (err) {
     if (lastGoodLive) {
       return {
@@ -253,22 +309,10 @@ export async function loadWarRoomBundle(opts = {}) {
     if (allowFixtureFallback()) {
       return normalizeBundle(buildFixtureBundle(), { fixture: true });
     }
-    return normalizeBundle({
-      asOf: nowIso(),
-      fixture: false,
-      freshness: {
-        kalshi: { asOf: nowIso(), status: "error", ageMs: 0, error: String(err?.message || err) },
-        polymarket: { asOf: nowIso(), status: "missing", ageMs: 0 },
-        nws: { asOf: nowIso(), status: "missing", ageMs: 0 },
-        news: { asOf: nowIso(), status: "idle", ageMs: 0 },
-      },
-      markets: [],
-      signals: [],
-      links: [],
-      featuredMarketId: null,
-    });
+    return emptyLiveBundle(err instanceof Error ? err.message : err);
   }
 }
+
 
 function marketDesk(market) {
   if (market?.category === "weather" || market?.desk === "weather") return "weather";
