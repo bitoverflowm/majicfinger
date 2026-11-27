@@ -27,6 +27,8 @@ import {
 } from "./WarRoomDetailCard";
 import { WarRoomLayersRail } from "./WarRoomLayersRail";
 import { WarRoomAgentStepsLoader, WarRoomRailSkeleton } from "./WarRoomLoadingProgress";
+import { WarRoomMobileDetailModal } from "./WarRoomMobileDetailModal";
+import { WarRoomMobileEmailInterrupt } from "./WarRoomMobileEmailInterrupt";
 import { relatedMarketsForHeadline } from "./relatedMarkets";
 import {
   WAR_ROOM_MARKET_PICK_EVENT,
@@ -205,9 +207,16 @@ export function WarRoomView({
   }
   /** Until the breakpoint is known, treat as desktop so we don't thrash mobile snapshot fetches. */
   const compact = (compactLockedRef.current ?? false) === true;
+  /**
+   * Homepage `#demo` on phones/tablets: live globe + pings only. Detail opens as a
+   * modal; feed/detail tab chrome stays off. Standalone `/war-room` compact is unchanged.
+   */
+  const mobileLanding = compact && embedded;
   const { dark, loadTone } = useWarRoomTheme();
   const [localMarket, setLocalMarket] = useState("");
   const [mobileView, setMobileView] = useState<"globe" | "feed" | "detail">("globe");
+  const [emailArmed, setEmailArmed] = useState(false);
+  const emailArmedRef = useRef(false);
   const [activityId, setActivityId] = useState<string | null>(null);
   const [focusTarget, setFocusTarget] = useState<FocusTarget>(null);
   const [detail, setDetail] = useState<WarRoomDetailTarget | null>(null);
@@ -266,6 +275,13 @@ export function WarRoomView({
     },
     [onMarketChange],
   );
+
+  /** First spin / ping on mobile landing arms the newsletter interrupt timer. */
+  const noteMobileInteraction = useCallback(() => {
+    if (!mobileLanding || emailArmedRef.current) return;
+    emailArmedRef.current = true;
+    setEmailArmed(true);
+  }, [mobileLanding]);
 
   const { snapshot, error, loading, transport } = useWarRoomData({
     desk: "all",
@@ -672,10 +688,11 @@ export function WarRoomView({
       setDetail({ kind: "market", market: row });
       setDetailOpen(true);
       setFeedRevealed(true);
-      if (compact) setMobileView("detail");
+      noteMobileInteraction();
+      if (compact && !mobileLanding) setMobileView("detail");
       return true;
     },
-    [compact, coordsForMarket, focusMarketPing, marketById, setMarket, stubPickRow],
+    [compact, coordsForMarket, focusMarketPing, marketById, mobileLanding, noteMobileInteraction, setMarket, stubPickRow],
   );
 
   // After camera/focus settles on a Jarvis pick: stream right rail + other pins (keep left panel).
@@ -844,7 +861,8 @@ export function WarRoomView({
         }
         setDetail({ kind: "news", activity: row, relatedMarkets: related });
         setDetailOpen(true);
-        if (compact) setMobileView("detail");
+        noteMobileInteraction();
+        if (compact && !mobileLanding) setMobileView("detail");
         return;
       }
 
@@ -859,9 +877,10 @@ export function WarRoomView({
         market: row.marketId ? marketById.get(row.marketId) || null : null,
       });
       setDetailOpen(true);
-      if (compact) setMobileView("detail");
+      noteMobileInteraction();
+      if (compact && !mobileLanding) setMobileView("detail");
     },
-    [compact, coordsForMarket, marketById, markets, setMarket],
+    [compact, coordsForMarket, marketById, markets, mobileLanding, noteMobileInteraction, setMarket],
   );
 
   const selectActivityRef = useRef(selectActivity);
@@ -939,9 +958,10 @@ export function WarRoomView({
       setMarket(row.id);
       setDetail({ kind: "market", market: row });
       setDetailOpen(true);
-      if (compact) setMobileView("detail");
+      noteMobileInteraction();
+      if (compact && !mobileLanding) setMobileView("detail");
     },
-    [compact, marketById, openMarketDetail, setMarket],
+    [compact, marketById, mobileLanding, noteMobileInteraction, openMarketDetail, setMarket],
   );
 
   const onSelectGlobe = useCallback(
@@ -1235,6 +1255,7 @@ export function WarRoomView({
       ) : null}
       <GlobeStage
         enhance={embedded ? "auto" : compact ? "never" : "always"}
+        allowCompact={embedded}
         features={features as WarRoomGlobeProps["features"]}
         pings={pings as WarRoomGlobeProps["pings"]}
         selectedMarketId={selectedId}
@@ -1330,7 +1351,7 @@ export function WarRoomView({
       activityFeed={activity}
       onOpenChange={(next) => {
         setDetailOpen(next);
-        if (!next && compact) setMobileView("globe");
+        if (!next && compact && !mobileLanding) setMobileView("globe");
       }}
       onNavigate={handleNavigate}
       onSelectRelatedMarket={onSelectRelatedMarket}
@@ -1338,9 +1359,16 @@ export function WarRoomView({
     />
   );
 
-  const showLeft = detailOpen;
+  const showLeft = mobileLanding ? false : detailOpen;
   // Select-only nav picks hide the “all tradable” right rail entirely.
-  const showRight = selectOnly ? false : compact ? mobileView === "feed" : feedRevealed;
+  // Mobile landing: globe only — no feed tab.
+  const showRight = mobileLanding
+    ? false
+    : selectOnly
+      ? false
+      : compact
+        ? mobileView === "feed"
+        : feedRevealed;
 
   return (
     <div
@@ -1372,59 +1400,85 @@ export function WarRoomView({
             {compact ? mobileTabs : null}
           </div>
         </header>
-      ) : compact ? (
+      ) : compact && !mobileLanding ? (
         <div className="absolute right-3 top-3 z-20">{mobileTabs}</div>
       ) : null}
 
       <div className={cn("relative flex min-h-0 flex-1", embedded && "overflow-hidden")}>
-        {/* Left: only when a selection needs the detail rail */}
-        <div
-          className={cn(
-            "min-h-0 overflow-hidden transition-[width,opacity,border-color] duration-300 ease-out",
-            compact
-              ? mobileView === "detail"
-                ? cn(
-                    "flex w-full flex-col border-r",
-                    dark ? "border-white/10" : "border-border/70",
-                  )
-                : "hidden w-0"
-              : showLeft
-                ? cn(
-                    "flex w-[min(100%,26rem)] shrink-0 flex-col border-r opacity-100",
-                    dark ? "border-white/10" : "border-border/70",
-                  )
-                : "w-0 border-r-0 opacity-0",
-          )}
-        >
-          {showLeft || (compact && mobileView === "detail") ? detailPane : null}
-        </div>
+        {/* Left: only when a selection needs the detail rail (desktop / standalone compact) */}
+        {mobileLanding ? null : (
+          <div
+            className={cn(
+              "min-h-0 overflow-hidden transition-[width,opacity,border-color] duration-300 ease-out",
+              compact
+                ? mobileView === "detail"
+                  ? cn(
+                      "flex w-full flex-col border-r",
+                      dark ? "border-white/10" : "border-border/70",
+                    )
+                  : "hidden w-0"
+                : showLeft
+                  ? cn(
+                      "flex w-[min(100%,26rem)] shrink-0 flex-col border-r opacity-100",
+                      dark ? "border-white/10" : "border-border/70",
+                    )
+                  : "w-0 border-r-0 opacity-0",
+            )}
+          >
+            {showLeft || (compact && mobileView === "detail") ? detailPane : null}
+          </div>
+        )}
 
         {/* Center: globe */}
         <div
           className={cn(
             "relative min-h-0",
-            compact ? (mobileView === "globe" ? "flex-1" : "hidden") : "min-w-0 flex-1",
+            mobileLanding
+              ? "min-w-0 flex-1"
+              : compact
+                ? mobileView === "globe"
+                  ? "flex-1"
+                  : "hidden"
+                : "min-w-0 flex-1",
           )}
+          onPointerDown={mobileLanding ? noteMobileInteraction : undefined}
         >
           {globe}
         </div>
 
         {/* Right: slides in once the War Room is in view */}
-        <div
-          className={cn(
-            "min-h-0 overflow-hidden transition-[width,transform,opacity] duration-500 ease-out",
-            compact
-              ? mobileView === "feed"
-                ? "flex w-full flex-col border-l border-white/10"
-                : "hidden w-0"
-              : showRight
-                ? "flex w-[min(100%,22rem)] shrink-0 translate-x-0 flex-col border-l border-white/10 opacity-100"
-                : "w-0 translate-x-8 border-l-0 opacity-0",
-          )}
-        >
-          {showRight || (compact && mobileView === "feed") ? feed : null}
-        </div>
+        {mobileLanding ? null : (
+          <div
+            className={cn(
+              "min-h-0 overflow-hidden transition-[width,transform,opacity] duration-500 ease-out",
+              compact
+                ? mobileView === "feed"
+                  ? "flex w-full flex-col border-l border-white/10"
+                  : "hidden w-0"
+                : showRight
+                  ? "flex w-[min(100%,22rem)] shrink-0 translate-x-0 flex-col border-l border-white/10 opacity-100"
+                  : "w-0 translate-x-8 border-l-0 opacity-0",
+            )}
+          >
+            {showRight || (compact && mobileView === "feed") ? feed : null}
+          </div>
+        )}
       </div>
+
+      {mobileLanding ? (
+        <>
+          <WarRoomMobileDetailModal
+            open={detailOpen}
+            target={liveDetail}
+            activityFeed={activity}
+            onOpenChange={setDetailOpen}
+            onNavigate={handleNavigate}
+            onSelectRelatedMarket={onSelectRelatedMarket}
+            onSelectActivity={selectActivity}
+          />
+          <WarRoomMobileEmailInterrupt armed={emailArmed} />
+        </>
+      ) : null}
     </div>
   );
 }
