@@ -10,16 +10,18 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 import { formatAge, formatCents } from "./format";
+import {
+  annotateTradeIntents,
+  intentLabel,
+  mapKalshiTradeRow,
+  mapLivePolymarketTrade,
+  mapPolymarketTradeRow,
+  unwrapPolymarketTradeRows,
+  type TradeRow,
+} from "./tradesFeedModel";
 import { useWarRoomTheme } from "./useWarRoomTheme";
 
 type LivePoint = { time: number; value: number };
-type TradeRow = {
-  id: string;
-  price: number;
-  size?: number | null;
-  side?: string | null;
-  at: number;
-};
 
 /** Seed enough history that “All” can show the full line we fetched. */
 const FULL_HISTORY_SECS = 90 * 24 * 3600;
@@ -164,22 +166,10 @@ async function fetchKalshiRecentTrades(ticker: string, signal: AbortSignal): Pro
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return [];
   const rows = Array.isArray(body?.trades) ? body.trades : [];
-  return rows
-    .map((row: Record<string, unknown>, index: number) => {
-      const price = asProb(row.yes_price_dollars ?? row.yes_price);
-      const at = Date.parse(String(row.created_time || "")) || Date.now() - index * 1000;
-      const id = String(row.trade_id || row.id || `${ticker}-${at}`);
-      if (price == null) return null;
-      return {
-        id,
-        price,
-        size: Number(row.count ?? row.count_fp) || null,
-        side: String(row.taker_side || "") || null,
-        at,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.at - a.at) as TradeRow[];
+  const mapped = rows
+    .map((row: Record<string, unknown>, index: number) => mapKalshiTradeRow(row, index, ticker))
+    .filter(Boolean) as TradeRow[];
+  return annotateTradeIntents(mapped.sort((a, b) => b.at - a.at));
 }
 
 async function fetchPolymarketRecentTrades(
@@ -201,35 +191,11 @@ async function fetchPolymarketRecentTrades(
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) return [];
-  const rows = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.trades)
-      ? payload.trades
-      : [];
-  return rows
-    .map((row: Record<string, unknown>, index: number) => {
-      if (!row || typeof row !== "object") return null;
-      const asset = String(row.asset || row.asset_id || "").trim();
-      if (asset && tokenId && asset !== tokenId) return null;
-      const price = asProb(row.price);
-      if (price == null) return null;
-      const rawTs = Number(row.timestamp ?? row.createdAt ?? row.match_time);
-      const at = Number.isFinite(rawTs)
-        ? rawTs < 1e12
-          ? rawTs * 1000
-          : rawTs
-        : Date.now() - index * 1000;
-      const id = String(row.transactionHash || row.id || `${conditionId}-${at}-${price}`);
-      return {
-        id,
-        price,
-        size: Number(row.size) || null,
-        side: String(row.side || row.type || "") || null,
-        at,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.at - a.at) as TradeRow[];
+  const rows = unwrapPolymarketTradeRows(payload);
+  const mapped = rows
+    .map((row, index) => mapPolymarketTradeRow(row, index, conditionId, tokenId))
+    .filter(Boolean) as TradeRow[];
+  return annotateTradeIntents(mapped.sort((a, b) => b.at - a.at));
 }
 
 function mergeSeedWithTrades(seed: LivePoint[], trades: TradeRow[]): LivePoint[] {
@@ -246,7 +212,7 @@ function mergeSeedWithTrades(seed: LivePoint[], trades: TradeRow[]): LivePoint[]
 
 function prependLiveTrade(prev: TradeRow[], next: TradeRow): TradeRow[] {
   if (prev.some((row) => row.id === next.id)) return prev;
-  return [next, ...prev].slice(0, 80);
+  return annotateTradeIntents([next, ...prev].slice(0, 80));
 }
 
 function TradesFeed({
@@ -262,47 +228,112 @@ function TradesFeed({
   if (!trades.length) {
     return (
       <p className={cn("py-2 text-[11px]", dark ? "text-slate-500" : "text-muted-foreground")}>
-        {loading ? "Loading trade history…" : "No trades yet — waiting for the next print…"}
+        {loading ? "Loading trade history…" : "No trades yet — waiting for the next fill…"}
       </p>
     );
   }
   return (
     <ul className={cn("overflow-y-auto", tall ? "max-h-[14rem]" : "max-h-[7rem]")}>
       {trades.slice(0, 40).map((trade) => {
-        const side = String(trade.side || "").toUpperCase();
-        const buy = side.includes("BUY");
-        const sell = side.includes("SELL");
+        const buy = trade.action === "buy";
+        const sell = trade.action === "sell";
+        const outcome =
+          trade.outcome === "yes" ? "YES" : trade.outcome === "no" ? "NO" : null;
+        const intent = intentLabel(trade.intent);
+        const who = trade.traderLabel || null;
         return (
           <li
             key={trade.id}
             className={cn(
-              "flex items-center gap-2 border-b py-1.5 text-[11px] last:border-b-0",
+              "border-b py-1.5 text-[11px] last:border-b-0",
               dark ? "border-white/[0.04]" : "border-border/60",
             )}
           >
-            <span
-              className={cn(
-                "w-9 shrink-0 font-semibold uppercase",
-                buy && (dark ? "text-emerald-300" : "text-emerald-600"),
-                sell && (dark ? "text-rose-300" : "text-rose-600"),
-                !buy && !sell && (dark ? "text-slate-500" : "text-muted-foreground"),
-              )}
-            >
-              {buy ? "Buy" : sell ? "Sell" : "Print"}
-            </span>
-            <span
-              className={cn(
-                "font-mono tabular-nums",
-                dark ? "text-slate-100" : "text-foreground",
-              )}
-            >
-              {formatCents(trade.price)}
-            </span>
-            <span className={cn("ml-auto", dark ? "text-slate-500" : "text-muted-foreground")}>
-              {trade.size != null ? Math.round(trade.size) : "—"}
-              <span className={cn("mx-1", dark ? "text-slate-600" : "text-muted-foreground/70")}>·</span>
-              {formatAge(new Date(trade.at).toISOString())}
-            </span>
+            <div className="flex min-w-0 items-center gap-1.5">
+              {buy || sell ? (
+                <span
+                  className={cn(
+                    "w-8 shrink-0 font-semibold",
+                    buy && (dark ? "text-emerald-300" : "text-emerald-600"),
+                    sell && (dark ? "text-rose-300" : "text-rose-600"),
+                  )}
+                >
+                  {buy ? "Buy" : "Sell"}
+                </span>
+              ) : null}
+              {outcome ? (
+                <span
+                  className={cn(
+                    "shrink-0 font-semibold tracking-wide",
+                    trade.outcome === "yes"
+                      ? dark
+                        ? "text-sky-300"
+                        : "text-sky-700"
+                      : dark
+                        ? "text-amber-300"
+                        : "text-amber-700",
+                  )}
+                >
+                  {outcome}
+                </span>
+              ) : null}
+              <span
+                className={cn(
+                  "font-mono tabular-nums",
+                  dark ? "text-slate-100" : "text-foreground",
+                )}
+              >
+                {formatCents(trade.fillPrice ?? trade.price)}
+              </span>
+              {trade.big ? (
+                <span
+                  className={cn(
+                    "shrink-0 rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide",
+                    dark
+                      ? "bg-amber-400/15 text-amber-200"
+                      : "bg-amber-100 text-amber-800",
+                  )}
+                  title={
+                    trade.blockTrade
+                      ? "Kalshi block trade"
+                      : "Notional ≥ $2,500"
+                  }
+                >
+                  {trade.blockTrade ? "Block" : "BIG"}
+                </span>
+              ) : null}
+              <span
+                className={cn(
+                  "ml-auto shrink-0 tabular-nums",
+                  dark ? "text-slate-500" : "text-muted-foreground",
+                )}
+              >
+                {trade.size != null ? Math.round(trade.size) : "—"}
+                <span className={cn("mx-1", dark ? "text-slate-600" : "text-muted-foreground/70")}>
+                  ·
+                </span>
+                {formatAge(new Date(trade.at).toISOString())}
+              </span>
+            </div>
+            {who || intent ? (
+              <div
+                className={cn(
+                  "mt-0.5 flex min-w-0 items-center gap-1.5 truncate pl-0 text-[10px]",
+                  buy || sell ? "pl-8" : "",
+                  dark ? "text-slate-500" : "text-muted-foreground",
+                )}
+              >
+                {who ? (
+                  <span className="truncate font-medium" title={trade.traderId || who}>
+                    {who}
+                  </span>
+                ) : null}
+                {who && intent ? (
+                  <span className={dark ? "text-slate-600" : "text-muted-foreground/70"}>·</span>
+                ) : null}
+                {intent ? <span className="shrink-0 italic">{intent}</span> : null}
+              </div>
+            ) : null}
           </li>
         );
       })}
@@ -530,13 +561,18 @@ export function WarRoomMarketChart({
               setPoints(capped);
               setLivePrice(price);
               setTrades((prev) =>
-                prependLiveTrade(prev, {
-                  id: `${trade.asset_id || tokenId}-${at}-${price}`,
-                  price,
-                  size: Number(trade.size) || null,
-                  side: trade.side || null,
-                  at: at > 1e12 ? at : at * 1000,
-                }),
+                prependLiveTrade(
+                  prev,
+                  mapLivePolymarketTrade({
+                    id: `${trade.asset_id || tokenId}-${at}-${price}`,
+                    price,
+                    size: Number(trade.size) || null,
+                    side: trade.side || null,
+                    at: at > 1e12 ? at : at * 1000,
+                    // Chart socket is subscribed to the YES token only.
+                    outcome: "yes",
+                  }),
+                ),
               );
             },
             onQuote: (quote: { mid?: number; price?: number }) => {
